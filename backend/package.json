@@ -23,12 +23,12 @@
     "zod": "^3.24.1"
   },
   "devDependencies": {
-    "@types/cors": "^2.8.17",
-    "@types/express": "^5.0.0",
-    "@types/multer": "^1.4.12",
-    "@types/node": "^22.10.7",
-    "@types/pdf-parse": "^1.1.4",
-    "@types/sql.js": "^1.4.9",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "@types/multer": "^1.4.13",
+    "@types/node": "^22.20.5",
+    "@types/pdf-parse": "^1.1.5",
+    "@types/sql.js": "^1.4.11",
     "tsx": "^4.19.2",
     "typescript": "^5.7.3"
   }
