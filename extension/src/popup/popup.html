@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>JobPilot AI Assistant</title>
+  <style>
+    body {
+      width: 340px;
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+      background: #0f172a;
+      color: #f8fafc;
+      padding: 16px;
+      box-sizing: border-box;
+    }
+    .header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid #334155;
+      padding-bottom: 12px;
+      margin-bottom: 14px;
+    }
+    .logo-badge {
+      background: linear-gradient(135deg, #4f46e5, #818cf8);
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 14px;
+    }
+    .title {
+      font-size: 15px;
+      font-weight: 700;
+    }
+    .subtitle {
+      font-size: 11px;
+      color: #94a3b8;
+    }
+    .preview-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 14px;
+      font-size: 12px;
+    }
+    .field-label {
+      color: #94a3b8;
+      font-size: 10px;
+      text-transform: uppercase;
+      font-weight: 700;
+      display: block;
+      margin-bottom: 2px;
+    }
+    .field-value {
+      font-weight: 600;
+      color: #f8fafc;
+      margin-bottom: 8px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    button {
+      width: 100%;
+      padding: 10px 14px;
+      border-radius: 6px;
+      border: none;
+      font-weight: 600;
+      font-size: 13px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      transition: all 0.2s;
+    }
+    .btn-primary {
+      background: #4f46e5;
+      color: #fff;
+    }
+    .btn-primary:hover {
+      background: #4338ca;
+    }
+    .status-msg {
+      margin-top: 10px;
+      font-size: 11px;
+      text-align: center;
+      color: #10b981;
+    }
+    .error-msg {
+      margin-top: 10px;
+      font-size: 11px;
+      text-align: center;
+      color: #f87171;
+    }
+  </style>
+</head>
+<body>
+  <div class="header">
+    <div class="logo-badge">JP</div>
+    <div>
+      <div class="title">JobPilot AI Assistant</div>
+      <div class="subtitle">Analyze Live Opportunity</div>
+    </div>
+  </div>
+
+  <div class="preview-card" id="preview-box">
+    <span class="field-label">Current Page</span>
+    <div class="field-value" id="page-title">Inspecting tab...</div>
+    <span class="field-label">Detected URL</span>
+    <div class="field-value" id="page-url">...</div>
+  </div>
+
+  <button class="btn-primary" id="btn-analyze">
+    Analyze with JobPilot
+  </button>
+
+  <div id="status-display"></div>
+
+  <script type="module" src="popup.ts"></script>
+</body>
+</html>

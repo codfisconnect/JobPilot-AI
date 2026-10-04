@@ -1,0 +1,302 @@
+.resume-studio-page {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.studio-title {
+  font-size: 1.5rem;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.studio-sub {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.empty-studio-box {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 60px 20px;
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.empty-icon {
+  color: #818cf8;
+}
+
+.studio-layout {
+  display: grid;
+  grid-template-columns: 320px 1fr;
+  gap: 24px;
+}
+
+.studio-versions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.versions-header-title {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 4px;
+}
+
+.version-card {
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.version-card-active {
+  border-color: var(--accent-primary);
+  background: rgba(79, 70, 229, 0.08);
+}
+
+.version-card-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.version-name-tag {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 700;
+  color: #818cf8;
+}
+
+.version-role {
+  font-size: 0.9375rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.version-company {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+.version-date {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  margin-top: 4px;
+}
+
+.studio-preview-pane {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+}
+
+.diff-card {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.diff-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.diff-items-container {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.diff-item {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.diff-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.diff-section-name {
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.diff-reason-tag {
+  font-size: 0.75rem;
+  color: #38bdf8;
+  background: rgba(14, 165, 233, 0.1);
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+}
+
+.diff-split-view {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.diff-side {
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+}
+
+.diff-lbl {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  display: block;
+  margin-bottom: 6px;
+}
+
+.diff-original {
+  background: rgba(239, 68, 68, 0.06);
+  border-left: 3px solid #ef4444;
+  color: var(--text-secondary);
+}
+
+.diff-tailored {
+  background: rgba(16, 185, 129, 0.06);
+  border-left: 3px solid #10b981;
+  color: var(--text-primary);
+}
+
+/* Resume Paper Simulation */
+.resume-sheet {
+  padding: 0;
+  overflow: hidden;
+}
+
+.sheet-top-bar {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 12px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.sheet-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.resume-paper {
+  background: #ffffff;
+  color: #1e293b;
+  padding: 40px 48px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.05);
+}
+
+.resume-paper-header {
+  border-bottom: 2px solid #0f172a;
+  padding-bottom: 12px;
+}
+
+.paper-name {
+  font-size: 1.625rem;
+  font-weight: 800;
+  color: #0f172a;
+}
+
+.paper-contact {
+  font-size: 0.8125rem;
+  color: #475569;
+  margin-top: 4px;
+}
+
+.paper-section {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.paper-section-title {
+  font-size: 0.875rem;
+  font-weight: 800;
+  color: #0f172a;
+  border-bottom: 1px solid #cbd5e1;
+  padding-bottom: 3px;
+  letter-spacing: 0.05em;
+}
+
+.paper-summary-text {
+  font-size: 0.8125rem;
+  color: #334155;
+  line-height: 1.5;
+}
+
+.paper-skills-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.paper-skill-chip {
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  color: #0f172a;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+
+.paper-exp-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.paper-exp-header {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+
+.paper-exp-dates {
+  font-size: 0.75rem;
+  color: #64748b;
+  font-weight: 500;
+}
+
+.paper-exp-comp {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: #2563eb;
+}
+
+.paper-exp-bullets {
+  padding-left: 18px;
+  font-size: 0.8125rem;
+  color: #334155;
+  line-height: 1.4;
+  margin-top: 4px;
+}
