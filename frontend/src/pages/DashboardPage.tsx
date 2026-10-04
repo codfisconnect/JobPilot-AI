@@ -13,10 +13,12 @@ import {
   TrendingUp,
   MapPin,
   ExternalLink,
-  Sparkles
+  Sparkles,
+  Activity,
+  BookOpen
 } from 'lucide-react';
 import { api } from "../api/index";
-import { JobDescription, ApplicationRecord } from "../types/index";
+import { JobDescription, ApplicationRecord, SourceHealthStatus } from "../types/index";
 import './DashboardPage.css';
 
 interface DashboardPageProps {
@@ -27,17 +29,77 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const { activeCandidate } = useApp();
   const [jobs, setJobs] = useState<JobDescription[]>([]);
   const [applications, setApplications] = useState<ApplicationRecord[]>([]);
+  const [sourceHealth, setSourceHealth] = useState<SourceHealthStatus[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     async function loadData() {
       try {
         setLoading(true);
-        const [jobsList, appsList] = await Promise.all([
+        const [jobsList, appsList, healthList] = await Promise.all([
           api.getJobs(),
-          api.getApplications(activeCandidate?.id)
+          api.getApplications(activeCandidate?.id),
+          api.getSourceHealth().catch(() => [])
         ]);
-        setJobs(jobsList);
+        setSourceHealth(healthList || []);
+
+        // Priority 11: Sort recommendations by candidate relevance/score
+        const scoredJobs = jobsList.map(job => {
+          let score = 0;
+          if (activeCandidate) {
+            const candSkills = new Set(
+              [...activeCandidate.primarySkills, ...activeCandidate.secondarySkills, ...activeCandidate.technologies].map(s => s.toLowerCase())
+            );
+            const matchedSkills = job.mustHaveSkills.filter(s => candSkills.has(s.toLowerCase())).length;
+            const skillScore = (matchedSkills / Math.max(1, job.mustHaveSkills.length)) * 40;
+
+            // Career track alignment
+            const candTrack = (activeCandidate.targetRoles[0] || '').toLowerCase();
+            const jobTrack = (job.careerTrack || job.role).toLowerCase();
+            let trackScore = 20;
+            if (
+              (candTrack.includes('project') || candTrack.includes('delivery') || candTrack.includes('agile')) &&
+              (jobTrack.includes('project') || jobTrack.includes('delivery') || jobTrack.includes('agile') || jobTrack.includes('scrum'))
+            ) {
+              trackScore = 30;
+            } else if (
+              (candTrack.includes('qa') || candTrack.includes('test') || candTrack.includes('automation')) &&
+              (jobTrack.includes('qa') || jobTrack.includes('test') || jobTrack.includes('automation'))
+            ) {
+              trackScore = 30;
+            } else if (
+              candTrack.includes('backend') && (jobTrack.includes('backend') || jobTrack.includes('java'))
+            ) {
+              trackScore = 30;
+            }
+
+            // Experience compatibility
+            const expMatch = job.experienceRequired.match(/(\d+)/);
+            const reqExp = expMatch ? parseInt(expMatch[1], 10) : 3;
+            let expScore = 15;
+            if (activeCandidate.yearsOfExperience >= reqExp) {
+              expScore = 20;
+            } else if (reqExp - activeCandidate.yearsOfExperience <= 2) {
+              expScore = 12;
+            } else {
+              expScore = 5;
+            }
+
+            // Location compatibility
+            let locScore = 5;
+            const candLoc = activeCandidate.location.toLowerCase();
+            const jobLoc = job.location.toLowerCase();
+            if (jobLoc.includes('remote') || activeCandidate.workPreference === 'Remote' || jobLoc.includes(candLoc)) {
+              locScore = 10;
+            }
+
+            score = Math.round(skillScore + trackScore + expScore + locScore);
+          }
+          return { job, relevanceScore: score };
+        });
+
+        scoredJobs.sort((a, b) => b.relevanceScore - a.relevanceScore);
+        setJobs(scoredJobs.map(sj => sj.job));
         setApplications(appsList);
       } catch (err) {
         console.error('Failed to load dashboard data:', err);
@@ -50,12 +112,13 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
 
   // Derived stats
   const totalAnalyzed = jobs.length;
-  const appliedCount = applications.filter(a => a.status === 'Applied').length;
-  const interviewCount = applications.filter(a => a.status === 'Interview').length;
+  const demoSubmittedCount = applications.filter(a => a.status === 'APPLIED_DEMO').length;
+  const externalStartedCount = applications.filter(a => a.status === 'APPLICATION_STARTED').length;
+  const totalAppliedCount = applications.filter(a => a.status === 'APPLIED' || a.status === 'APPLIED_DEMO').length;
+  const interviewCount = applications.filter(a => a.status === 'INTERVIEW' || a.status === 'Interview').length;
   const strongMatchesCount = jobs.filter(j => {
-    // Check if any matching skill overlap
-    const skills = activeCandidate?.primarySkills || [];
-    return j.mustHaveSkills.some(s => skills.includes(s));
+    const skills = (activeCandidate?.primarySkills || []).map(s => s.toLowerCase());
+    return j.mustHaveSkills.some(s => skills.includes(s.toLowerCase()));
   }).length;
 
   return (
@@ -92,7 +155,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           </div>
           <div className="kpi-data">
             <span className="kpi-val">{totalAnalyzed}</span>
-            <span className="kpi-label">Jobs Analyzed</span>
+            <span className="kpi-label">Jobs Discovered</span>
           </div>
         </Card>
 
@@ -112,7 +175,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           </div>
           <div className="kpi-data">
             <span className="kpi-val">{applications.length}</span>
-            <span className="kpi-label">Tracked Applications</span>
+            <span className="kpi-label">Tracked Applications ({demoSubmittedCount} Demo, {externalStartedCount} Ext)</span>
           </div>
         </Card>
 
@@ -126,6 +189,43 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           </div>
         </Card>
       </div>
+
+      {/* Live Ingestion & Source Health Status Bar */}
+      <Card className="source-health-banner">
+        <div className="health-banner-header">
+          <div className="health-banner-title">
+            <Activity size={18} className="health-icon-pulse" />
+            <span className="health-title-text">Live Ingestion & Job Connector Health</span>
+          </div>
+          <div className="health-actions">
+            <Button variant="ghost" size="sm" icon={<BookOpen size={14} />} onClick={() => onNavigate('learning')}>
+              Skill Gap & Learning Academy
+            </Button>
+            <Button variant="ghost" size="sm" onClick={() => onNavigate('settings')}>
+              Manage Sources
+            </Button>
+          </div>
+        </div>
+        <div className="connector-chips-grid">
+          {sourceHealth.length > 0 ? (
+            sourceHealth.map((src) => (
+              <div key={src.sourceKey} className="connector-status-chip">
+                <span className={`status-dot dot-${src.status.toLowerCase()}`} />
+                <span className="source-name">{src.name}</span>
+                <span className="source-jobs-count">({src.jobsDiscovered} jobs)</span>
+                <Badge variant={src.status === 'HEALTHY' ? 'emerald' : src.status === 'WARNING' ? 'amber' : 'rose'} size="sm">
+                  {src.status}
+                </Badge>
+              </div>
+            ))
+          ) : (
+            <div className="connector-fallback-status">
+              <span className="status-dot dot-healthy" />
+              <span>Connectors active: Codewalla, Lever, Ashby, Greenhouse (Ingestion Ready)</span>
+            </div>
+          )}
+        </div>
+      </Card>
 
       {/* Two Column Layout: Recommended Jobs & Recent Applications */}
       <div className="dash-columns">

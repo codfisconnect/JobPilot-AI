@@ -140,6 +140,34 @@ export const SettingsPage: React.FC = () => {
             </div>
           </div>
         </Card>
+
+        {/* Founder / Admin Applications Audit Console */}
+        <Card className="settings-card" style={{ gridColumn: 'span 2', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+          <div className="card-top-icon">
+            <Cpu size={20} className="icon-indigo" />
+            <h3 className="section-title">Founder & Admin Console — Applications Audit</h3>
+          </div>
+          <p className="settings-desc">
+            System-level audit verifying that Codewalla and Demo applications remain local simulated records with zero unauthorized external transmission.
+          </p>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginTop: '12px' }}>
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <div style={{ fontSize: '0.74rem', color: '#94a3b8', textTransform: 'uppercase' }}>Codewalla Safeguard</div>
+              <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#fbbf24', marginTop: '4px' }}>MANDATORY DEMO ONLY</div>
+              <p style={{ margin: '4px 0 0', fontSize: '0.74rem', color: '#94a3b8' }}>Zero external calls permitted to codewalla.com</p>
+            </div>
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <div style={{ fontSize: '0.74rem', color: '#94a3b8', textTransform: 'uppercase' }}>External Mode Safeguard</div>
+              <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#34d399', marginTop: '4px' }}>APPLICATION_STARTED</div>
+              <p style={{ margin: '4px 0 0', fontSize: '0.74rem', color: '#94a3b8' }}>Requires candidate confirmation before marking applied</p>
+            </div>
+            <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+              <div style={{ fontSize: '0.74rem', color: '#94a3b8', textTransform: 'uppercase' }}>Resume Immutability</div>
+              <div style={{ fontSize: '0.92rem', fontWeight: 700, color: '#818cf8', marginTop: '4px' }}>VERSION SNAPSHOTS</div>
+              <p style={{ margin: '4px 0 0', fontSize: '0.74rem', color: '#94a3b8' }}>Exact submitted resume retained historically</p>
+            </div>
+          </div>
+        </Card>
       </div>
     </div>
   );

@@ -1,0 +1,72 @@
+.app-mode-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-radius: 6px;
+  white-space: nowrap;
+  user-select: none;
+  transition: all 0.2s ease;
+}
+
+.app-mode-badge.size-sm {
+  font-size: 0.68rem;
+  padding: 2px 7px;
+}
+
+.app-mode-badge.size-md {
+  font-size: 0.75rem;
+  padding: 4px 10px;
+}
+
+.app-mode-badge.size-lg {
+  font-size: 0.85rem;
+  padding: 6px 14px;
+}
+
+/* Demo Styling: Professional Amber / Indigo Accent */
+.app-mode-demo {
+  background: rgba(245, 158, 11, 0.12);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.08);
+}
+
+.app-mode-demo .dot-demo {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 6px #f59e0b;
+  animation: pulse-demo 2s infinite ease-in-out;
+}
+
+/* External Styling: Distinct Emerald / Cyan Accent */
+.app-mode-external {
+  background: rgba(16, 185, 129, 0.12);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  box-shadow: 0 0 10px rgba(16, 185, 129, 0.08);
+}
+
+.app-mode-external .dot-external {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 6px #10b981;
+}
+
+@keyframes pulse-demo {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(0.85);
+  }
+}

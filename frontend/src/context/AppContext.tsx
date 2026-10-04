@@ -27,16 +27,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }, 4000);
   };
 
+  const setActiveAndPersistCandidate = (candidate: CandidateProfile) => {
+    setActiveCandidate(candidate);
+    try {
+      localStorage.setItem('jobpilot_active_candidate_id', candidate.id);
+    } catch (e) {
+      console.warn('Failed to save active candidate to localStorage', e);
+    }
+  };
+
   const refreshCandidates = async () => {
     try {
       setIsLoading(true);
       const list = await api.getCandidates();
       setCandidates(list);
-      if (list.length > 0 && !activeCandidate) {
-        setActiveCandidate(list[0]);
-      } else if (activeCandidate) {
-        const updated = list.find(c => c.id === activeCandidate.id);
-        if (updated) setActiveCandidate(updated);
+
+      const savedCandidateId = localStorage.getItem('jobpilot_active_candidate_id');
+      if (savedCandidateId) {
+        const found = list.find(c => c.id === savedCandidateId);
+        if (found) {
+          setActiveCandidate(found);
+          return;
+        }
+      }
+
+      if (list.length > 0) {
+        if (!activeCandidate) {
+          setActiveCandidate(list[0]);
+          localStorage.setItem('jobpilot_active_candidate_id', list[0].id);
+        } else {
+          const updated = list.find(c => c.id === activeCandidate.id);
+          if (updated) {
+            setActiveCandidate(updated);
+          } else {
+            setActiveCandidate(list[0]);
+            localStorage.setItem('jobpilot_active_candidate_id', list[0].id);
+          }
+        }
       }
     } catch (err) {
       console.error('Failed to load candidates:', err);
@@ -54,7 +81,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       value={{
         activeCandidate,
         candidates,
-        setActiveCandidate,
+        setActiveCandidate: setActiveAndPersistCandidate,
         refreshCandidates,
         isLoading,
         toastMessage,

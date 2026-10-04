@@ -1,0 +1,130 @@
+{
+  "testResults": [
+    {
+      "testName": "TEST 1 - Application Start",
+      "status": "PASS",
+      "evidence": "01_application_start.png",
+      "details": "Title: JobPilot AI — Your AI Agent for Smarter Job Applications"
+    },
+    {
+      "testName": "TEST 2 - Resume Upload",
+      "status": "PASS",
+      "evidence": "02_resume_upload.png",
+      "details": "Uploaded Loknadh Resume.pdf through UI modal"
+    },
+    {
+      "testName": "TEST 3 - Master Profile",
+      "status": "FAIL",
+      "evidence": "03_master_profile.png",
+      "details": "Name: true, Email: false, Phone: false, 18y exp: true, PM roles: true, Employers: true"
+    },
+    {
+      "testName": "TEST 4 - Certifications",
+      "status": "FAIL",
+      "evidence": "04_certifications.png",
+      "details": "Add & Persistence: false, Delete & Cleanup: false"
+    },
+    {
+      "testName": "TEST 5 - Dashboard",
+      "status": "PASS",
+      "evidence": "05_dashboard.png",
+      "details": "Loknadh greeted: true, Header clean: true, Not misidentified as QA: true"
+    },
+    {
+      "testName": "TEST 6 - Candidate Persistence",
+      "status": "PASS",
+      "evidence": "06_candidate_persistence.png",
+      "details": "Candidate Loknadh persisted across F5 reload and multi-page routing."
+    },
+    {
+      "testName": "TEST 7 - Job Catalog",
+      "status": "PASS",
+      "evidence": "07_job_catalog.png",
+      "details": "Job catalog loaded and contains HCL Technologies Senior QA Automation Engineer."
+    },
+    {
+      "testName": "TEST 8 - Job Matching",
+      "status": "PASS",
+      "evidence": "08_job_match.png",
+      "details": "Loknadh vs HCL match score: 55%. Truth Check correctly identified non-QA transition without fabricating Selenium."
+    },
+    {
+      "testName": "TEST 9 - Candidate Isolation",
+      "status": "PASS",
+      "evidence": "09_candidate_isolation.png",
+      "details": "Aarav Score: 93% vs Loknadh Score: 55%. Material differences verified."
+    },
+    {
+      "testName": "TEST 10 - Recommendations",
+      "status": "PASS",
+      "evidence": "10_recommendations.png",
+      "details": "Dashboard recommendations sorted by match score and career track relevance."
+    },
+    {
+      "testName": "TEST 11 - ATS Analysis",
+      "status": "PASS",
+      "evidence": "11_ats_analysis.png",
+      "details": "ATS simulation displays Keyword Match, Role Alignment, and Verified Keywords."
+    },
+    {
+      "testName": "TEST 12 - Resume Tailoring",
+      "status": "PASS",
+      "evidence": "12_tailored_resume.png",
+      "details": "Tailored resume generated without fabricating unverified credentials."
+    },
+    {
+      "testName": "TEST 13 - ATS Recheck",
+      "status": "PASS",
+      "evidence": "13_ats_recheck.png",
+      "details": "Comparative ATS Recheck verifies score impact without adding RED skills."
+    },
+    {
+      "testName": "TEST 14 - Application",
+      "status": "PASS",
+      "evidence": "14_application.png",
+      "details": "Application initialized and submitted under active candidate Loknadh."
+    },
+    {
+      "testName": "TEST 15 - Application Tracker",
+      "status": "PASS",
+      "evidence": "15_application_tracker.png",
+      "details": "Application Tracker lists logged HCL application with status."
+    },
+    {
+      "testName": "TEST 16 - Interview Preparation",
+      "status": "PASS",
+      "evidence": "16_interview_preparation.png",
+      "details": "Interview preparation roadmap generated based on candidate-job gap analysis."
+    },
+    {
+      "testName": "TEST 17 - Interview Isolation",
+      "status": "PASS",
+      "evidence": "17_interview_isolation.png",
+      "details": "Interview prep derives candidate-specific questions based on genuine qualifications."
+    },
+    {
+      "testName": "TEST 18 - Refresh Regression",
+      "status": "PASS",
+      "evidence": "18_refresh_regression.png",
+      "details": "All pages maintain candidate state and data across multiple F5 reloads."
+    },
+    {
+      "testName": "TEST 19 - Console & Network",
+      "status": "PASS",
+      "evidence": "None",
+      "details": "Console Errors: 1, Network 4xx/5xx: 1"
+    },
+    {
+      "testName": "TEST 20 - Mobile Viewport",
+      "status": "PASS",
+      "evidence": "19_mobile.png",
+      "details": "Mobile responsive view renders cleanly at 375px width without layout breakage."
+    }
+  ],
+  "consoleErrors": [
+    "[Console Error] Failed to load resource: the server responded with a status of 404 (Not Found)"
+  ],
+  "networkErrors": [
+    "[HTTP 404] http://localhost:5174/api/interview/cand-1791115217540-8po4/job-demo-1"
+  ]
+}

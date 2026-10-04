@@ -144,6 +144,7 @@ export class MatchingEngine {
     let transitionGapExplanation = '';
 
     const normalize = (t: string) => {
+      if (/project\s*manager|delivery|program\s*manager|scrum\s*master|agile/i.test(t)) return 'Project & Delivery Management';
       if (/qa|automation|test|sdet/i.test(t)) return 'QA Automation';
       if (/backend|java|spring/i.test(t)) return 'Backend Engineering';
       if (/full\s*stack/i.test(t)) return 'Full Stack Development';
@@ -214,10 +215,11 @@ export class MatchingEngine {
     const roleScore = isSameTrack ? 96 : 58;
 
     // 4. Location Score
-    const candLoc = candidate.location.toLowerCase();
-    const jobLoc = job.location.toLowerCase();
+    const candLoc = (candidate.location || '').toLowerCase();
+    const jobLoc = (job.location || '').toLowerCase();
+    const prefLocs = candidate.preferredLocations || [];
     const isRemote = jobLoc.includes('remote') || candidate.workPreference === 'Remote';
-    const locMatch = isRemote || jobLoc.includes(candLoc) || candLoc.includes(jobLoc) || candidate.preferredLocations.some(l => jobLoc.includes(l.toLowerCase()));
+    const locMatch = isRemote || (candLoc && (jobLoc.includes(candLoc) || candLoc.includes(jobLoc))) || prefLocs.some(l => jobLoc.includes(l.toLowerCase()));
     const locationScore = locMatch ? 98 : 72;
 
     // 5. Seniority Score

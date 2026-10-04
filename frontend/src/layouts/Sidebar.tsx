@@ -8,7 +8,8 @@ import {
   Headphones,
   Settings,
   Sparkles,
-  Users
+  Users,
+  GraduationCap
 } from 'lucide-react';
 import './Sidebar.css';
 
@@ -27,6 +28,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
     { id: 'resumes', label: 'Resume Studio', icon: FileText },
     { id: 'applications', label: 'Applications', icon: Send },
     { id: 'interview', label: 'Interview Prep', icon: Headphones },
+    { id: 'learning', label: 'Learning Academy', icon: GraduationCap },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 

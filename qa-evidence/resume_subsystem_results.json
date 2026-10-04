@@ -1,0 +1,86 @@
+[
+  {
+    "testId": "TEST 1",
+    "testName": "Master Profile Render",
+    "status": "PASS",
+    "evidence": "resume_01_master_profile.png",
+    "details": "Master Profile displays candidate with clear separation of identity, headline, and contacts."
+  },
+  {
+    "testId": "TEST 2",
+    "testName": "Strict Contact Separation",
+    "status": "PASS",
+    "evidence": "resume_01_master_profile.png",
+    "details": "Name is cleanly isolated. No email, phone, or location leakage inside candidate name field."
+  },
+  {
+    "testId": "TEST 3",
+    "testName": "Skill Categorization & Deduplication",
+    "status": "PASS",
+    "evidence": "resume_01_master_profile.png",
+    "details": "Skills cleanly partitioned into structured categories (Automation Testing, CI/CD, etc.) with normalized labels and zero duplication."
+  },
+  {
+    "testId": "TEST 4",
+    "testName": "Job Selection",
+    "status": "PASS",
+    "evidence": "resume_02_jobs_catalog.png",
+    "details": "Loaded 15 normalized jobs. QA Automation positions accessible for targeted generation."
+  },
+  {
+    "testId": "TEST 5",
+    "testName": "JD Intelligence & Match Analysis",
+    "status": "PASS",
+    "evidence": "resume_03_match_analysis.png",
+    "details": "Match intelligence computes match breakdown, skill gaps, and ATS readiness."
+  },
+  {
+    "testId": "TEST 6",
+    "testName": "Resume Studio Pre-Export Validation",
+    "status": "PASS",
+    "evidence": "resume_04_resume_studio.png",
+    "details": "10-Point Pre-Export checklist verifies candidate identity, contacts, overlap, truth check, ATS, and zero target company leakage."
+  },
+  {
+    "testId": "TEST 7",
+    "testName": "Target Company Leak Prevention",
+    "status": "PASS",
+    "evidence": "resume_04_resume_studio.png",
+    "details": "Resume Professional Summary is completely generic. No \"tailored for\" or target prospective employer leakage."
+  },
+  {
+    "testId": "TEST 8",
+    "testName": "Generation Modes",
+    "status": "PASS",
+    "evidence": "resume_04_resume_studio.png",
+    "details": "Multi-mode generation available: Targeted (ATS-tailored), Focused (Domain-specific), Full (Master History)."
+  },
+  {
+    "testId": "TEST 9",
+    "testName": "Resume Versioning",
+    "status": "PASS",
+    "evidence": "resume_04_resume_studio.png",
+    "details": "Resume versions persisted and browsable with timestamps, modes, and ATS scores."
+  },
+  {
+    "testId": "TEST 10",
+    "testName": "Document Export & Print View",
+    "status": "PASS",
+    "evidence": "resume_04_resume_studio.png",
+    "details": "Clean export & PDF print view integrated. Clean text copyable and structured for ATS."
+  },
+  {
+    "testId": "TEST 11",
+    "testName": "Application Linkage",
+    "status": "PASS",
+    "evidence": "resume_05_applications_tracking.png",
+    "details": "Applications tracker preserves record of applied jobs, status, and tailored resumes."
+  },
+  {
+    "testId": "TEST 12",
+    "testName": "Responsive Viewports (390px & 768px)",
+    "status": "PASS",
+    "evidence": "resume_06_profile_mobile_390.png, resume_07_resume_mobile_390.png, resume_08_resume_tablet_768.png",
+    "details": "Profile and Resume Studio adapt cleanly with flex-wrap and responsive typography."
+  }
+]

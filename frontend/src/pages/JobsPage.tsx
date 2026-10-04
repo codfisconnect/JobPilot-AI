@@ -18,6 +18,7 @@ import {
   Sparkles,
   AlertCircle
 } from 'lucide-react';
+import { ApplicationModeBadge } from "../components/common/ApplicationModeBadge";
 import './JobsPage.css';
 
 interface JobsPageProps {
@@ -33,6 +34,8 @@ export const JobsPage: React.FC<JobsPageProps> = ({
   const [jobs, setJobs] = useState<JobDescription[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterTrack, setFilterTrack] = useState('All');
+  const [filterSource, setFilterSource] = useState<'All' | 'Predefined' | 'Codewalla'>('All');
+  const [isSyncing, setIsSyncing] = useState(false);
 
   // Input Modal state
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
@@ -48,6 +51,18 @@ export const JobsPage: React.FC<JobsPageProps> = ({
       setJobs(list);
     } catch (err) {
       console.error(err);
+    }
+  };
+
+  const handleSyncCodewalla = async () => {
+    try {
+      setIsSyncing(true);
+      await api.syncJobSource('codewalla');
+      await fetchJobs();
+    } catch (err) {
+      console.error('Failed to sync Codewalla jobs:', err);
+    } finally {
+      setIsSyncing(false);
     }
   };
 
@@ -114,10 +129,18 @@ export const JobsPage: React.FC<JobsPageProps> = ({
     const matchesTrack =
       filterTrack === 'All' || j.careerTrack.toLowerCase().includes(filterTrack.toLowerCase());
 
-    return matchesSearch && matchesTrack;
+    const matchesSource =
+      filterSource === 'All'
+        ? true
+        : filterSource === 'Codewalla'
+        ? j.source === 'Codewalla' || j.isExternal === true
+        : !j.isExternal && j.source !== 'Codewalla';
+
+    return matchesSearch && matchesTrack && matchesSource;
   });
 
   const tracks = ['All', 'QA Automation', 'Java Backend', 'Full Stack', 'Data Analytics', 'DevOps'];
+  const sources: ('All' | 'Predefined' | 'Codewalla')[] = ['All', 'Predefined', 'Codewalla'];
 
   return (
     <div className="jobs-page">
@@ -126,17 +149,28 @@ export const JobsPage: React.FC<JobsPageProps> = ({
         <div>
           <h2 className="jobs-page-title">Jobs & Opportunities Catalog</h2>
           <p className="jobs-page-sub">
-            Review live and demo opportunities. Run deep truth checking, ATS simulation, and resume tailoring.
+            Review live Codewalla and predefined opportunities. Run deep truth checking, ATS simulation, and resume tailoring.
           </p>
         </div>
 
-        <Button
-          variant="primary"
-          icon={<Plus size={16} />}
-          onClick={() => setIsAddModalOpen(true)}
-        >
-          Add / Analyze New Job
-        </Button>
+        <div style={{ display: 'flex', gap: '10px' }}>
+          <Button
+            variant="outline"
+            icon={<Sparkles size={16} />}
+            loading={isSyncing}
+            onClick={handleSyncCodewalla}
+          >
+            {isSyncing ? 'Syncing...' : 'Sync Codewalla Jobs'}
+          </Button>
+
+          <Button
+            variant="primary"
+            icon={<Plus size={16} />}
+            onClick={() => setIsAddModalOpen(true)}
+          >
+            Add / Analyze New Job
+          </Button>
+        </div>
       </div>
 
       {/* Filter and Search Bar */}
@@ -149,6 +183,19 @@ export const JobsPage: React.FC<JobsPageProps> = ({
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
+        </div>
+
+        <div className="track-pills" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Source:</span>
+          {sources.map(s => (
+            <button
+              key={s}
+              className={`track-pill ${filterSource === s ? 'track-pill-active' : ''}`}
+              onClick={() => setFilterSource(s)}
+            >
+              {s === 'Codewalla' ? '🌐 Codewalla' : s === 'Predefined' ? '💼 Predefined' : 'All Sources'}
+            </button>
+          ))}
         </div>
 
         <div className="track-pills">
@@ -180,7 +227,27 @@ export const JobsPage: React.FC<JobsPageProps> = ({
               onClick={() => onSelectJobForAnalysis(job.id)}
             >
               <div className="job-top-meta">
-                <span className="job-company-pill">{job.company}</span>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span className="job-company-pill">{job.company}</span>
+                  <ApplicationModeBadge
+                    mode={job.applicationMode}
+                    isCodewalla={job.company.toLowerCase().includes('codewalla') || (job.source || '').toLowerCase().includes('codewalla')}
+                    size="sm"
+                  />
+                  {job.source && (
+                    <span style={{
+                      fontSize: '0.72rem',
+                      padding: '2px 8px',
+                      borderRadius: '4px',
+                      background: job.source === 'Codewalla' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(148, 163, 184, 0.1)',
+                      color: job.source === 'Codewalla' ? '#818cf8' : 'var(--text-muted)',
+                      border: `1px solid ${job.source === 'Codewalla' ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
+                      fontWeight: 600
+                    }}>
+                      Source: {job.source}
+                    </span>
+                  )}
+                </div>
                 <Badge
                   variant={
                     matchPercent >= 70 ? 'emerald' : matchPercent >= 40 ? 'blue' : 'amber'

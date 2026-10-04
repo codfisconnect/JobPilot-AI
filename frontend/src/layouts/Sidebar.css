@@ -154,3 +154,33 @@
   color: var(--text-muted);
   margin-top: 2px;
 }
+
+@media (max-width: 768px) {
+  .app-sidebar {
+    width: 68px;
+    min-width: 68px;
+  }
+  .brand-info,
+  .brand-tag,
+  .nav-label,
+  .switcher-header,
+  .demo-badge,
+  .sidebar-footer {
+    display: none !important;
+  }
+  .sidebar-brand {
+    padding: 16px 12px;
+    justify-content: center;
+  }
+  .demo-switcher-box {
+    padding: 10px 6px;
+  }
+  .nav-item {
+    justify-content: center;
+    padding: 12px;
+  }
+  .nav-item-active {
+    border-left: none;
+    border-bottom: 3px solid var(--accent-primary);
+  }
+}

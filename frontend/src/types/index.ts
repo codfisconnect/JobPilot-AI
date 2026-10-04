@@ -1,39 +1,115 @@
-export interface ExperienceItem {
+export type VerificationStatus = 'VERIFIED' | 'CONFIRMED' | 'PARSED' | 'NEEDS_REVIEW' | 'UNVERIFIED';
+
+export interface CategorizedSkill {
+  name: string;
+  category: 
+    | 'Programming Languages'
+    | 'Automation Testing'
+    | 'Manual Testing'
+    | 'API Testing'
+    | 'Frameworks'
+    | 'Databases'
+    | 'CI/CD'
+    | 'Cloud'
+    | 'DevOps'
+    | 'Version Control'
+    | 'Testing Tools'
+    | 'Project Management / Agile'
+    | 'Operating Systems'
+    | 'Other Tools'
+    | 'Domain Knowledge';
+  status: VerificationStatus;
+  years?: number;
+  proficiency?: 'Beginner' | 'Intermediate' | 'Advanced' | 'Expert';
+}
+
+export interface DetailedExperienceItem {
   id: string;
-  title: string;
   company: string;
+  title: string;
   location?: string;
   startDate: string;
   endDate: string;
   isCurrent?: boolean;
-  highlights: string[];
-  skillsUsed: string[];
+  duration?: string;
+  description?: string;
+  responsibilities: string[];
+  highlights?: string[];
+  achievements?: string[];
+  technologies: string[];
+  domain?: string;
+  employmentType?: string;
+  isCompressed?: boolean;
 }
 
-export interface EducationItem {
+export interface DetailedEducationItem {
   id: string;
   degree: string;
+  specialization?: string;
   institution: string;
+  location?: string;
+  startDate?: string;
+  endDate?: string;
   year?: string;
+  grade?: string;
   details?: string;
 }
 
-export interface ProjectItem {
+export interface DetailedCertificationItem {
   id: string;
   name: string;
+  issuer?: string;
+  issueDate?: string;
+  expiryDate?: string;
+  credentialId?: string;
+  credentialUrl?: string;
+}
+
+export interface DetailedProjectItem {
+  id: string;
+  name: string;
+  client?: string;
+  domain?: string;
   description: string;
+  responsibilities?: string[];
   technologies: string[];
+  achievements?: string[];
+  duration?: string;
   link?: string;
+}
+
+export interface ResumeValidationCheck {
+  id: string;
+  label: string;
+  status: 'PASS' | 'FAIL' | 'WARN';
+  details?: string;
+}
+
+export interface ResumeValidationResult {
+  passed: boolean;
+  canExport: boolean;
+  targetCompanyLeakDetected: boolean;
+  unsupportedClaimsDetected: boolean;
+  checks: ResumeValidationCheck[];
+  completenessScore: number;
+  completenessDetails: string[];
 }
 
 export interface CandidateProfile {
   id: string;
   name: string;
+  headline?: string;
   email: string;
   phone: string;
   location: string;
+  state?: string;
+  country?: string;
+  linkedInUrl?: string;
+  gitHubUrl?: string;
+  portfolioUrl?: string;
   targetRoles: string[];
   yearsOfExperience: number;
+  relevantYearsOfExperience?: number;
   preferredLocations: string[];
   expectedSalary: string;
   noticePeriod: string;
@@ -41,16 +117,32 @@ export interface CandidateProfile {
   primarySkills: string[];
   secondarySkills: string[];
   technologies: string[];
+  categorizedSkills?: CategorizedSkill[];
   companies: string[];
-  education: EducationItem[];
+  education: DetailedEducationItem[];
   certifications: string[];
-  projects: ProjectItem[];
+  detailedCertifications?: DetailedCertificationItem[];
+  projects: DetailedProjectItem[];
+  achievements?: string[];
+  languages?: string[];
   summary: string;
-  experiences: ExperienceItem[];
+  experiences: DetailedExperienceItem[];
   isDemo?: boolean;
+  extractionAudit?: {
+    rawName?: string;
+    rawEmail?: string;
+    rawPhone?: string;
+    extractionConfidence?: number;
+    fieldsNeedingReview?: string[];
+  };
   createdAt: string;
   updatedAt: string;
 }
+
+// Backwards compatibility aliases
+export type ExperienceItem = DetailedExperienceItem;
+export type EducationItem = DetailedEducationItem;
+export type ProjectItem = DetailedProjectItem;
 
 export interface JobDescription {
   id: string;
@@ -58,7 +150,16 @@ export interface JobDescription {
   company: string;
   location: string;
   sourceUrl?: string;
-  sourceType: 'pasted' | 'url' | 'extension' | 'sample';
+  sourceType: 'pasted' | 'url' | 'extension' | 'sample' | 'external';
+  source?: string; // e.g. 'Codewalla', 'JobPilot Predefined'
+  applicationUrl?: string;
+  applicationMethod?: 'External Website' | 'Email' | 'LinkedIn' | 'Other';
+  applicationMode: 'demo' | 'external';
+  employmentType?: string;
+  workMode?: string;
+  publishedDate?: string;
+  isExternal?: boolean;
+  externalJobId?: string;
   experienceRequired: string;
   salary?: string;
   careerTrack: string;
@@ -146,6 +247,26 @@ export interface JobMatchAnalysis {
   createdAt: string;
 }
 
+export interface ResumeVersionItem {
+  id: string;
+  versionName: string;
+  candidateId: string;
+  jobId?: string;
+  targetRole?: string;
+  targetCompany?: string;
+  mode: ResumeMode;
+  tailoredSummary: string;
+  orderedSkills: string[];
+  experiences: DetailedExperienceItem[];
+  projects: DetailedProjectItem[];
+  education?: DetailedEducationItem[];
+  certifications?: string[];
+  truthCheckVerified: boolean;
+  atsScore?: number;
+  pdfUrl?: string;
+  createdAt: string;
+}
+
 export interface TailoredResume {
   id: string;
   versionName: string;
@@ -153,10 +274,13 @@ export interface TailoredResume {
   jobId: string;
   targetRole: string;
   targetCompany: string;
+  mode?: ResumeMode;
   tailoredSummary: string;
   orderedSkills: string[];
-  experiences: ExperienceItem[];
-  projects: ProjectItem[];
+  experiences: DetailedExperienceItem[];
+  projects: DetailedProjectItem[];
+  education?: DetailedEducationItem[];
+  certifications?: string[];
   modifications: {
     section: string;
     original: string;
@@ -164,10 +288,27 @@ export interface TailoredResume {
     reason: string;
   }[];
   truthCheckVerified: boolean;
+  targetCompanyLeakDetected?: boolean;
+  atsScore?: number;
   createdAt: string;
 }
 
 export type ApplicationStatus =
+  | 'DISCOVERED'
+  | 'ANALYZED'
+  | 'MATCHED'
+  | 'RESUME_GENERATED'
+  | 'ATS_CHECKED'
+  | 'READY_TO_APPLY'
+  | 'APPLICATION_STARTED'
+  | 'APPLIED_DEMO'
+  | 'APPLIED'
+  | 'WAITING_FOR_RESPONSE'
+  | 'INTERVIEW'
+  | 'REJECTED'
+  | 'SELECTED'
+  | 'FAILED'
+  // Legacy aliases
   | 'Saved'
   | 'Ready to Apply'
   | 'Applied'
@@ -176,6 +317,12 @@ export type ApplicationStatus =
   | 'Selected'
   | 'Withdrawn'
   | 'Skipped';
+
+export interface ApplicationTimelineEvent {
+  timestamp: string;
+  stage: string;
+  description: string;
+}
 
 export interface ApplicationRecord {
   id: string;
@@ -186,12 +333,19 @@ export interface ApplicationRecord {
   company: string;
   role: string;
   location: string;
+  applicationMode: 'demo' | 'external';
   jobUrl?: string;
+  applicationUrl?: string;
   matchScore: number;
+  atsScore?: number;
   status: ApplicationStatus;
   applicationDate: string;
+  appliedAt?: string;
   notes: string;
   customAnswers?: Record<string, string>;
+  skillGaps?: string[];
+  timeline?: ApplicationTimelineEvent[];
+  coverLetter?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -210,4 +364,90 @@ export interface InterviewPreparation {
   roleSpecificQuestions: { scenario: string; keyCheckpoints: string[] }[];
   preparationAreas: string[];
   createdAt: string;
+}
+
+export interface CompanyRegistryItem {
+  id: string;
+  name: string;
+  officialDomain: string;
+  careersUrl: string;
+  country: string;
+  locations: string[];
+  industry: string;
+  atsProvider: 'Codewalla' | 'Lever' | 'Ashby' | 'Workable' | 'SmartRecruiters' | 'Greenhouse' | 'Custom';
+  atsIdentifier?: string;
+  sourceType: 'OFFICIAL_HTML' | 'PUBLIC_FEED' | 'ATS_PUBLIC_BOARD' | 'MANUAL';
+  discoveryStatus: 'ACTIVE' | 'PENDING' | 'VERIFIED' | 'UNSUPPORTED';
+  lastVerifiedAt: string;
+  lastCheckedAt: string;
+  healthStatus: 'HEALTHY' | 'DEGRADED' | 'DOWN';
+  activeJobsCount: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ResumeMode = 'FULL' | 'FOCUSED' | 'TARGETED';
+
+export interface SmartResumeStrategy {
+  mode: ResumeMode;
+  targetRole: string;
+  targetCompany: string;
+  whyMode: string;
+  whatToEmphasize: string[];
+  whatToCompress: string[];
+  whatToDeemphasize: string[];
+  transferableCapabilities: { capability: string; transferableTo: string; rationale: string }[];
+  genuineSkillGaps: string[];
+  truthWarnings: string[];
+  candidateApproved: boolean;
+}
+
+export interface SkillGapItem {
+  skill: string;
+  status: 'VERIFIED' | 'PARTIAL' | 'TRANSFERABLE' | 'MISSING' | 'UNKNOWN';
+  priority: 'HIGH' | 'MEDIUM' | 'LOW';
+  frequencyInTargetJobs: number;
+  importanceInTargetRole: string;
+  candidateStatus: string;
+  reason: string;
+  learningSequence: number;
+}
+
+export interface OnlineLearningResource {
+  id: string;
+  skill: string;
+  title: string;
+  platform: 'YouTube' | 'Official Documentation' | 'Interactive Tutorial' | 'Coursera / MOOC';
+  url: string;
+  language: string;
+  level: 'Beginner' | 'Intermediate' | 'Advanced';
+  approximateDuration?: string;
+  isVerified: boolean;
+  description: string;
+}
+
+export interface LocalTrainingInstitute {
+  id: string;
+  name: string;
+  city: string;
+  area: string;
+  skillsTaught: string[];
+  courseRelevance: string;
+  rating?: number;
+  contactPhone?: string;
+  website?: string;
+  distanceEstimate?: string;
+  isVerified: boolean;
+}
+
+export interface SourceHealthStatus {
+  sourceKey: string;
+  name: string;
+  status: 'HEALTHY' | 'WARNING' | 'ERROR';
+  lastSuccessfulFetch: string;
+  lastAttemptedFetch: string;
+  jobsDiscovered: number;
+  jobsUpdated: number;
+  errorCount: number;
+  failureReason?: string;
 }

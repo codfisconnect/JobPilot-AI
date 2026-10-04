@@ -4,7 +4,8 @@ import {
   JobMatchAnalysis,
   TailoredResume,
   ApplicationRecord,
-  InterviewPreparation
+  InterviewPreparation,
+  ResumeValidationResult
 } from "../types/index";
 
 const API_BASE = '/api';
@@ -71,6 +72,19 @@ export const api = {
     });
     return await res.json();
   },
+  getJobSources: async (): Promise<any[]> => {
+    const res = await fetch(`${API_BASE}/jobs/sources`);
+    const json = await res.json();
+    return json.data || [];
+  },
+  syncJobSource: async (sourceKey = 'codewalla'): Promise<{ success: boolean; data?: any; error?: string }> => {
+    const res = await fetch(`${API_BASE}/jobs/sync-source`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sourceKey })
+    });
+    return await res.json();
+  },
 
   // Match Engine
   analyzeMatch: async (candidateId: string, jobId: string): Promise<JobMatchAnalysis> => {
@@ -90,15 +104,50 @@ export const api = {
   },
 
   // Resumes
-  tailorResume: async (candidateId: string, jobId: string): Promise<TailoredResume> => {
+  tailorResume: async (candidateId: string, jobId: string, mode?: string): Promise<TailoredResume> => {
     const res = await fetch(`${API_BASE}/resumes/tailor`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ candidateId, jobId })
+      body: JSON.stringify({ candidateId, jobId, mode })
     });
     const json = await res.json();
     if (!json.success) throw new Error(json.error || 'Failed to tailor resume');
     return json.data;
+  },
+  validateResume: async (resumeId: string, candidateId: string): Promise<ResumeValidationResult> => {
+    const res = await fetch(`${API_BASE}/resumes/validate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resumeId, candidateId })
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to validate resume');
+    return json.data;
+  },
+  exportResume: async (resumeId: string, format = 'txt'): Promise<{ content: string; filename: string }> => {
+    const res = await fetch(`${API_BASE}/resumes/export`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resumeId, format })
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to export resume document');
+    return json.data;
+  },
+  saveResumeVersion: async (version: any): Promise<any> => {
+    const res = await fetch(`${API_BASE}/resumes/versions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(version)
+    });
+    const json = await res.json();
+    if (!json.success) throw new Error(json.error || 'Failed to save resume version');
+    return json.data;
+  },
+  getResumeVersions: async (candidateId: string): Promise<any[]> => {
+    const res = await fetch(`${API_BASE}/resumes/versions/${candidateId}`);
+    const json = await res.json();
+    return json.success ? json.data : [];
   },
   getResumes: async (): Promise<TailoredResume[]> => {
     const res = await fetch(`${API_BASE}/resumes`);
@@ -156,5 +205,48 @@ export const api = {
     const res = await fetch(`${API_BASE}/interview/${candidateId}/${jobId}`);
     const json = await res.json();
     return json.success ? json.data : null;
+  },
+
+  // Company Registry
+  getCompanies: async (): Promise<any[]> => {
+    const res = await fetch(`${API_BASE}/companies`);
+    const json = await res.json();
+    return json.data || [];
+  },
+
+  // Smart Resume Strategy
+  getResumeStrategy: async (candidateId: string, jobId: string): Promise<any> => {
+    const res = await fetch(`${API_BASE}/strategy/evaluate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ candidateId, jobId })
+    });
+    const json = await res.json();
+    return json.data;
+  },
+
+  // Learning & Skill Gap Engine
+  getSkillGaps: async (candidateId: string): Promise<any[]> => {
+    const res = await fetch(`${API_BASE}/learning/skill-gaps?candidateId=${candidateId}`);
+    const json = await res.json();
+    return json.data || [];
+  },
+  getLearningResources: async (skill: string, language?: string): Promise<any[]> => {
+    const url = language ? `${API_BASE}/learning/resources?skill=${encodeURIComponent(skill)}&language=${encodeURIComponent(language)}` : `${API_BASE}/learning/resources?skill=${encodeURIComponent(skill)}`;
+    const res = await fetch(url);
+    const json = await res.json();
+    return json.data || [];
+  },
+  getLocalInstitutes: async (city: string, skill?: string): Promise<any[]> => {
+    const url = skill ? `${API_BASE}/learning/institutes?city=${encodeURIComponent(city)}&skill=${encodeURIComponent(skill)}` : `${API_BASE}/learning/institutes?city=${encodeURIComponent(city)}`;
+    const res = await fetch(url);
+    const json = await res.json();
+    return json.data || [];
+  },
+  getSourceHealth: async (): Promise<any[]> => {
+    const res = await fetch(`${API_BASE}/jobs/source-health`);
+    const json = await res.json();
+    return json.data || [];
   }
 };
+

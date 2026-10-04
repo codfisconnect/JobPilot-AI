@@ -7,6 +7,7 @@ import { JobAnalysisPage } from "./pages/JobAnalysisPage";
 import { ResumeStudioPage } from "./pages/ResumeStudioPage";
 import { ApplicationsPage } from "./pages/ApplicationsPage";
 import { InterviewPage } from "./pages/InterviewPage";
+import { LearningPage } from "./pages/LearningPage";
 import { SettingsPage } from "./pages/SettingsPage";
 
 export const App: React.FC = () => {
@@ -63,6 +64,10 @@ export const App: React.FC = () => {
           preselectedJobId={contextId}
           onNavigate={handleNavigate}
         />
+      )}
+
+      {currentTab === 'learning' && (
+        <LearningPage />
       )}
 
       {currentTab === 'settings' && (

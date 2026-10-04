@@ -43,7 +43,13 @@ app.use((err: any, req: express.Request, res: express.Response, next: express.Ne
 
 // Initialize DB and Start
 getDb()
-  .then(() => {
+  .then(async () => {
+    try {
+      const { seedMasterData } = await import('./database/seedMaster.js');
+      await seedMasterData();
+    } catch (seedErr) {
+      console.warn('Master data seeding notice:', seedErr);
+    }
     app.listen(PORT, () => {
       console.log(`JobPilot AI backend running on http://localhost:${PORT}`);
     });
