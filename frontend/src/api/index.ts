@@ -8,7 +8,7 @@ import {
   ResumeValidationResult
 } from "../types/index";
 
-const API_BASE = '/api';
+const API_BASE = import.meta.env.VITE_API_BASE || (import.meta.env.PROD ? 'https://jobpilot-ai-backend-a8h6.onrender.com/api' : '/api');
 
 export const api = {
   // Candidate

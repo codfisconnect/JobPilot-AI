@@ -15,6 +15,11 @@
   gap: 24px;
 }
 
+[data-theme="light"] .dash-hero {
+  background: linear-gradient(135deg, #ffffff, #f1f5f9);
+  box-shadow: var(--shadow-sm);
+}
+
 .dash-hero-title {
   font-size: 1.75rem;
   font-weight: 800;
@@ -350,5 +355,97 @@
   gap: 8px;
   font-size: 0.8125rem;
   color: var(--text-secondary);
+}
+
+/* ==========================================================================
+   Responsive Breakpoints for DashboardPage
+   ========================================================================== */
+
+@media (max-width: 1100px) {
+  .dash-columns {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+}
+
+@media (max-width: 768px) {
+  .dashboard-page {
+    gap: 20px;
+  }
+
+  .dash-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    padding: 20px 18px;
+    gap: 16px;
+  }
+
+  .dash-hero-title {
+    font-size: 1.375rem;
+  }
+
+  .dash-hero-subtitle {
+    font-size: 0.875rem;
+  }
+
+  .dash-hero-actions {
+    width: 100%;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .dash-hero-actions button,
+  .dash-hero-actions a {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .kpi-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+
+  .kpi-card {
+    padding: 14px;
+    gap: 12px;
+  }
+
+  .kpi-icon-wrap {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+  }
+
+  .kpi-val {
+    font-size: 1.25rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .kpi-card {
+    padding: 12px 14px;
+  }
+
+  .section-head {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .connector-status-chip {
+    width: 100%;
+    justify-content: space-between;
+  }
 }
 

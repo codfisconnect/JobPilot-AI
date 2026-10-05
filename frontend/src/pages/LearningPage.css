@@ -140,3 +140,21 @@
     grid-template-columns: 1fr;
   }
 }
+
+@media (max-width: 600px) {
+  .learning-controls-row {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px;
+  }
+
+  .control-item {
+    justify-content: space-between;
+  }
+
+  .res-footer, .inst-footer {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+}

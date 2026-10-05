@@ -18,7 +18,7 @@ export const ApplicationModeBadge: React.FC<ApplicationModeBadgeProps> = ({
 
   if (isDemo) {
     return (
-      <span className={`app-mode-badge app-mode-demo size-${size} ${className}`} title="Simulated inside JobPilot. Zero submissions to external employers.">
+      <span className={`app-mode-badge app-mode-demo size-${size} ${className}`} title="Simulated inside Pilot Mama. Zero submissions to external employers.">
         <span className="mode-dot dot-demo" />
         <span className="mode-text">DEMO APPLICATION</span>
       </span>

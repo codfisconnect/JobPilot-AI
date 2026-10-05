@@ -44,7 +44,7 @@ export const SettingsPage: React.FC = () => {
             <h3 className="section-title">Gemini AI Engine</h3>
           </div>
           <p className="settings-desc">
-            JobPilot AI utilizes Google Gemini 1.5 Flash (free tier) for dynamic semantic reasoning, resume summary synthesis, and ATS simulation.
+            Pilot Mama utilizes Google Gemini 1.5 Flash (free tier) for dynamic semantic reasoning, resume summary synthesis, and ATS simulation.
           </p>
 
           <div className="status-indicator-box">
@@ -61,7 +61,7 @@ export const SettingsPage: React.FC = () => {
             <ol className="inst-list">
               <li>Obtain a free key from <a href="https://aistudio.google.com/" target="_blank" rel="noreferrer">Google AI Studio <ExternalLink size={11} /></a>.</li>
               <li>Add your key inside the root <code>.env</code> file: <br /><code>GEMINI_API_KEY=your_key_here</code></li>
-              <li>Restart the backend server. If no key is set, JobPilot runs with its full deterministic heuristic engine.</li>
+              <li>Restart the backend server. If no key is set, Pilot Mama runs with its full deterministic heuristic engine.</li>
             </ol>
           </div>
         </Card>
@@ -135,7 +135,7 @@ export const SettingsPage: React.FC = () => {
               <span className="step-num">4</span>
               <div>
                 <strong>Inspect Job Opportunity</strong>
-                <p>Open any public job description page and click the <strong>JobPilot AI</strong> extension icon to extract and send the job details directly to your dashboard.</p>
+                <p>Open any public job description page and click the <strong>Pilot Mama</strong> extension icon to extract and send the job details directly to your dashboard.</p>
               </div>
             </div>
           </div>

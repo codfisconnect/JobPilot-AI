@@ -174,15 +174,15 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
         resumeVersionName: resumeVerName,
         status: 'APPLIED_DEMO',
         appliedAt: now,
-        notes: `Simulated Demo Application submitted in JobPilot. Tailored version: ${resumeVerName}.`,
+        notes: `Simulated Demo Application submitted in Pilot Mama. Tailored version: ${resumeVerName}.`,
         skillGaps,
         coverLetter: formFields.coverLetter,
         customAnswers: matchAnalysis?.suggestedAnswers || {},
         timeline: [
-          { timestamp: now, stage: 'Job Discovered', description: `Job opportunity ingested from ${job.source || 'JobPilot Catalog'}.` },
+          { timestamp: now, stage: 'Job Discovered', description: `Job opportunity ingested from ${job.source || 'Pilot Mama Catalog'}.` },
           { timestamp: now, stage: 'Match Evaluated', description: `Calculated match score of ${matchScore}%.` },
           { timestamp: now, stage: 'ATS Checked', description: `Automated ATS simulation scored ${currentAtsScore}%.` },
-          { timestamp: now, stage: 'Demo Application Submitted', description: `Candidate submitted simulated demo application via JobPilot. Zero data transmitted externally.` }
+          { timestamp: now, stage: 'Demo Application Submitted', description: `Candidate submitted simulated demo application via Pilot Mama. Zero data transmitted externally.` }
         ]
       };
 
@@ -337,7 +337,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                   <div>
                     <h4 className="banner-title">DEMO APPLICATION — SIMULATION ONLY</h4>
                     <p className="banner-desc">
-                      This application is simulated for JobPilot testing. <strong>Nothing will be submitted to Codewalla.</strong> Zero requests will be transmitted to codewalla.com.
+                      This application is simulated for Pilot Mama testing. <strong>Nothing will be submitted to Codewalla.</strong> Zero requests will be transmitted to codewalla.com.
                     </p>
                   </div>
                 </div>
@@ -362,7 +362,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                   <div className="pod-value">
                     <ApplicationModeBadge mode={effectiveMode} isCodewalla={isCodewalla} size="sm" />
                   </div>
-                  <span className="pod-sub">{effectiveMode === 'demo' ? 'Local JobPilot Sandbox' : 'External Career Portal'}</span>
+                  <span className="pod-sub">{effectiveMode === 'demo' ? 'Local Pilot Mama Sandbox' : 'External Career Portal'}</span>
                 </Card>
               </div>
 
@@ -442,7 +442,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
             <div className="selection-step-content">
               <h4 className="selection-heading">Choose Resume for This Application</h4>
               <p className="selection-sub">
-                JobPilot records the exact immutable resume version attached to this submission.
+                Pilot Mama records the exact immutable resume version attached to this submission.
               </p>
 
               <div className="resume-options-grid">
@@ -535,7 +535,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                   <div>
                     <h4 className="banner-title">DEMO APPLICATION — ZERO EXTERNAL TRANSMISSION</h4>
                     <p className="banner-desc">
-                      This application is simulated for JobPilot testing. Nothing will be submitted to Codewalla.
+                      This application is simulated for Pilot Mama testing. Nothing will be submitted to Codewalla.
                     </p>
                   </div>
                 </div>
@@ -671,7 +671,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                 </h3>
                 <p className="success-sub">
                   {effectiveMode === 'demo'
-                    ? `Your JobPilot demo application for ${job?.company} has been recorded locally.`
+                    ? `Your Pilot Mama demo application for ${job?.company} has been recorded locally.`
                     : `Direct application portal opened for ${job?.company}. Verify submission status below.`}
                 </p>
               </div>
@@ -680,7 +680,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                 <div className="codewalla-demo-banner text-center">
                   <ShieldAlert size={18} className="banner-icon" />
                   <div>
-                    <strong>Nothing was submitted to Codewalla.</strong> All records reside strictly within your local JobPilot testing database.
+                    <strong>Nothing was submitted to Codewalla.</strong> All records reside strictly within your local Pilot Mama testing database.
                   </div>
                 </div>
               )}
@@ -728,7 +728,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                 <div className="external-confirmation-box">
                   <Info size={18} />
                   <div className="box-text">
-                    <strong>External Portal Safeguard:</strong> JobPilot never assumes an external submission succeeded merely because the website was opened.
+                    <strong>External Portal Safeguard:</strong> Pilot Mama never assumes an external submission succeeded merely because the website was opened.
                   </div>
                   <Button
                     variant="primary"

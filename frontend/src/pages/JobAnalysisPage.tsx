@@ -97,7 +97,7 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
     return (
       <div className="analysis-loading-state">
         <Sparkles className="spin-icon" size={32} />
-        <h3>JobPilot AI is executing 14-point evaluation...</h3>
+        <h3>Pilot Mama is executing 14-point evaluation...</h3>
         <p>Scanning career track alignment, truth-checking candidate skills, and simulating ATS algorithms.</p>
       </div>
     );
@@ -357,7 +357,7 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
               </Badge>
             </div>
             <p className="truth-rule-desc">
-              Strict Rule: JobPilot never invents unverified experience. RED skills will not be injected onto the resume.
+              Strict Rule: Pilot Mama never invents unverified experience. RED skills will not be injected onto the resume.
             </p>
 
             <div className="truth-summary-pills">
@@ -530,7 +530,7 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
 
             <div className="continue-app-strip">
               <p className="safe-policy-note">
-                JobPilot completed intelligence flow: Match → Tailored Resume → ATS Check → Complete Apply Journey.
+                Pilot Mama completed intelligence flow: Match → Tailored Resume → ATS Check → Complete Apply Journey.
               </p>
               <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                 <Button

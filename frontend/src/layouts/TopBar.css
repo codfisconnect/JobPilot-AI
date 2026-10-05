@@ -6,20 +6,86 @@
   align-items: center;
   justify-content: space-between;
   padding: 0 28px;
+  padding-left: calc(28px + var(--sal));
+  padding-right: calc(28px + var(--sar));
   position: sticky;
   top: 0;
   z-index: 40;
+  width: 100%;
+}
+
+.topbar-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  flex: 1;
+}
+
+.topbar-mobile-brand {
+  display: none;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .topbar-mobile-brand {
+    display: flex;
+  }
+}
+
+.mobile-menu-toggle-btn {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 40px;
+  height: 40px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  cursor: pointer;
+  padding: 8px;
+  flex-shrink: 0;
+  transition: all 0.2s ease;
+}
+
+.mobile-menu-toggle-btn:hover,
+.mobile-menu-toggle-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--accent-primary);
+}
+
+.hamburger-bar {
+  width: 18px;
+  height: 2px;
+  background: var(--text-primary);
+  border-radius: 2px;
+  transition: all 0.2s ease;
+}
+
+.topbar-title-wrap {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
 }
 
 .topbar-title {
   font-size: 1rem;
   font-weight: 700;
   color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .topbar-sub {
   font-size: 0.75rem;
   color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .highlight-name {
@@ -31,4 +97,51 @@
   display: flex;
   align-items: center;
   gap: 12px;
+  flex-shrink: 0;
 }
+
+.btn-label-mobile {
+  display: none;
+}
+
+.btn-label-desktop {
+  display: inline;
+}
+
+@media (max-width: 768px) {
+  .app-topbar {
+    padding: 0 16px;
+    padding-left: calc(16px + var(--sal));
+    padding-right: calc(16px + var(--sar));
+    height: 58px;
+  }
+
+  .mobile-menu-toggle-btn {
+    display: flex;
+  }
+
+  .btn-label-desktop {
+    display: none;
+  }
+
+  .btn-label-mobile {
+    display: inline;
+  }
+
+  .meta-details {
+    display: none;
+  }
+}
+
+@media (max-width: 380px) {
+  .topbar-title {
+    font-size: 0.9rem;
+  }
+  .topbar-sub {
+    font-size: 0.7rem;
+  }
+  .app-topbar {
+    padding: 0 10px;
+  }
+}
+

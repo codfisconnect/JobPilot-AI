@@ -2,13 +2,29 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>JobPilot AI — Your AI Agent for Smarter Job Applications</title>
-    <meta name="description" content="AI-powered master resume matching, ATS optimization, and personalized interview preparation." />
+    <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+    <link rel="icon" type="image/png" sizes="256x256" href="/favicon.png" />
+    <link rel="apple-touch-icon" href="/brand/pilot-mama-icon.png" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=5.0" />
+    <title>Pilot Mama — Your AI Agent for Smarter Job Applications</title>
+    <meta name="description" content="Pilot Mama: AI-powered master resume matching, tailored ATS optimization, and personalized interview preparation." />
+    <meta name="theme-color" content="#4f46e5" />
+    <meta property="og:title" content="Pilot Mama — AI Job Application Copilot" />
+    <meta property="og:description" content="Transform your job search with Pilot Mama: truth-checked tailored resumes, ATS optimization, and smart job matching." />
+    <meta property="og:image" content="/brand/pilot-mama-logo.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+    <script>
+      /* Prevent theme flicker on page load */
+      try {
+        var t = localStorage.getItem('pilot-mama-theme');
+        if (!t && window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) {
+          t = 'light';
+        }
+        document.documentElement.setAttribute('data-theme', t || 'dark');
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

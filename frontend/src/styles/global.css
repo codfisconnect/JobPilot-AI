@@ -2,7 +2,29 @@
   --font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
-  /* Premium SaaS Theme - Dark Slate & Electric Indigo */
+  /* Brand Gradient Tokens (Pilot Mama signature purple-to-violet-blue gradient) */
+  --brand-gradient: linear-gradient(135deg, #7c3aed 0%, #4f46e5 50%, #2563eb 100%);
+  --brand-gradient-hover: linear-gradient(135deg, #6d28d9 0%, #4338ca 50%, #1d4ed8 100%);
+  --brand-glow: rgba(124, 58, 237, 0.25);
+
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 14px;
+  --radius-full: 9999px;
+
+  /* Safe Area Insets for iPhone Dynamic Island / Home Indicator */
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+
+  /* Touch sizing */
+  --touch-target-min: 44px;
+}
+
+/* 🌙 DARK THEME (Default) */
+:root,
+[data-theme="dark"] {
   --bg-primary: #0b0f19;
   --bg-secondary: #111827;
   --bg-surface: #1e293b;
@@ -16,9 +38,9 @@
   --text-secondary: #94a3b8;
   --text-muted: #64748b;
 
-  --accent-primary: #4f46e5;
-  --accent-primary-hover: #4338ca;
-  --accent-glow: rgba(79, 70, 229, 0.25);
+  --accent-primary: #6366f1;
+  --accent-primary-hover: #4f46e5;
+  --accent-glow: rgba(99, 102, 241, 0.25);
 
   --color-success: #10b981;
   --color-success-bg: rgba(16, 185, 129, 0.12);
@@ -29,21 +51,64 @@
   --color-info: #0ea5e9;
   --color-info-bg: rgba(14, 165, 233, 0.12);
 
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 14px;
-  --radius-full: 9999px;
+  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.45);
+  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.35);
 
-  --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.2);
-  --shadow-md: 0 4px 12px -2px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 10px 25px -5px rgba(0, 0, 0, 0.5);
-  --shadow-glow: 0 0 20px rgba(79, 70, 229, 0.35);
+  --input-bg: rgba(0, 0, 0, 0.25);
+  --card-highlight: rgba(255, 255, 255, 0.02);
+}
+
+/* ☀️ LIGHT THEME (Clean, modern, crisp, professional) */
+[data-theme="light"] {
+  --bg-primary: #f8fafc;
+  --bg-secondary: #ffffff;
+  --bg-surface: #ffffff;
+  --bg-surface-hover: #f1f5f9;
+  --bg-surface-glass: rgba(255, 255, 255, 0.85);
+
+  --border-primary: #e2e8f0;
+  --border-subtle: rgba(0, 0, 0, 0.06);
+
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+
+  --accent-primary: #6366f1;
+  --accent-primary-hover: #4f46e5;
+  --accent-glow: rgba(99, 102, 241, 0.18);
+
+  --color-success: #059669;
+  --color-success-bg: rgba(16, 185, 129, 0.1);
+  --color-warning: #d97706;
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-danger: #dc2626;
+  --color-danger-bg: rgba(239, 68, 68, 0.1);
+  --color-info: #0284c7;
+  --color-info-bg: rgba(14, 165, 233, 0.1);
+
+  --shadow-sm: 0 1px 3px 0 rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 4px 12px -2px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 10px 25px -5px rgba(15, 23, 42, 0.12);
+  --shadow-glow: 0 0 20px rgba(99, 102, 241, 0.15);
+
+  --input-bg: #ffffff;
+  --card-highlight: #ffffff;
 }
 
 * {
   box-sizing: border-box;
   margin: 0;
   padding: 0;
+  -webkit-tap-highlight-color: transparent;
+}
+
+html {
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  overflow-x: hidden;
 }
 
 body {
@@ -51,23 +116,60 @@ body {
   background-color: var(--bg-primary);
   color: var(--text-primary);
   min-height: 100vh;
+  min-height: 100dvh;
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  width: 100%;
 }
 
+/* iOS Safari auto-zoom prevention: Inputs must be at least 16px font size on mobile */
 input, button, textarea, select {
   font-family: inherit;
+  font-size: 1rem;
+}
+
+@media (max-width: 768px) {
+  input, textarea, select {
+    font-size: 16px !important;
+  }
+}
+
+button {
+  cursor: pointer;
+  touch-action: manipulation;
 }
 
 a {
   color: inherit;
   text-decoration: none;
+  touch-action: manipulation;
+}
+
+/* Touch targets guarantee */
+.clickable-target {
+  min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Reduced Motion Preference */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* Scrollbars */
 ::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
+  width: 6px;
+  height: 6px;
 }
 ::-webkit-scrollbar-track {
   background: var(--bg-primary);
@@ -79,3 +181,4 @@ a {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--text-muted);
 }
+

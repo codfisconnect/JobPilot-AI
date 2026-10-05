@@ -324,7 +324,7 @@ export const ProfilePage: React.FC = () => {
               </Button>
             </div>
             <p className="section-note">
-              Strict Truth Guarantee: JobPilot only uses verified skills present here when optimizing your resumes.
+              Strict Truth Guarantee: Pilot Mama only uses verified skills present here when optimizing your resumes.
             </p>
             <div className="skill-tags-cloud">
               {profile.primarySkills.map((skill, idx) => (

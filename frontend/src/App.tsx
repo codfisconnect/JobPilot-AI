@@ -14,6 +14,22 @@ export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
   const [contextId, setContextId] = useState<string | undefined>(undefined);
 
+  // Update browser document title based on active section
+  React.useEffect(() => {
+    const tabTitles: Record<string, string> = {
+      dashboard: 'Pilot Mama | Dashboard',
+      profile: 'Pilot Mama | My Profile',
+      jobs: 'Pilot Mama | Jobs & Matching',
+      analysis: 'Pilot Mama | Job Fit Analysis',
+      resumes: 'Pilot Mama | Resume Studio',
+      applications: 'Pilot Mama | Applications Pipeline',
+      interview: 'Pilot Mama | Interview Prep',
+      learning: 'Pilot Mama | Learning Academy',
+      settings: 'Pilot Mama | Settings & Integrations'
+    };
+    document.title = tabTitles[currentTab] || 'Pilot Mama — AI Job Application Copilot';
+  }, [currentTab]);
+
   const handleNavigate = (tab: string, id?: string) => {
     setCurrentTab(tab);
     setContextId(id);

@@ -215,3 +215,37 @@
   border-bottom-color: var(--accent-primary);
   color: var(--text-primary);
 }
+
+/* ==========================================================================
+   Responsive Breakpoints for ProfilePage
+   ========================================================================== */
+
+@media (max-width: 900px) {
+  .profile-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .profile-header-banner {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 20px;
+  }
+
+  .profile-header-banner button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 600px) {
+  .form-row {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .profile-section-card {
+    padding: 16px;
+  }
+}

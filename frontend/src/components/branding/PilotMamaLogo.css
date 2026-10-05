@@ -1,0 +1,45 @@
+.pilot-mama-logo-wrap {
+  display: inline-flex;
+  align-items: center;
+  user-select: none;
+}
+
+.pilot-mama-logo-img {
+  height: 100%;
+  width: auto;
+  object-fit: contain;
+  display: block;
+  transition: opacity 0.2s ease;
+}
+
+.pilot-mama-logo-wrap.size-sm {
+  height: 28px;
+}
+
+.pilot-mama-logo-wrap.size-md {
+  height: 38px;
+}
+
+.pilot-mama-logo-wrap.size-lg {
+  height: 52px;
+}
+
+.pilot-mama-icon {
+  object-fit: contain;
+  display: block;
+}
+
+.pilot-mama-icon.size-sm {
+  width: 28px;
+  height: 28px;
+}
+
+.pilot-mama-icon.size-md {
+  width: 38px;
+  height: 38px;
+}
+
+.pilot-mama-icon.size-lg {
+  width: 48px;
+  height: 48px;
+}

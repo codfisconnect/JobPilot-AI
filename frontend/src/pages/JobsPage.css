@@ -262,3 +262,73 @@
   justify-content: flex-end;
   gap: 12px;
 }
+
+/* ==========================================================================
+   Responsive Breakpoints for JobsPage
+   ========================================================================== */
+
+@media (max-width: 1200px) {
+  .jobs-grid-display {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 860px) {
+  .jobs-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 16px;
+  }
+
+  .jobs-header-row button {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .search-filter-bar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+    padding: 14px;
+  }
+
+  .search-input-wrap {
+    max-width: 100%;
+  }
+
+  .track-pills {
+    width: 100%;
+    padding-bottom: 4px;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .jobs-grid-display {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 480px) {
+  .job-item-card {
+    padding: 16px;
+  }
+
+  .job-actions-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .job-actions-row button,
+  .job-actions-row a {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .modal-action-row {
+    flex-direction: column;
+  }
+
+  .modal-action-row button {
+    width: 100%;
+  }
+}

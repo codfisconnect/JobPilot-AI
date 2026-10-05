@@ -13,36 +13,14 @@
 .sidebar-brand {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 24px 20px;
+  justify-content: space-between;
+  padding: 20px 18px;
   border-bottom: 1px solid var(--border-primary);
+  min-height: 72px;
 }
 
-.brand-logo {
-  width: 38px;
-  height: 38px;
-  border-radius: var(--radius-md);
-  background: linear-gradient(135deg, var(--accent-primary), #818cf8);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #fff;
-  box-shadow: 0 4px 12px var(--accent-glow);
-}
-
-.brand-name {
-  font-size: 1.125rem;
-  font-weight: 800;
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
-}
-
-.brand-tag {
-  font-size: 0.6875rem;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  font-weight: 700;
-  letter-spacing: 0.05em;
+.sidebar-logo-brand {
+  max-width: 175px;
 }
 
 .demo-switcher-box {
@@ -155,32 +133,90 @@
   margin-top: 2px;
 }
 
+/* Mobile Backdrop Overlay */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(10, 15, 29, 0.7);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 998;
+  animation: fadeInOverlay 0.2s ease-out;
+}
+
+@keyframes fadeInOverlay {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.sidebar-close-mobile-btn {
+  display: none;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 8px;
+  border-radius: var(--radius-md);
+  margin-left: auto;
+  min-height: var(--touch-target-min);
+  min-width: var(--touch-target-min);
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease;
+}
+
+.sidebar-close-mobile-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
 @media (max-width: 768px) {
-  .app-sidebar {
-    width: 68px;
-    min-width: 68px;
+  .sidebar-close-mobile-btn {
+    display: flex;
   }
+
+  .app-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    bottom: 0;
+    width: 280px;
+    max-width: 85vw;
+    height: 100%;
+    height: 100dvh;
+    z-index: 999;
+    background: var(--bg-secondary);
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.6);
+    transform: translateX(-100%);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    will-change: transform;
+    padding-top: var(--sat);
+    padding-bottom: var(--sab);
+  }
+
+  .app-sidebar.sidebar-mobile-open {
+    transform: translateX(0);
+  }
+
+  .sidebar-brand {
+    padding: 18px 16px;
+  }
+
+  .sidebar-nav {
+    padding: 12px 10px;
+  }
+
+  .nav-item {
+    padding: 12px 14px;
+    min-height: var(--touch-target-min);
+  }
+
   .brand-info,
   .brand-tag,
   .nav-label,
   .switcher-header,
   .demo-badge,
   .sidebar-footer {
-    display: none !important;
-  }
-  .sidebar-brand {
-    padding: 16px 12px;
-    justify-content: center;
-  }
-  .demo-switcher-box {
-    padding: 10px 6px;
-  }
-  .nav-item {
-    justify-content: center;
-    padding: 12px;
-  }
-  .nav-item-active {
-    border-left: none;
-    border-bottom: 3px solid var(--accent-primary);
+    display: block !important;
   }
 }

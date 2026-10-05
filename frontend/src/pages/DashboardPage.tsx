@@ -133,7 +133,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             Welcome back, {activeCandidate?.name || 'Candidate'}
           </h2>
           <p className="dash-hero-subtitle">
-            JobPilot has synchronized your master profile. Review top role alignments, generate tailored ATS-optimized resumes, and prep for upcoming technical interviews.
+            Pilot Mama has synchronized your master profile. Review top role alignments, generate tailored ATS-optimized resumes, and prep for upcoming technical interviews.
           </p>
         </div>
         <div className="dash-hero-actions">

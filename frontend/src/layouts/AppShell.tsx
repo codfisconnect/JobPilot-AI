@@ -24,6 +24,26 @@ export const AppShell: React.FC<AppShellProps> = ({
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+
+  // Prevent background scrolling when mobile navigation drawer is open & support Escape key
+  React.useEffect(() => {
+    if (isMobileMenuOpen) {
+      document.body.style.overflow = 'hidden';
+      const handleKeyDown = (e: KeyboardEvent) => {
+        if (e.key === 'Escape') {
+          setIsMobileMenuOpen(false);
+        }
+      };
+      window.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.body.style.overflow = '';
+        window.removeEventListener('keydown', handleKeyDown);
+      };
+    } else {
+      document.body.style.overflow = '';
+    }
+  }, [isMobileMenuOpen]);
 
   const handleUpload = async () => {
     if (!uploadFile) return;
@@ -46,10 +66,19 @@ export const AppShell: React.FC<AppShellProps> = ({
 
   return (
     <div className="app-layout">
-      <Sidebar currentTab={currentTab} onSelectTab={onSelectTab} />
+      <Sidebar
+        currentTab={currentTab}
+        onSelectTab={onSelectTab}
+        isMobileOpen={isMobileMenuOpen}
+        onCloseMobile={() => setIsMobileMenuOpen(false)}
+      />
 
       <div className="app-main-viewport">
-        <TopBar onOpenUpload={() => setIsUploadOpen(true)} />
+        <TopBar
+          onOpenUpload={() => setIsUploadOpen(true)}
+          isMobileMenuOpen={isMobileMenuOpen}
+          onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+        />
         <main className="app-page-content">{children}</main>
       </div>
 
@@ -69,7 +98,7 @@ export const AppShell: React.FC<AppShellProps> = ({
       >
         <div className="upload-modal-content">
           <p className="upload-desc">
-            Upload your master resume in PDF or DOCX format. JobPilot AI will extract your complete work history, verified technologies, and credentials without fabricating skills.
+            Upload your master resume in PDF or DOCX format. Pilot Mama will extract your complete work history, verified technologies, and credentials without fabricating skills.
           </p>
 
           <label className="upload-dropzone">

@@ -333,7 +333,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
                 onChange={e => setJobUrl(e.target.value)}
               />
               <p className="helper-url-text">
-                JobPilot will securely inspect visible public page content. If blocked by authentication or anti-bot defenses, it will safely provide a paste-fallback.
+                Pilot Mama will securely inspect visible public page content. If blocked by authentication or anti-bot defenses, it will safely provide a paste-fallback.
               </p>
             </div>
           )}
@@ -355,7 +355,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
               icon={<Sparkles size={16} />}
               onClick={handleAddJob}
             >
-              Analyze with JobPilot
+              Analyze with Pilot Mama
             </Button>
           </div>
         </div>

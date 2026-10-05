@@ -1,4 +1,5 @@
 import { useApp } from '../context/AppContext';
+import { PilotMamaLogo } from '../components/branding/PilotMamaLogo';
 import {
   LayoutDashboard,
   User,
@@ -16,9 +17,16 @@ import './Sidebar.css';
 interface SidebarProps {
   currentTab: string;
   onSelectTab: (tab: string) => void;
+  isMobileOpen?: boolean;
+  onCloseMobile?: () => void;
 }
 
-export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => {
+export const Sidebar: React.FC<SidebarProps> = ({
+  currentTab,
+  onSelectTab,
+  isMobileOpen = false,
+  onCloseMobile
+}) => {
   const { activeCandidate, candidates, setActiveCandidate } = useApp();
 
   const menuItems = [
@@ -32,18 +40,39 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
+  const handleItemClick = (id: string) => {
+    onSelectTab(id);
+    if (onCloseMobile) {
+      onCloseMobile();
+    }
+  };
+
   return (
-    <aside className="app-sidebar">
-      {/* Brand */}
-      <div className="sidebar-brand">
-        <div className="brand-logo">
-          <Sparkles className="brand-icon" size={22} />
+    <>
+      {/* Mobile Backdrop Overlay */}
+      {isMobileOpen && (
+        <div
+          className="sidebar-backdrop"
+          onClick={onCloseMobile}
+          aria-hidden="true"
+        />
+      )}
+
+      <aside className={`app-sidebar ${isMobileOpen ? 'sidebar-mobile-open' : ''}`}>
+        {/* Brand */}
+        <div className="sidebar-brand">
+          <PilotMamaLogo variant="full" size="md" className="sidebar-logo-brand" />
+          {onCloseMobile && (
+            <button
+              type="button"
+              className="sidebar-close-mobile-btn"
+              onClick={onCloseMobile}
+              aria-label="Close navigation sidebar"
+            >
+              ✕
+            </button>
+          )}
         </div>
-        <div className="brand-info">
-          <h2 className="brand-name">JobPilot AI</h2>
-          <span className="brand-tag">Candidate Copilot</span>
-        </div>
-      </div>
 
       {/* Candidate Selector Switcher (Demo Mode) */}
       <div className="demo-switcher-box">
@@ -79,7 +108,7 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
             <button
               key={item.id}
               className={`nav-item ${isActive ? 'nav-item-active' : ''}`}
-              onClick={() => onSelectTab(item.id)}
+              onClick={() => handleItemClick(item.id)}
             >
               <Icon size={18} className="nav-icon" />
               <span className="nav-label">{item.label}</span>
@@ -91,10 +120,11 @@ export const Sidebar: React.FC<SidebarProps> = ({ currentTab, onSelectTab }) => 
       {/* Footer Info */}
       <div className="sidebar-footer">
         <div className="footer-card">
-          <p className="footer-title">JobPilot v1.0 Prototype</p>
-          <p className="footer-sub">Built with Local SQLite & Gemini AI</p>
+          <p className="footer-title">Pilot Mama Copilot</p>
+          <p className="footer-sub">Smart Matching & Tailored Resumes</p>
         </div>
       </div>
     </aside>
+    </>
   );
 };

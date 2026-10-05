@@ -455,3 +455,38 @@
   font-weight: 600;
 }
 
+/* ==========================================================================
+   Responsive Breakpoints for ApplicationsPage
+   ========================================================================== */
+
+@media (max-width: 992px) {
+  .apps-grid {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .detail-head-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}
+
+@media (max-width: 640px) {
+  .apps-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 8px;
+  }
+
+  .meta-badges-row {
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+
+  .detail-section-grid {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+}
+
