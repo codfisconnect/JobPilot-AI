@@ -626,6 +626,15 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
                   {existingApp ? 'APPLY NOW (Applied)' : 'APPLY NOW'}
                 </Button>
 
+                <Button
+                  variant="outline"
+                  icon={<Sparkles size={16} />}
+                  onClick={() => onNavigate('interview', job.id)}
+                  style={{ fontWeight: 600, padding: '10px 16px', fontSize: '0.9rem', color: '#818cf8', borderColor: 'rgba(99, 102, 241, 0.4)' }}
+                >
+                  Prepare for Interview
+                </Button>
+
                 {tailoredResume && (
                   <Button
                     variant="outline"

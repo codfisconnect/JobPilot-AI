@@ -11,6 +11,8 @@ import { resumeRouter } from './routes/v1/resume.routes.js';
 import { resumeVersionRouter } from './routes/v1/resumeVersion.routes.js';
 import { jobRouter } from './routes/v1/job.routes.js';
 import { companyRouter } from './routes/v1/company.routes.js';
+import { interviewRouter } from './modules/interviews/interview.routes.js';
+import { careerRouter } from './modules/career/career.routes.js';
 import { apiRouter as prototypeApiRouter } from './routes/api.routes.js';
 import { getDb } from './database/db.js';
 import { logger } from './utils/logger.js';
@@ -39,6 +41,8 @@ app.use('/api/v1/resumes', resumeRouter);
 app.use('/api/v1/resume-versions', resumeVersionRouter);
 app.use('/api/v1/jobs', jobRouter);
 app.use('/api/v1/companies', companyRouter);
+app.use('/api/v1/interview', interviewRouter);
+app.use('/api/v1/career', careerRouter);
 app.use('/api/v1', healthRouter);
 
 // 4. Preserved Prototype API Routes

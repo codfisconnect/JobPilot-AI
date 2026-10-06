@@ -7,8 +7,8 @@ import { JobAnalysisPage } from "./pages/JobAnalysisPage";
 import { ResumesPage } from "./pages/ResumesPage";
 import { ResumeStudioPage } from "./pages/ResumeStudioPage";
 import { ApplicationsPage } from "./pages/ApplicationsPage";
-import { InterviewPage } from "./pages/InterviewPage";
-import { LearningPage } from "./pages/LearningPage";
+import { InterviewPrepPage } from "./pages/InterviewPrepPage";
+import { CareerPage } from "./pages/CareerPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { AuthPage } from "./pages/AuthPage";
 
@@ -25,7 +25,8 @@ export const App: React.FC = () => {
       resumes: 'Pilot Mama | Resumes',
       analysis: 'Pilot Mama | Job Fit Analysis',
       applications: 'Pilot Mama | Applications Pipeline',
-      interview: 'Pilot Mama | Interview Prep',
+      interview: 'Pilot Mama | Interview Prep Intelligence',
+      career: 'Pilot Mama | Career Intelligence & Roadmap',
       learning: 'Pilot Mama | Learning Academy',
       settings: 'Pilot Mama | Settings & Integrations'
     };
@@ -82,14 +83,22 @@ export const App: React.FC = () => {
       )}
 
       {currentTab === 'interview' && (
-        <InterviewPage
+        <InterviewPrepPage
           preselectedJobId={contextId}
           onNavigate={handleNavigate}
         />
       )}
 
+      {currentTab === 'career' && (
+        <CareerPage
+          onNavigate={handleNavigate}
+        />
+      )}
+
       {currentTab === 'learning' && (
-        <LearningPage />
+        <CareerPage
+          onNavigate={handleNavigate}
+        />
       )}
 
       {currentTab === 'settings' && (

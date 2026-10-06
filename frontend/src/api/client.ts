@@ -329,6 +329,72 @@ class ApiClient {
   async getTailoredResumes(jobId: string): Promise<any[]> {
     return this.request<any[]>(`/jobs/${jobId}/tailored-resumes`);
   }
+
+  // Sprint 6 Interview Intelligence APIs
+  async createInterviewSession(jobId: string, resumeVersionId?: string): Promise<any> {
+    return this.request<any>(`/jobs/${jobId}/interview/sessions`, {
+      method: 'POST',
+      body: JSON.stringify({ resumeVersionId })
+    });
+  }
+
+  async getInterviewSessions(): Promise<any[]> {
+    return this.request<any[]>('/interview/sessions');
+  }
+
+  async getInterviewSessionById(sessionId: string): Promise<any> {
+    return this.request<any>(`/interview/sessions/${sessionId}`);
+  }
+
+  async generateInterviewQuestions(sessionId: string, count: number = 5): Promise<any[]> {
+    return this.request<any[]>(`/interview/sessions/${sessionId}/questions`, {
+      method: 'POST',
+      body: JSON.stringify({ count })
+    });
+  }
+
+  async submitInterviewAnswer(questionId: string, answerText: string): Promise<any> {
+    return this.request<any>(`/interview/questions/${questionId}/answer`, {
+      method: 'POST',
+      body: JSON.stringify({ answerText })
+    });
+  }
+
+  async evaluateInterviewAnswer(questionId: string, answerId?: string): Promise<any> {
+    return this.request<any>(`/interview/questions/${questionId}/evaluate`, {
+      method: 'POST',
+      body: JSON.stringify({ answerId })
+    });
+  }
+
+  // Sprint 6 Career Intelligence APIs
+  async getCareerProfile(targetJobId?: string): Promise<any> {
+    const qs = targetJobId ? `?targetJobId=${encodeURIComponent(targetJobId)}` : '';
+    return this.request<any>(`/career/profile${qs}`);
+  }
+
+  async getCareerSkills(targetJobId?: string): Promise<any> {
+    const qs = targetJobId ? `?targetJobId=${encodeURIComponent(targetJobId)}` : '';
+    return this.request<any>(`/career/skills${qs}`);
+  }
+
+  async getCareerLearningPlan(): Promise<any> {
+    return this.request<any>('/career/learning-plan');
+  }
+
+  async createCareerLearningPlan(data: { jobId?: string; targetJobId?: string; title?: string; targetRole?: string; description?: string }): Promise<any> {
+    return this.request<any>('/career/learning-plan', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateLearningPlanItem(itemId: string, data: { status?: string; loggedHours?: number; hoursSpent?: number; notes?: string; targetDate?: string }): Promise<any> {
+    return this.request<any>(`/career/learning-plan/items/${itemId}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+  }
 }
 
 export const apiClient = new ApiClient();

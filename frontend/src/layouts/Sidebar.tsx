@@ -38,6 +38,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'profile', label: 'My Profile', icon: User },
     { id: 'resumes', label: 'Resumes', icon: FileText },
     { id: 'jobs', label: 'Jobs', icon: Briefcase },
+    { id: 'interview', label: 'Interview Prep', icon: Headphones },
+    { id: 'career', label: 'Career Intelligence', icon: GraduationCap },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
