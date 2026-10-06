@@ -210,6 +210,7 @@ model Skill {
   updatedAt DateTime      @updatedAt @map("updated_at")
 
   candidateSkills CandidateSkill[]
+  jobSkills       JobSkill[]
 
   @@map("skills")
 }
@@ -336,3 +337,167 @@ model InstituteProfile {
 
   @@map("institute_profiles")
 }
+
+// ==========================================
+// SPRINT 3: PRODUCTION JOB ENGINE & COMPANY REGISTRY
+// ==========================================
+
+enum JobStatus {
+  ACTIVE
+  EXPIRED
+  CLOSED
+  REMOVED
+}
+
+enum RemoteType {
+  REMOTE
+  HYBRID
+  ON_SITE
+  UNKNOWN
+}
+
+enum EmploymentType {
+  FULL_TIME
+  PART_TIME
+  CONTRACT
+  TEMPORARY
+  INTERNSHIP
+  OTHER
+}
+
+enum JobSkillType {
+  REQUIRED
+  PREFERRED
+}
+
+enum SourceHealth {
+  HEALTHY
+  DEGRADED
+  FAILING
+  DISABLED
+}
+
+model Company {
+  id             String    @id @default(uuid())
+  name           String
+  officialDomain String?   @unique @map("official_domain")
+  careersUrl     String?   @map("careers_url")
+  industry       String?
+  country        String?
+  description    String?
+  logoUrl        String?   @map("logo_url")
+  atsProvider    String?   @map("ats_provider") // e.g. GREENHOUSE, LEVER, ASHBY, CODEWALLA, CUSTOM
+  atsIdentifier  String?   @map("ats_identifier") // slug or board token
+  sourceType     String    @default("EXTERNAL") @map("source_type")
+  status         String    @default("ACTIVE")
+  lastVerifiedAt DateTime? @map("last_verified_at")
+  createdAt      DateTime  @default(now()) @map("created_at")
+  updatedAt      DateTime  @updatedAt @map("updated_at")
+
+  sources CompanySource[]
+  jobs    Job[]
+
+  @@index([name])
+  @@map("companies")
+}
+
+model CompanySource {
+  id                   String       @id @default(uuid())
+  companyId            String       @map("company_id")
+  sourceType           String       @map("source_type") // CODEWALLA, GREENHOUSE, LEVER, ASHBY, etc.
+  sourceName           String       @map("source_name")
+  sourceUrl            String       @map("source_url")
+  externalIdentifier   String?      @map("external_identifier") // e.g. board slug or career site path
+  enabled              Boolean      @default(true)
+  lastCheckedAt        DateTime?    @map("last_checked_at")
+  lastSuccessfulSyncAt DateTime?    @map("last_successful_sync_at")
+  lastFailureAt        DateTime?    @map("last_failure_at")
+  failureCount         Int          @default(0) @map("failure_count")
+  healthStatus         SourceHealth @default(HEALTHY) @map("health_status")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@unique([companyId, sourceType, externalIdentifier])
+  @@index([companyId])
+  @@index([sourceType])
+  @@map("company_sources")
+}
+
+model Job {
+  id                      String         @id @default(uuid())
+  companyId               String         @map("company_id")
+  externalJobId           String?        @map("external_job_id")
+  sourceType              String         @map("source_type") // CODEWALLA, GREENHOUSE, LEVER, ASHBY, DIRECT
+  sourceName              String         @map("source_name")
+  sourceUrl               String         @map("source_url")
+  applicationUrl          String?        @map("application_url")
+
+  title                   String
+  description             String
+  responsibilities        String[]       @default([])
+  requirements            String[]       @default([])
+  preferredQualifications String[]       @default([]) @map("preferred_qualifications")
+
+  location                String?
+  country                 String?
+  city                    String?
+  stateProvince           String?        @map("state_province")
+
+  remoteType              RemoteType     @default(UNKNOWN) @map("remote_type")
+  employmentType          EmploymentType @default(FULL_TIME) @map("employment_type")
+
+  salaryMin               Decimal?       @map("salary_min") @db.Decimal(12, 2)
+  salaryMax               Decimal?       @map("salary_max") @db.Decimal(12, 2)
+  salaryCurrency          String?        @map("salary_currency")
+
+  experienceMin           Float?         @map("experience_min")
+  experienceMax           Float?         @map("experience_max")
+
+  education               String?
+
+  postedAt                DateTime?      @map("posted_at")
+  firstSeenAt             DateTime       @default(now()) @map("first_seen_at")
+  lastSeenAt              DateTime       @default(now()) @map("last_seen_at")
+  lastCheckedAt           DateTime       @default(now()) @map("last_checked_at")
+
+  contentHash             String         @unique @map("content_hash")
+
+  status                  JobStatus      @default(ACTIVE)
+
+  createdAt               DateTime       @default(now()) @map("created_at")
+  updatedAt               DateTime       @updatedAt @map("updated_at")
+
+  company                 Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  skills                  JobSkill[]
+
+  @@index([companyId])
+  @@index([title])
+  @@index([country])
+  @@index([city])
+  @@index([remoteType])
+  @@index([employmentType])
+  @@index([status])
+  @@index([postedAt])
+  @@index([sourceType])
+  @@index([sourceType, externalJobId])
+  @@map("jobs")
+}
+
+model JobSkill {
+  id        String       @id @default(uuid())
+  jobId     String       @map("job_id")
+  skillId   String       @map("skill_id")
+  skillType JobSkillType @default(REQUIRED) @map("skill_type")
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  job   Job   @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  skill Skill @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, skillId])
+  @@index([jobId])
+  @@index([skillId])
+  @@map("job_skills")
+}
+

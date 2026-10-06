@@ -268,6 +268,41 @@ class ApiClient {
   async getResumeVersion(versionId: string): Promise<any> {
     return this.request<any>(`/resume-versions/${versionId}`);
   }
+
+  // Sprint 3 Canonical Job Engine Methods
+  async getCanonicalJobs(params: Record<string, any> = {}): Promise<{ data: any[]; pagination: any }> {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        query.append(k, String(v));
+      }
+    });
+    const qs = query.toString();
+    const headers = new Headers();
+    if (this.accessToken) {
+      headers.set('Authorization', `Bearer ${this.accessToken}`);
+    }
+    const res = await fetch(`${API_V1_BASE}/jobs${qs ? `?${qs}` : ''}`, {
+      headers,
+      credentials: 'include'
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.success === false) {
+      throw json.error || new Error(json.message || 'Failed to fetch jobs');
+    }
+    return { data: json.data || [], pagination: json.pagination };
+  }
+
+  async getCanonicalJobById(id: string): Promise<any> {
+    return this.request<any>(`/jobs/${id}`);
+  }
+
+  async syncJobs(sourceType?: string): Promise<any> {
+    return this.request<any>('/jobs/sync', {
+      method: 'POST',
+      body: JSON.stringify({ sourceType })
+    });
+  }
 }
 
 export const apiClient = new ApiClient();
