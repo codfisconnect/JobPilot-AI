@@ -11,6 +11,7 @@ import { SavedJobsPage } from "./pages/SavedJobsPage";
 import { InterviewPrepPage } from "./pages/InterviewPrepPage";
 import { CareerPage } from "./pages/CareerPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { PricingPage } from "./pages/PricingPage";
 import { AuthPage } from "./pages/AuthPage";
 
 export const App: React.FC = () => {
@@ -30,6 +31,7 @@ export const App: React.FC = () => {
       interview: 'Pilot Mama | Interview Prep Intelligence',
       career: 'Pilot Mama | Career Intelligence & Roadmap',
       learning: 'Pilot Mama | Learning Academy',
+      pricing: 'Pilot Mama | Plans, Credits & Premium',
       settings: 'Pilot Mama | Settings & Integrations'
     };
     document.title = tabTitles[currentTab] || 'Pilot Mama — AI Job Application Copilot';
@@ -103,6 +105,12 @@ export const App: React.FC = () => {
 
       {currentTab === 'learning' && (
         <CareerPage
+          onNavigate={handleNavigate}
+        />
+      )}
+
+      {currentTab === 'pricing' && (
+        <PricingPage
           onNavigate={handleNavigate}
         />
       )}

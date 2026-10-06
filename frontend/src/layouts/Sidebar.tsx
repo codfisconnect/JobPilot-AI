@@ -13,6 +13,7 @@ import {
   Sparkles,
   Users,
   GraduationCap,
+  CreditCard,
   LogOut,
   LogIn
 } from 'lucide-react';
@@ -43,6 +44,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'saved-jobs', label: 'Saved Jobs', icon: Bookmark },
     { id: 'interview', label: 'Interview Prep', icon: Headphones },
     { id: 'career', label: 'Career Intelligence', icon: GraduationCap },
+    { id: 'pricing', label: 'Plans & Credits', icon: CreditCard },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
