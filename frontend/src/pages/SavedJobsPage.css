@@ -1,0 +1,232 @@
+.saved-jobs-page {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 1.5rem;
+}
+
+.saved-jobs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.saved-jobs-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--color-text, #0f172a);
+  margin: 0 0 0.25rem;
+}
+
+.saved-jobs-subtitle {
+  font-size: 0.875rem;
+  color: var(--color-text-muted, #64748b);
+  margin: 0;
+}
+
+.refresh-saved-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.625rem 1rem;
+  border: 1px solid var(--color-border, #cbd5e1);
+  border-radius: var(--radius-md, 0.5rem);
+  background: var(--color-surface, #ffffff);
+  color: var(--color-text, #334155);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.refresh-saved-btn:hover:not(:disabled) {
+  background: var(--color-background, #f1f5f9);
+}
+
+.saved-jobs-loading,
+.saved-jobs-error,
+.saved-jobs-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  gap: 1rem;
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-lg, 0.75rem);
+}
+
+.saved-jobs-empty svg {
+  color: #94a3b8;
+}
+
+.saved-jobs-empty h3 {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text, #0f172a);
+  margin: 0;
+}
+
+.saved-jobs-empty p {
+  font-size: 0.875rem;
+  color: var(--color-text-muted, #64748b);
+  max-width: 420px;
+  margin: 0;
+}
+
+.browse-jobs-btn {
+  padding: 0.625rem 1.25rem;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-md, 0.5rem);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.saved-jobs-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.saved-job-card {
+  background: var(--color-surface, #ffffff);
+  border: 1px solid var(--color-border, #e2e8f0);
+  border-radius: var(--radius-lg, 0.75rem);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.25rem;
+  transition: all 0.2s ease;
+}
+
+.saved-job-card:hover {
+  border-color: #cbd5e1;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.saved-job-card-main {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.saved-job-icon {
+  width: 3rem;
+  height: 3rem;
+  border-radius: 0.625rem;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.saved-job-title {
+  font-size: 1.0625rem;
+  font-weight: 600;
+  color: var(--color-text, #0f172a);
+  margin: 0 0 0.25rem;
+}
+
+.saved-job-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted, #64748b);
+  margin-bottom: 0.25rem;
+}
+
+.saved-company {
+  font-weight: 600;
+  color: var(--color-text, #334155);
+}
+
+.saved-location {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.saved-notes {
+  font-size: 0.8125rem;
+  color: #475569;
+  background: var(--color-background, #f8fafc);
+  padding: 0.25rem 0.5rem;
+  border-radius: 0.25rem;
+  margin: 0.25rem 0;
+}
+
+.saved-date {
+  font-size: 0.75rem;
+  color: #94a3b8;
+}
+
+.saved-job-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.remove-saved-btn {
+  padding: 0.5625rem;
+  border: 1px solid var(--color-border, #e2e8f0);
+  background: var(--color-surface, #ffffff);
+  color: #94a3b8;
+  border-radius: var(--radius-md, 0.5rem);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.remove-saved-btn:hover:not(:disabled) {
+  color: #ef4444;
+  border-color: #fca5a5;
+  background: #fef2f2;
+}
+
+.analyze-fit-btn {
+  padding: 0.5625rem 1rem;
+  border: 1px solid #cbd5e1;
+  background: var(--color-surface, #ffffff);
+  color: #334155;
+  border-radius: var(--radius-md, 0.5rem);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.analyze-fit-btn:hover {
+  background: #f1f5f9;
+}
+
+.start-apply-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5625rem 1.125rem;
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: var(--radius-md, 0.5rem);
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.start-apply-btn:hover:not(:disabled) {
+  background: #1d4ed8;
+}
+
+.start-apply-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

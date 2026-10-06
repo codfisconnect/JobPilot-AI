@@ -113,6 +113,8 @@ model CandidateProfile {
   skills         CandidateSkill[]
   projects       Project[]
   jobMatches     JobMatch[]
+  applications   Application[]
+  savedJobs      SavedJob[]
 
   @@map("candidate_profiles")
 }
@@ -301,6 +303,7 @@ model ResumeVersion {
 
   resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
   jobMatches JobMatch[]
+  applications Application[]
 
   @@index([resumeId])
   @@map("resume_versions")
@@ -474,6 +477,8 @@ model Job {
   company                 Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   skills                  JobSkill[]
   jobMatches              JobMatch[]
+  applications            Application[]
+  savedJobs               SavedJob[]
 
   @@index([companyId])
   @@index([title])
@@ -539,6 +544,115 @@ model JobMatch {
   @@index([jobId])
   @@index([overallScore])
   @@map("job_matches")
+}
+
+// ==========================================
+// SPRINT 5: APPLICATION INTELLIGENCE & TRACKING
+// ==========================================
+
+enum ApplicationStatus {
+  SAVED
+  READY_TO_APPLY
+  APPLIED
+  ASSESSMENT
+  HR_SCREEN
+  TECHNICAL
+  FINAL_ROUND
+  OFFER
+  REJECTED
+  WITHDRAWN
+}
+
+model Application {
+  id                 String            @id @default(uuid())
+  candidateProfileId String            @map("candidate_profile_id")
+  jobId              String            @map("job_id")
+  resumeVersionId    String?           @map("resume_version_id")
+  status             ApplicationStatus @default(SAVED)
+  appliedAt          DateTime?         @map("applied_at")
+  externalUrl        String?           @map("external_url")
+  notesSummary       String?           @map("notes_summary")
+  customAnswers      Json?             @map("custom_answers")
+  metadata           Json?
+  createdAt          DateTime          @default(now()) @map("created_at")
+  updatedAt          DateTime          @updatedAt @map("updated_at")
+
+  candidateProfile CandidateProfile           @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  job              Job                        @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  resumeVersion    ResumeVersion?             @relation(fields: [resumeVersionId], references: [id], onDelete: SetNull)
+  statusHistory    ApplicationStatusHistory[]
+  notes            ApplicationNote[]
+  reminders        ApplicationReminder[]
+
+  @@unique([candidateProfileId, jobId])
+  @@index([candidateProfileId])
+  @@index([jobId])
+  @@index([status])
+  @@index([appliedAt])
+  @@map("applications")
+}
+
+model ApplicationStatusHistory {
+  id             String             @id @default(uuid())
+  applicationId  String             @map("application_id")
+  previousStatus ApplicationStatus? @map("previous_status")
+  newStatus      ApplicationStatus  @map("new_status")
+  reason         String?
+  changedAt      DateTime           @default(now()) @map("changed_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([changedAt])
+  @@map("application_status_history")
+}
+
+model SavedJob {
+  id                 String   @id @default(uuid())
+  candidateProfileId String   @map("candidate_profile_id")
+  jobId              String   @map("job_id")
+  notes              String?
+  savedAt            DateTime @default(now()) @map("saved_at")
+
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  job              Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateProfileId, jobId])
+  @@index([candidateProfileId])
+  @@index([jobId])
+  @@map("saved_jobs")
+}
+
+model ApplicationNote {
+  id            String   @id @default(uuid())
+  applicationId String   @map("application_id")
+  content       String
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([createdAt])
+  @@map("application_notes")
+}
+
+model ApplicationReminder {
+  id            String    @id @default(uuid())
+  applicationId String    @map("application_id")
+  title         String
+  dueDate       DateTime  @map("due_date")
+  isCompleted   Boolean   @default(false) @map("is_completed")
+  completedAt   DateTime? @map("completed_at")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @updatedAt @map("updated_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([dueDate])
+  @@index([isCompleted])
+  @@map("application_reminders")
 }
 
 
