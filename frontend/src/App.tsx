@@ -9,6 +9,7 @@ import { ApplicationsPage } from "./pages/ApplicationsPage";
 import { InterviewPage } from "./pages/InterviewPage";
 import { LearningPage } from "./pages/LearningPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { AuthPage } from "./pages/AuthPage";
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
@@ -88,6 +89,10 @@ export const App: React.FC = () => {
 
       {currentTab === 'settings' && (
         <SettingsPage />
+      )}
+
+      {currentTab === 'auth' && (
+        <AuthPage onSuccess={() => handleNavigate('dashboard')} />
       )}
     </AppShell>
   );

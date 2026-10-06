@@ -1,60 +1,64 @@
 import express from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
-import path from 'path';
-import { apiRouter } from './routes/api.routes.js';
+import cookieParser from 'cookie-parser';
+import { env } from './config/env.js';
+import { requestLogger } from './middleware/requestLogger.middleware.js';
+import { errorHandler } from './middleware/error.middleware.js';
+import { authRouter } from './routes/v1/auth.routes.js';
+import { healthRouter } from './routes/v1/health.routes.js';
+import { apiRouter as prototypeApiRouter } from './routes/api.routes.js';
 import { getDb } from './database/db.js';
+import { logger } from './utils/logger.js';
 
-dotenv.config();
+export const app = express();
 
-const app = express();
-const PORT = process.env.PORT || 5000;
+// 1. Structured Request ID & Logging
+app.use(requestLogger);
 
-// Security & Middlewares
+// 2. Security & Cookie Parsing
 app.use(cors({
-  origin: '*', // Allow Vite frontend and Chrome extension
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS']
+  origin: env.CORS_ORIGIN || 'http://localhost:5173',
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id']
 }));
 
+app.use(cookieParser());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Health Check
-app.get('/api/health', (req, res) => {
-  res.json({
-    status: 'healthy',
-    product: 'JobPilot AI',
-    timestamp: new Date().toISOString(),
-    geminiConfigured: Boolean(process.env.GEMINI_API_KEY)
-  });
-});
+// 3. V1 Production API Routes
+app.use('/api/v1/auth', authRouter);
+app.use('/api/v1', healthRouter);
 
-// Main API Router
-app.use('/api', apiRouter);
+// 4. Preserved Prototype API Routes
+app.use('/api', prototypeApiRouter);
 
-// Global Error Handler
-app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('Unhandled Server Error:', err);
-  res.status(500).json({
-    success: false,
-    error: err.message || 'An internal server error occurred'
-  });
-});
+// 5. Global Error Handling
+app.use(errorHandler);
 
-// Initialize DB and Start
-getDb()
-  .then(async () => {
-    try {
-      const { seedMasterData } = await import('./database/seedMaster.js');
-      await seedMasterData();
-    } catch (seedErr) {
-      console.warn('Master data seeding notice:', seedErr);
-    }
-    app.listen(PORT, () => {
-      console.log(`JobPilot AI backend running on http://localhost:${PORT}`);
+// 6. Server Bootstrap
+const PORT = env.PORT;
+
+// Only bind listener when this file is executed directly (not during test runs)
+const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.TEST_MODE) || process.argv.some(arg => arg.includes('test'));
+
+if (!isTestEnv) {
+  getDb()
+    .then(async () => {
+      try {
+        const { seedMasterData } = await import('./database/seedMaster.js');
+        await seedMasterData();
+      } catch (seedErr) {
+        logger.warn('Prototype master data seeding notice:', { error: (seedErr as any)?.message });
+      }
+
+      app.listen(PORT, () => {
+        logger.info(`Pilot Mama backend listening on port ${PORT} [${env.NODE_ENV}]`);
+      });
+    })
+    .catch(err => {
+      logger.error('Failed to initialize prototype database on startup:', err);
+      process.exit(1);
     });
-  })
-  .catch(err => {
-    console.error('Failed to initialize database on startup:', err);
-    process.exit(1);
-  });
+}

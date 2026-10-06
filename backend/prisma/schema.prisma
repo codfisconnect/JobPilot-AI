@@ -1,0 +1,172 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+enum UserRole {
+  CANDIDATE
+  EMPLOYER
+  INSTITUTE
+  ADMIN
+}
+
+enum WorkMode {
+  REMOTE
+  HYBRID
+  ONSITE
+}
+
+enum ResumeStrategy {
+  FULL
+  FOCUSED
+  TARGETED
+}
+
+enum SkillCategory {
+  TECHNICAL
+  SOFT
+  TOOL
+}
+
+model User {
+  id            String    @id @default(uuid())
+  email         String    @unique
+  passwordHash  String    @map("password_hash")
+  role          UserRole  @default(CANDIDATE)
+  isActive      Boolean   @default(true) @map("is_active")
+  emailVerified Boolean   @default(false) @map("email_verified")
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updated_at    DateTime  @updatedAt @map("updated_at")
+
+  candidateProfile CandidateProfile?
+  employerProfile  EmployerProfile?
+  instituteProfile InstituteProfile?
+
+  refreshTokens RefreshToken[]
+
+  @@map("users")
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  userId    String   @map("user_id")
+  tokenHash String   @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model CandidateProfile {
+  id           String   @id @default(uuid())
+  userId       String   @unique @map("user_id")
+  fullName     String   @map("full_name")
+  headline     String?
+  phone        String?
+  location     String?
+  bio          String?
+  linkedinUrl  String?  @map("linkedin_url")
+  githubUrl    String?  @map("github_url")
+  portfolioUrl String?  @map("portfolio_url")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  preferences CandidatePreference?
+  resumes     Resume[]
+
+  @@map("candidate_profiles")
+}
+
+model CandidatePreference {
+  id                 String     @id @default(uuid())
+  candidateProfileId String     @unique @map("candidate_profile_id")
+  targetRoles        String[]   @map("target_roles")
+  workModes          WorkMode[] @map("work_modes")
+  preferredLocations String[]   @map("preferred_locations")
+  minSalary          Int?       @map("min_salary")
+  currency           String     @default("USD")
+  createdAt          DateTime   @default(now()) @map("created_at")
+  updatedAt          DateTime   @updatedAt @map("updated_at")
+
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+
+  @@map("candidate_preferences")
+}
+
+model Resume {
+  id                 String   @id @default(uuid())
+  candidateProfileId String   @map("candidate_profile_id")
+  title              String
+  isMaster           Boolean  @default(false) @map("is_master")
+  filePath           String?  @map("file_path")
+  rawText            String?  @map("raw_text")
+  parsedData         Json?    @map("parsed_data")
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  versions         ResumeVersion[]
+
+  @@index([candidateProfileId])
+  @@map("resumes")
+}
+
+model ResumeVersion {
+  id                String         @id @default(uuid())
+  resumeId          String         @map("resume_id")
+  jobId             String?        @map("job_id")
+  versionName       String         @map("version_name")
+  strategy          ResumeStrategy @default(TARGETED)
+  structuredContent Json           @map("structured_content")
+  pdfPath           String?        @map("pdf_path")
+  docxPath          String?        @map("docx_path")
+  atsScore          Int?           @map("ats_score")
+  createdAt         DateTime       @default(now()) @map("created_at")
+
+  resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+
+  @@index([resumeId])
+  @@map("resume_versions")
+}
+
+model EmployerProfile {
+  id           String   @id @default(uuid())
+  userId       String   @unique @map("user_id")
+  companyName  String   @map("company_name")
+  companyDomain String? @map("company_domain")
+  logoUrl      String?  @map("logo_url")
+  website      String?
+  industry     String?
+  headquarters String?
+  isVerified   Boolean  @default(false) @map("is_verified")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("employer_profiles")
+}
+
+model InstituteProfile {
+  id          String   @id @default(uuid())
+  userId      String   @unique @map("user_id")
+  name        String
+  description String?
+  website     String?
+  logoUrl     String?  @map("logo_url")
+  isVerified  Boolean  @default(false) @map("is_verified")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("institute_profiles")
+}

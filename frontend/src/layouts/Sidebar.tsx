@@ -1,4 +1,5 @@
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { PilotMamaLogo } from '../components/branding/PilotMamaLogo';
 import {
   LayoutDashboard,
@@ -10,7 +11,9 @@ import {
   Settings,
   Sparkles,
   Users,
-  GraduationCap
+  GraduationCap,
+  LogOut,
+  LogIn
 } from 'lucide-react';
 import './Sidebar.css';
 
@@ -28,6 +31,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile
 }) => {
   const { activeCandidate, candidates, setActiveCandidate } = useApp();
+  const { user, logout } = useAuth();
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
@@ -117,12 +121,43 @@ export const Sidebar: React.FC<SidebarProps> = ({
         })}
       </nav>
 
-      {/* Footer Info */}
+      {/* Footer Info & Auth */}
       <div className="sidebar-footer">
         <div className="footer-card">
           <p className="footer-title">Pilot Mama Copilot</p>
           <p className="footer-sub">Smart Matching & Tailored Resumes</p>
         </div>
+
+        {user ? (
+          <div className="sidebar-user-section" style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ overflow: 'hidden' }}>
+              <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
+                {user.candidateProfile?.fullName || user.email.split('@')[0]}
+              </div>
+              <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                {user.role}
+              </div>
+            </div>
+            <button
+              onClick={() => logout()}
+              title="Sign Out"
+              aria-label="Sign Out"
+              style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', padding: '6px', borderRadius: 'var(--radius-sm)', display: 'inline-flex', alignItems: 'center' }}
+            >
+              <LogOut size={16} />
+            </button>
+          </div>
+        ) : (
+          <div style={{ marginTop: '0.75rem' }}>
+            <button
+              onClick={() => handleItemClick('auth')}
+              style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px', padding: '8px', fontSize: '0.8125rem', fontWeight: 600, background: 'var(--bg-surface-hover)', border: '1px solid var(--border-primary)', borderRadius: 'var(--radius-md)', color: 'var(--accent-primary)', cursor: 'pointer' }}
+            >
+              <LogIn size={15} />
+              <span>Sign In / Register</span>
+            </button>
+          </div>
+        )}
       </div>
     </aside>
     </>
