@@ -8,7 +8,7 @@
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "seed": "tsx src/database/seed.ts",
-    "test": "tsx src/tests/runTests.ts"
+    "test": "tsx src/tests/runTests.ts && tsx --test src/tests/*.test.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.21.0",

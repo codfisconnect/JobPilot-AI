@@ -7,6 +7,7 @@ import {
   Briefcase,
   FileText,
   Send,
+  Bookmark,
   Headphones,
   Settings,
   Sparkles,
@@ -38,6 +39,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'profile', label: 'My Profile', icon: User },
     { id: 'resumes', label: 'Resumes', icon: FileText },
     { id: 'jobs', label: 'Jobs', icon: Briefcase },
+    { id: 'applications', label: 'Applications', icon: Send },
+    { id: 'saved-jobs', label: 'Saved Jobs', icon: Bookmark },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
