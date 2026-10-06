@@ -605,6 +605,42 @@ class ApiClient {
       body: JSON.stringify(data)
     });
   }
+
+  // Sprint 9: AI Career Agent APIs
+  async createAgentSession(title?: string): Promise<{ success: boolean; data: any }> {
+    return this.request('/agent/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ title })
+    });
+  }
+
+  async getAgentSessions(): Promise<{ success: boolean; data: any[] }> {
+    return this.request('/agent/sessions');
+  }
+
+  async getAgentSession(sessionId: string): Promise<{ success: boolean; data: any }> {
+    return this.request(`/agent/sessions/${sessionId}`);
+  }
+
+  async sendAgentMessage(sessionId: string, message: string): Promise<{ success: boolean; data: { message: any; action?: any } }> {
+    return this.request(`/agent/sessions/${sessionId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ message })
+    });
+  }
+
+  async approveAgentAction(actionId: string): Promise<{ success: boolean; data: any }> {
+    return this.request(`/agent/actions/${actionId}/approve`, {
+      method: 'POST'
+    });
+  }
+
+  async rejectAgentAction(actionId: string, reason?: string): Promise<{ success: boolean; data: any }> {
+    return this.request(`/agent/actions/${actionId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason })
+    });
+  }
 }
 
 export const apiClient = new ApiClient();

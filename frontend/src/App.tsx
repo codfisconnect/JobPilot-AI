@@ -13,6 +13,7 @@ import { CareerPage } from "./pages/CareerPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { PricingPage } from "./pages/PricingPage";
 import { EmployerPage } from "./pages/EmployerPage";
+import { CareerAgentPage } from "./pages/CareerAgentPage";
 import { AuthPage } from "./pages/AuthPage";
 
 export const App: React.FC = () => {
@@ -112,6 +113,12 @@ export const App: React.FC = () => {
 
       {currentTab === 'employer' && (
         <EmployerPage
+          onNavigate={handleNavigate}
+        />
+      )}
+
+      {currentTab === 'agent' && (
+        <CareerAgentPage
           onNavigate={handleNavigate}
         />
       )}

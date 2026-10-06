@@ -123,6 +123,7 @@ model CandidateProfile {
   careerAssessments CareerTrackAssessment[]
   applications      Application[]
   savedJobs         SavedJob[]
+  agentSessions     AgentSession[]
 
   @@map("candidate_profiles")
 }
@@ -1145,3 +1146,82 @@ model EmployerApplicationReview {
   @@index([stage])
   @@map("employer_application_reviews")
 }
+
+// ==========================================
+// SPRINT 9: ADVANCED AI CAREER AGENT
+// ==========================================
+
+enum AgentSessionStatus {
+  ACTIVE
+  PAUSED
+  COMPLETED
+  ARCHIVED
+}
+
+enum AgentActionStatus {
+  PROPOSED
+  WAITING_FOR_APPROVAL
+  APPROVED
+  REJECTED
+  EXECUTED
+  FAILED
+}
+
+enum AgentActionType {
+  RECOMMENDATION
+  TAILOR_RESUME
+  PREPARE_INTERVIEW
+  CREATE_APPLICATION_DRAFT
+  UPDATE_LEARNING_PLAN
+}
+
+model AgentSession {
+  id                 String             @id @default(uuid())
+  candidateProfileId String             @map("candidate_profile_id")
+  title              String             @default("Career Copilot Session")
+  status             AgentSessionStatus @default(ACTIVE)
+  summaryContext     Json?              @map("summary_context")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  candidateProfile   CandidateProfile   @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  messages           AgentMessage[]
+  actions            AgentAction[]
+
+  @@index([candidateProfileId])
+  @@map("agent_sessions")
+}
+
+model AgentMessage {
+  id        String       @id @default(uuid())
+  sessionId String       @map("session_id")
+  role      String       // USER, ASSISTANT, SYSTEM
+  content   String
+  metadata  Json?
+  createdAt DateTime     @default(now()) @map("created_at")
+
+  session   AgentSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@map("agent_messages")
+}
+
+model AgentAction {
+  id          String            @id @default(uuid())
+  sessionId   String            @map("session_id")
+  actionType  AgentActionType   @map("action_type")
+  description String
+  payload     Json              // Proposed execution payload
+  status      AgentActionStatus @default(PROPOSED)
+  creditCost  Int               @default(0) @map("credit_cost")
+  executedAt  DateTime?         @map("executed_at")
+  createdAt   DateTime          @default(now()) @map("created_at")
+  updatedAt   DateTime          @updatedAt @map("updated_at")
+
+  session     AgentSession      @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId])
+  @@index([status])
+  @@map("agent_actions")
+}
+

@@ -16,6 +16,7 @@ import { careerRouter } from './modules/career/career.routes.js';
 import { applicationRouter, savedJobRouter } from './modules/applications/application.routes.js';
 import { billingRouter } from './modules/billing/billing.routes.js';
 import { employerRouter } from './modules/employer/employer.routes.js';
+import { agentRouter } from './modules/agent/agent.routes.js';
 import { apiRouter as prototypeApiRouter } from './routes/api.routes.js';
 import { getDb } from './database/db.js';
 import { logger } from './utils/logger.js';
@@ -55,6 +56,7 @@ app.use('/api/v1/interview', interviewRouter);
 app.use('/api/v1/career', careerRouter);
 app.use('/api/v1/billing', billingRouter);
 app.use('/api/v1/employer', employerRouter);
+app.use('/api/v1/agent', agentRouter);
 app.use('/api/v1', healthRouter);
 
 // 4. Preserved Prototype API Routes
