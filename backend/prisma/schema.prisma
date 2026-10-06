@@ -64,13 +64,39 @@ model RefreshToken {
   @@map("refresh_tokens")
 }
 
+enum ResumeStatus {
+  UPLOADED
+  PARSING
+  PARSED
+  PARSE_REVIEW_REQUIRED
+  FAILED
+  ARCHIVED
+}
+
+enum ResumeSource {
+  UPLOADED
+  GENERATED
+}
+
+enum SkillSource {
+  MANUAL
+  RESUME
+  IMPORTED
+}
+
 model CandidateProfile {
   id           String   @id @default(uuid())
   userId       String   @unique @map("user_id")
   fullName     String   @map("full_name")
   headline     String?
   phone        String?
+  email        String?
   location     String?
+  country      String?
+  city         String?
+  stateProvince String? @map("state_province")
+  postalCode   String?  @map("postal_code")
+  summary      String?
   bio          String?
   linkedinUrl  String?  @map("linkedin_url")
   githubUrl    String?  @map("github_url")
@@ -78,9 +104,14 @@ model CandidateProfile {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
-  user        User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
-  preferences CandidatePreference?
-  resumes     Resume[]
+  user           User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+  preferences    CandidatePreference?
+  resumes        Resume[]
+  experiences    Experience[]
+  educations     Education[]
+  certifications Certification[]
+  skills         CandidateSkill[]
+  projects       Project[]
 
   @@map("candidate_profiles")
 }
@@ -89,10 +120,18 @@ model CandidatePreference {
   id                 String     @id @default(uuid())
   candidateProfileId String     @unique @map("candidate_profile_id")
   targetRoles        String[]   @map("target_roles")
-  workModes          WorkMode[] @map("work_modes")
   preferredLocations String[]   @map("preferred_locations")
+  preferredCountries String[]   @map("preferred_countries")
+  remotePreference   String?    @map("remote_preference") // e.g. REMOTE, HYBRID, ONSITE, ANY
+  employmentType     String?    @map("employment_type") // e.g. FULL_TIME, CONTRACT, PART_TIME
+  salaryExpectations String?    @map("salary_expectations")
   minSalary          Int?       @map("min_salary")
+  maxSalary          Int?       @map("max_salary")
   currency           String     @default("USD")
+  noticePeriod       String?    @map("notice_period")
+  willingToRelocate  Boolean    @default(false) @map("willing_to_relocate")
+  preferredWorkArrangement String? @map("preferred_work_arrangement")
+  workModes          WorkMode[] @map("work_modes")
   createdAt          DateTime   @default(now()) @map("created_at")
   updatedAt          DateTime   @updatedAt @map("updated_at")
 
@@ -101,16 +140,139 @@ model CandidatePreference {
   @@map("candidate_preferences")
 }
 
+model Experience {
+  id                 String    @id @default(uuid())
+  candidateProfileId String    @map("candidate_profile_id")
+  company            String
+  jobTitle           String    @map("job_title")
+  location           String?
+  employmentType     String?   @map("employment_type")
+  startDate          DateTime  @map("start_date")
+  endDate            DateTime? @map("end_date")
+  isCurrent          Boolean   @default(false) @map("is_current")
+  description        String?
+  responsibilities   String[]  @default([])
+  achievements       String[]  @default([])
+  technologies       String[]  @default([])
+  displayOrder       Int       @default(0) @map("display_order")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+
+  @@index([candidateProfileId])
+  @@map("experiences")
+}
+
+model Education {
+  id                 String    @id @default(uuid())
+  candidateProfileId String    @map("candidate_profile_id")
+  institution        String
+  degree             String
+  fieldOfStudy       String?   @map("field_of_study")
+  location           String?
+  startDate          DateTime? @map("start_date")
+  endDate            DateTime? @map("end_date")
+  gradeGpa           String?   @map("grade_gpa")
+  description        String?
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+
+  @@index([candidateProfileId])
+  @@map("educations")
+}
+
+model Certification {
+  id                  String    @id @default(uuid())
+  candidateProfileId  String    @map("candidate_profile_id")
+  name                String
+  issuingOrganization String    @map("issuing_organization")
+  issueDate           DateTime? @map("issue_date")
+  expirationDate      DateTime? @map("expiration_date")
+  credentialId        String?   @map("credential_id")
+  credentialUrl       String?   @map("credential_url")
+  createdAt           DateTime  @default(now()) @map("created_at")
+  updatedAt           DateTime  @updatedAt @map("updated_at")
+
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+
+  @@index([candidateProfileId])
+  @@map("certifications")
+}
+
+model Skill {
+  id        String        @id @default(uuid())
+  name      String        @unique
+  category  SkillCategory @default(TECHNICAL)
+  createdAt DateTime      @default(now()) @map("created_at")
+  updatedAt DateTime      @updatedAt @map("updated_at")
+
+  candidateSkills CandidateSkill[]
+
+  @@map("skills")
+}
+
+model CandidateSkill {
+  id                 String      @id @default(uuid())
+  candidateProfileId String      @map("candidate_profile_id")
+  skillId            String      @map("skill_id")
+  proficiency        String?     // e.g. Beginner, Intermediate, Advanced, Expert (when provided)
+  yearsOfExperience  Float?      @map("years_of_experience") // only when explicitly stated
+  source             SkillSource @default(MANUAL)
+  displayOrder       Int         @default(0) @map("display_order")
+  createdAt          DateTime    @default(now()) @map("created_at")
+  updatedAt          DateTime    @updatedAt @map("updated_at")
+
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  skill            Skill            @relation(fields: [skillId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateProfileId, skillId])
+  @@index([candidateProfileId])
+  @@map("candidate_skills")
+}
+
+model Project {
+  id                 String    @id @default(uuid())
+  candidateProfileId String    @map("candidate_profile_id")
+  name               String
+  description        String?
+  role               String?
+  technologies       String[]  @default([])
+  url                String?
+  startDate          DateTime? @map("start_date")
+  endDate            DateTime? @map("end_date")
+  displayOrder       Int       @default(0) @map("display_order")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+
+  @@index([candidateProfileId])
+  @@map("projects")
+}
+
 model Resume {
-  id                 String   @id @default(uuid())
-  candidateProfileId String   @map("candidate_profile_id")
-  title              String
-  isMaster           Boolean  @default(false) @map("is_master")
-  filePath           String?  @map("file_path")
-  rawText            String?  @map("raw_text")
-  parsedData         Json?    @map("parsed_data")
-  createdAt          DateTime @default(now()) @map("created_at")
-  updatedAt          DateTime @updatedAt @map("updated_at")
+  id                 String       @id @default(uuid())
+  candidateProfileId String       @map("candidate_profile_id")
+  title              String       @default("Master Resume")
+  isMaster           Boolean      @default(false) @map("is_master")
+  originalFileName   String?      @map("original_file_name")
+  mimeType           String?      @map("mime_type")
+  fileSize           Int?         @map("file_size")
+  storageProvider    String       @default("local") @map("storage_provider")
+  storageKey         String?      @map("storage_key")
+  status             ResumeStatus @default(UPLOADED)
+  source             ResumeSource @default(UPLOADED)
+  filePath           String?      @map("file_path")
+  rawText            String?      @map("raw_text")
+  parsedData         Json?        @map("parsed_data")
+  uploadedAt         DateTime     @default(now()) @map("uploaded_at")
+  parsedAt           DateTime?    @map("parsed_at")
+  archivedAt         DateTime?    @map("archived_at")
+  createdAt          DateTime     @default(now()) @map("created_at")
+  updatedAt          DateTime     @updatedAt @map("updated_at")
 
   candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
   versions         ResumeVersion[]
@@ -122,9 +284,13 @@ model Resume {
 model ResumeVersion {
   id                String         @id @default(uuid())
   resumeId          String         @map("resume_id")
+  versionNumber     Int            @default(1) @map("version_number")
+  title             String         @default("Resume Version")
+  summary           String?
   jobId             String?        @map("job_id")
   versionName       String         @map("version_name")
   strategy          ResumeStrategy @default(TARGETED)
+  contentSnapshot   Json?          @map("content_snapshot")
   structuredContent Json           @map("structured_content")
   pdfPath           String?        @map("pdf_path")
   docxPath          String?        @map("docx_path")

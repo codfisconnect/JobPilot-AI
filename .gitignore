@@ -14,3 +14,7 @@ build/
 
 resumes/generated/*
 !resumes/generated/.gitkeep
+
+# Sprint 2 Private storage
+backend/storage/
+storage/

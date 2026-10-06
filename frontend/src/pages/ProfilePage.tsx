@@ -25,6 +25,8 @@ import {
 } from 'lucide-react';
 import './ProfilePage.css';
 
+import { ResumeUploadManager } from '../components/profile/ResumeUploadManager';
+
 export const ProfilePage: React.FC = () => {
   const { activeCandidate, setActiveCandidate, refreshCandidates, showToast } = useApp();
   const [profile, setProfile] = useState(activeCandidate);
@@ -192,6 +194,9 @@ export const ProfilePage: React.FC = () => {
           </Button>
         </div>
       </div>
+
+      {/* Production Resume Vault & Parser Area */}
+      <ResumeUploadManager onProfileUpdated={refreshCandidates} />
 
       {/* Profile Sections Grid */}
       <div className="profile-grid">

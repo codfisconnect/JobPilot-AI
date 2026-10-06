@@ -6,6 +6,9 @@ import { requestLogger } from './middleware/requestLogger.middleware.js';
 import { errorHandler } from './middleware/error.middleware.js';
 import { authRouter } from './routes/v1/auth.routes.js';
 import { healthRouter } from './routes/v1/health.routes.js';
+import { candidateRouter } from './routes/v1/candidate.routes.js';
+import { resumeRouter } from './routes/v1/resume.routes.js';
+import { resumeVersionRouter } from './routes/v1/resumeVersion.routes.js';
 import { apiRouter as prototypeApiRouter } from './routes/api.routes.js';
 import { getDb } from './database/db.js';
 import { logger } from './utils/logger.js';
@@ -19,7 +22,7 @@ app.use(requestLogger);
 app.use(cors({
   origin: env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id']
 }));
 
@@ -29,6 +32,9 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // 3. V1 Production API Routes
 app.use('/api/v1/auth', authRouter);
+app.use('/api/v1/candidates', candidateRouter);
+app.use('/api/v1/resumes', resumeRouter);
+app.use('/api/v1/resume-versions', resumeVersionRouter);
 app.use('/api/v1', healthRouter);
 
 // 4. Preserved Prototype API Routes
