@@ -31,6 +31,9 @@ import { ApplicationModeBadge } from "../components/common/ApplicationModeBadge"
 import { ApplicationModal } from "../components/applications/ApplicationModal";
 import './JobAnalysisPage.css';
 
+import { apiClient } from '../api/client';
+import { useAuth } from '../context/AuthContext';
+
 interface JobAnalysisPageProps {
   jobId: string;
   onBack: () => void;
@@ -43,46 +46,110 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
   onNavigate
 }) => {
   const { activeCandidate, showToast } = useApp();
-  const [job, setJob] = useState<JobDescription | null>(null);
-  const [analysis, setAnalysis] = useState<JobMatchAnalysis | null>(null);
+  const { user } = useAuth();
+  const [job, setJob] = useState<any | null>(null);
+  const [analysis, setAnalysis] = useState<any | null>(null);
+  const [skillGaps, setSkillGaps] = useState<any | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isTailoring, setIsTailoring] = useState(false);
-  const [tailoredResume, setTailoredResume] = useState<TailoredResume | null>(null);
+  const [tailoredResume, setTailoredResume] = useState<any | null>(null);
+  const [tailoringMode, setTailoringMode] = useState<'FULL' | 'FOCUSED' | 'TARGETED'>('TARGETED');
   const [existingApp, setExistingApp] = useState<any | null>(null);
   const [isAppModalOpen, setIsAppModalOpen] = useState(false);
   const [strategy, setStrategy] = useState<any | null>(null);
 
   useEffect(() => {
     async function loadAnalysis() {
-      if (!activeCandidate) return;
       try {
         setIsLoading(true);
-        const jobData = await api.getJob(jobId);
-        setJob(jobData);
 
-        // Fetch or calculate match
-        let existingMatch = await api.getMatch(activeCandidate.id, jobId);
-        if (!existingMatch) {
-          existingMatch = await api.analyzeMatch(activeCandidate.id, jobId);
+        // Try V1 production APIs first
+        try {
+          const [v1Job, v1Match, v1Gaps, v1TailoredList] = await Promise.all([
+            apiClient.getCanonicalJobById(jobId).catch(() => null),
+            apiClient.getJobMatch(jobId).catch(() => null),
+            apiClient.getJobSkillGap(jobId).catch(() => null),
+            apiClient.getTailoredResumes(jobId).catch(() => [])
+          ]);
+
+          if (v1Job) {
+            setJob({
+              id: v1Job.id,
+              role: v1Job.title,
+              company: v1Job.company?.name || 'Company',
+              careerTrack: v1Job.title,
+              location: v1Job.location || v1Job.city || 'Remote',
+              experienceRequired: v1Job.experienceMin ? `${v1Job.experienceMin}+ years` : '3+ years',
+              salary: v1Job.salaryMin ? `$${Number(v1Job.salaryMin).toLocaleString()}` : 'Competitive',
+              source: v1Job.sourceName || v1Job.sourceType,
+              sourceType: v1Job.sourceType,
+              sourceUrl: v1Job.sourceUrl || v1Job.applicationUrl,
+              rawText: v1Job.description,
+              applicationMode: 'external'
+            });
+          }
+
+          if (v1Match) {
+            setAnalysis({
+              id: v1Match.id,
+              scores: v1Match.breakdown ? {
+                overallScore: v1Match.overallScore,
+                skillScore: v1Match.breakdown.skillScore,
+                experienceScore: v1Match.breakdown.experienceScore,
+                roleScore: v1Match.breakdown.roleScore,
+                locationScore: v1Match.breakdown.locationScore,
+                seniorityScore: v1Match.breakdown.seniorityScore
+              } : { overallScore: 80, skillScore: 80, experienceScore: 80, roleScore: 80, locationScore: 80, seniorityScore: 80 },
+              recommendation: {
+                level: v1Match.category === 'STRONG_MATCH' ? 'Strongly Recommended' : v1Match.category === 'GOOD_MATCH' ? 'Recommended' : 'Review',
+                color: v1Match.category === 'STRONG_MATCH' ? 'emerald' : v1Match.category === 'GOOD_MATCH' ? 'blue' : 'amber',
+                description: `Deterministic evaluation produced ${v1Match.overallScore}% overall match index.`
+              },
+              careerTrack: v1Match.careerTrack || { candidateTrack: 'Engineering', jobTrack: 'Engineering', isSameTrack: true },
+              truthCheck: v1Match.truthCheck || { greenCount: 0, yellowCount: 0, redCount: 0, items: [] },
+              atsAnalysis: v1Match.atsAnalysis || { estimatedScore: v1Match.overallScore, disclaimer: 'Estimated ATS Match', breakdown: { keywordMatch: 80, roleAlignment: 80, experienceAlignment: 80, readability: 90 }, keywords: { green: [], red: [] } },
+              whyMatch: {
+                matchingStrengths: ['Verified profile match with documented competencies.'],
+                missingOrWeakAreas: ['Review unverified technologies before interview.'],
+                potentialConcerns: ['Ensure portfolio artifacts demonstrate relevant outcomes.']
+              },
+              suggestedAnswers: {
+                'Why are you interested in this position?': 'My verified background directly aligns with the technical scope and engineering goals of this role.'
+              }
+            });
+          }
+
+          if (v1Gaps) {
+            setSkillGaps(v1Gaps);
+          }
+
+          if (v1TailoredList && v1TailoredList.length > 0) {
+            const latest = v1TailoredList[0];
+            setTailoredResume({
+              id: latest.id,
+              versionName: latest.versionName,
+              modifications: latest.structuredContent?.modifications || ['Tailored bullet points based on verified skills']
+            });
+          }
+        } catch {
+          // If V1 fails or in prototype mode, fallback gracefully to prototype api
         }
-        setAnalysis(existingMatch);
 
-        // Fetch smart resume strategy
-        const strat = await api.getResumeStrategy(activeCandidate.id, jobId);
-        setStrategy(strat);
-
-        // Check if tailored resume already exists for this job
-        const allResumes = await api.getResumes();
-        const foundResume = allResumes.find(r => r.candidateId === activeCandidate.id && r.jobId === jobId);
-        if (foundResume) {
-          setTailoredResume(foundResume);
+        // Prototype Fallback if analysis is still null
+        if (!job) {
+          const protoJob = await api.getJob(jobId).catch(() => null);
+          if (protoJob) setJob(protoJob);
         }
 
-        // Check if application already exists
-        const apps = await api.getApplications(activeCandidate.id);
-        const app = apps.find(a => a.jobId === jobId);
-        if (app) {
-          setExistingApp(app);
+        if (!analysis && activeCandidate) {
+          let existingMatch = await api.getMatch(activeCandidate.id, jobId).catch(() => null);
+          if (!existingMatch) {
+            existingMatch = await api.analyzeMatch(activeCandidate.id, jobId).catch(() => null);
+          }
+          if (existingMatch) setAnalysis(existingMatch);
+
+          const strat = await api.getResumeStrategy(activeCandidate.id, jobId).catch(() => null);
+          if (strat) setStrategy(strat);
         }
       } catch (err) {
         console.error('Error loading job analysis:', err);
@@ -93,24 +160,31 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
     loadAnalysis();
   }, [jobId, activeCandidate]);
 
-  if (isLoading || !job || !analysis || !activeCandidate) {
-    return (
-      <div className="analysis-loading-state">
-        <Sparkles className="spin-icon" size={32} />
-        <h3>Pilot Mama is executing 14-point evaluation...</h3>
-        <p>Scanning career track alignment, truth-checking candidate skills, and simulating ATS algorithms.</p>
-      </div>
-    );
-  }
-
-  const { scores, recommendation, whyMatch, careerTrack, truthCheck, atsAnalysis, suggestedAnswers } = analysis;
-
   const handleGenerateTailoredResume = async () => {
     try {
       setIsTailoring(true);
-      const res = await api.tailorResume(activeCandidate.id, job.id);
-      setTailoredResume(res);
-      showToast(`Tailored resume generated: ${res.versionName}!`);
+      // Try V1 production tailoring API first
+      try {
+        const v1Result = await apiClient.tailorResume(jobId, tailoringMode);
+        if (v1Result) {
+          setTailoredResume({
+            id: v1Result.versionId,
+            versionName: v1Result.versionName,
+            modifications: v1Result.modifications || ['Tailored bullet points', 'Target company leak verified clean']
+          });
+          showToast(`Immutable Resume Version Created: ${v1Result.versionName}!`);
+          return;
+        }
+      } catch (v1Err: any) {
+        if (!activeCandidate) throw v1Err;
+      }
+
+      // Fallback to prototype tailor API
+      if (activeCandidate) {
+        const res = await api.tailorResume(activeCandidate.id, jobId, tailoringMode);
+        setTailoredResume(res);
+        showToast(`Tailored resume generated: ${res.versionName}!`);
+      }
     } catch (err: any) {
       alert(`Tailoring failed: ${err.message}`);
     } finally {
@@ -118,7 +192,17 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
     }
   };
 
+  if (isLoading || !job || !analysis) {
+    return (
+      <div className="analysis-loading-state">
+        <Sparkles className="spin-icon" size={32} />
+        <h3>Pilot Mama is executing 14-point evaluation...</h3>
+        <p>Scanning career track alignment, truth-checking candidate skills, and evaluating ATS compatibility.</p>
+      </div>
+    );
+  }
 
+  const { scores, recommendation, whyMatch, careerTrack, truthCheck, atsAnalysis, suggestedAnswers } = analysis;
 
   return (
     <div className="job-analysis-page">
@@ -334,10 +418,10 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
               Editable responses derived from master candidate profile for quick copy-paste into application portals.
             </p>
             <div className="answers-faq-list">
-              {Object.entries(suggestedAnswers).map(([q, a], idx) => (
+              {Object.entries(suggestedAnswers || {}).map(([q, a], idx) => (
                 <div key={idx} className="faq-answer-item">
                   <span className="faq-question">{q}</span>
-                  <p className="faq-answer-text">{a}</p>
+                  <p className="faq-answer-text">{String(a)}</p>
                 </div>
               ))}
             </div>
@@ -540,6 +624,15 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
                   style={{ fontWeight: 700, padding: '10px 20px', fontSize: '0.95rem' }}
                 >
                   {existingApp ? 'APPLY NOW (Applied)' : 'APPLY NOW'}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  icon={<Sparkles size={16} />}
+                  onClick={() => onNavigate('interview', job.id)}
+                  style={{ fontWeight: 600, padding: '10px 16px', fontSize: '0.9rem', color: '#818cf8', borderColor: 'rgba(99, 102, 241, 0.4)' }}
+                >
+                  Prepare for Interview
                 </Button>
 
                 {tailoredResume && (

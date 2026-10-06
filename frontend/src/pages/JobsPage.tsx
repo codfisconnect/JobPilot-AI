@@ -1,28 +1,28 @@
 import React, { useState, useEffect } from 'react';
-import { useApp } from "../context/AppContext";
-import { Card } from "../components/common/Card";
-import { Button } from "../components/common/Button";
-import { Badge } from "../components/common/Badge";
-import { Modal } from "../components/common/Modal";
-import { api } from "../api/index";
-import { JobDescription } from "../types/index";
+import { CanonicalJob } from '../types/job.types';
+import { apiClient } from '../api/client';
+import { JobCard } from '../components/jobs/JobCard';
+import { JobDetailModal } from '../components/jobs/JobDetailModal';
+import { Button } from '../components/common/Button';
+import { Modal } from '../components/common/Modal';
+import { api } from '../api/index';
 import {
-  Briefcase,
   Search,
+  Filter,
+  RefreshCw,
   Plus,
-  Globe,
+  Briefcase,
+  AlertCircle,
   FileText,
-  MapPin,
-  Clock,
-  ArrowRight,
+  Globe,
   Sparkles,
-  AlertCircle
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
-import { ApplicationModeBadge } from "../components/common/ApplicationModeBadge";
 import './JobsPage.css';
 
 interface JobsPageProps {
-  onSelectJobForAnalysis: (jobId: string) => void;
+  onSelectJobForAnalysis?: (jobId: string) => void;
   preselectedJobId?: string;
 }
 
@@ -30,137 +30,181 @@ export const JobsPage: React.FC<JobsPageProps> = ({
   onSelectJobForAnalysis,
   preselectedJobId
 }) => {
-  const { activeCandidate } = useApp();
-  const [jobs, setJobs] = useState<JobDescription[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterTrack, setFilterTrack] = useState('All');
-  const [filterSource, setFilterSource] = useState<'All' | 'Predefined' | 'Codewalla'>('All');
+  // Discovery and Query state
+  const [jobs, setJobs] = useState<CanonicalJob[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // Filter params
+  const [searchQuery, setSearchQuery] = useState('');
+  const [remoteFilter, setRemoteFilter] = useState('');
+  const [employmentFilter, setEmploymentFilter] = useState('');
+  const [sourceFilter, setSourceFilter] = useState('');
+
+  // Pagination
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+
+  // Syncing state
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Input Modal state
+  // Detail Modal state
+  const [selectedJob, setSelectedJob] = useState<CanonicalJob | null>(null);
+  const [isDetailOpen, setIsDetailOpen] = useState(false);
+
+  // Add Job Modal state (Preserved prototype workflow)
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
   const [inputTab, setInputTab] = useState<'paste' | 'url'>('paste');
   const [pastedJD, setPastedJD] = useState('');
   const [jobUrl, setJobUrl] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [modalError, setModalError] = useState<string | null>(null);
 
-  const fetchJobs = async () => {
+  const fetchCanonicalJobs = async (targetPage = 1) => {
+    setLoading(true);
+    setError(null);
     try {
-      const list = await api.getJobs();
-      setJobs(list);
-    } catch (err) {
-      console.error(err);
+      const res = await apiClient.getCanonicalJobs({
+        query: searchQuery || undefined,
+        remoteType: remoteFilter || undefined,
+        employmentType: employmentFilter || undefined,
+        sourceType: sourceFilter || undefined,
+        page: targetPage,
+        pageSize: 12
+      });
+
+      setJobs(res.data);
+      if (res.pagination) {
+        setPage(res.pagination.page);
+        setTotalPages(res.pagination.totalPages);
+        setTotalCount(res.pagination.total);
+      }
+    } catch (err: any) {
+      console.error('Failed to load canonical jobs:', err);
+      // Fallback: If DB table is empty or unauthenticated in dev, fetch prototype jobs gracefully
+      try {
+        const protoJobs = await api.getJobs();
+        const mapped = protoJobs.map((pj: any) => ({
+          id: pj.id,
+          title: pj.role,
+          company: { id: 'comp-' + pj.id, name: pj.company },
+          description: pj.rawText || pj.role,
+          responsibilities: pj.responsibilities || [],
+          requirements: pj.qualifications || [],
+          preferredQualifications: [],
+          remoteType: (pj.workMode?.toUpperCase().includes('REMOTE') ? 'REMOTE' : 'ON_SITE') as any,
+          employmentType: 'FULL_TIME' as any,
+          status: 'ACTIVE' as any,
+          sourceType: pj.source || 'PROTOTYPE',
+          sourceName: pj.source || 'Predefined',
+          sourceUrl: pj.sourceUrl || '#',
+          applicationUrl: pj.applicationUrl || pj.sourceUrl,
+          firstSeenAt: new Date().toISOString(),
+          lastSeenAt: new Date().toISOString(),
+          skills: (pj.mustHaveSkills || []).map((s: string) => ({ id: s, name: s, category: 'TECHNICAL', type: 'REQUIRED' as any }))
+        }));
+        setJobs(mapped);
+        setTotalPages(1);
+        setTotalCount(mapped.length);
+      } catch (fErr: any) {
+        setError(err.message || 'Unable to fetch job opportunities');
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
-  const handleSyncCodewalla = async () => {
+  useEffect(() => {
+    fetchCanonicalJobs(1);
+  }, [remoteFilter, employmentFilter, sourceFilter]);
+
+  const handleSearchSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    fetchCanonicalJobs(1);
+  };
+
+  const handleSyncAll = async () => {
+    setIsSyncing(true);
     try {
-      setIsSyncing(true);
-      await api.syncJobSource('codewalla');
-      await fetchJobs();
+      await apiClient.syncJobs();
+      await fetchCanonicalJobs(1);
     } catch (err) {
-      console.error('Failed to sync Codewalla jobs:', err);
+      console.warn('Sync notice:', err);
+      // Run fallback codewalla sync
+      await api.syncJobSource('codewalla').catch(() => {});
+      await fetchCanonicalJobs(1);
     } finally {
       setIsSyncing(false);
     }
   };
 
-  useEffect(() => {
-    fetchJobs();
-  }, []);
-
-  useEffect(() => {
-    if (preselectedJobId && jobs.length > 0) {
-      onSelectJobForAnalysis(preselectedJobId);
-    }
-  }, [preselectedJobId, jobs]);
+  const handleOpenJobDetail = (job: CanonicalJob) => {
+    setSelectedJob(job);
+    setIsDetailOpen(true);
+  };
 
   const handleAddJob = async () => {
-    setErrorMessage(null);
+    setModalError(null);
     setIsProcessing(true);
-
     try {
       if (inputTab === 'paste') {
         if (!pastedJD.trim()) {
-          setErrorMessage('Please paste the job description text.');
+          setModalError('Please paste the job description text.');
           setIsProcessing(false);
           return;
         }
         const created = await api.parseJob(pastedJD, 'pasted');
-        await fetchJobs();
+        await fetchCanonicalJobs(1);
         setIsAddModalOpen(false);
         setPastedJD('');
-        onSelectJobForAnalysis(created.id);
+        if (onSelectJobForAnalysis) onSelectJobForAnalysis(created.id);
       } else {
         if (!jobUrl.trim()) {
-          setErrorMessage('Please enter a valid job URL.');
+          setModalError('Please enter a valid job URL.');
           setIsProcessing(false);
           return;
         }
         const res = await api.extractJobUrl(jobUrl);
         if (!res.success && res.fallbackRequired) {
-          setErrorMessage('Unable to reliably extract this job page. Paste the job description instead.');
+          setModalError('Unable to extract job page automatically. Paste the job description text instead.');
           setInputTab('paste');
           setIsProcessing(false);
           return;
         }
         if (res.data) {
-          await fetchJobs();
+          await fetchCanonicalJobs(1);
           setIsAddModalOpen(false);
           setJobUrl('');
-          onSelectJobForAnalysis(res.data.id);
+          if (onSelectJobForAnalysis) onSelectJobForAnalysis(res.data.id);
         }
       }
     } catch (err: any) {
-      setErrorMessage(err.message || 'Failed to process job opportunity');
+      setModalError(err.message || 'Failed to process job opportunity');
     } finally {
       setIsProcessing(false);
     }
   };
 
-  // Filtered jobs
-  const filtered = jobs.filter(j => {
-    const matchesSearch =
-      j.role.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      j.company.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      j.mustHaveSkills.some(s => s.toLowerCase().includes(searchTerm.toLowerCase()));
-
-    const matchesTrack =
-      filterTrack === 'All' || j.careerTrack.toLowerCase().includes(filterTrack.toLowerCase());
-
-    const matchesSource =
-      filterSource === 'All'
-        ? true
-        : filterSource === 'Codewalla'
-        ? j.source === 'Codewalla' || j.isExternal === true
-        : !j.isExternal && j.source !== 'Codewalla';
-
-    return matchesSearch && matchesTrack && matchesSource;
-  });
-
-  const tracks = ['All', 'QA Automation', 'Java Backend', 'Full Stack', 'Data Analytics', 'DevOps'];
-  const sources: ('All' | 'Predefined' | 'Codewalla')[] = ['All', 'Predefined', 'Codewalla'];
-
   return (
     <div className="jobs-page">
-      {/* Header and Controls */}
+      {/* Header & Main Ingestion Controls */}
       <div className="jobs-header-row">
         <div>
-          <h2 className="jobs-page-title">Jobs & Opportunities Catalog</h2>
+          <h2 className="jobs-page-title">Production Job Discovery Engine</h2>
           <p className="jobs-page-sub">
-            Review live Codewalla and predefined opportunities. Run deep truth checking, ATS simulation, and resume tailoring.
+            Real-time multi-source job aggregation across Codewalla, Greenhouse, Lever, and Ashby with automated deduplication & source transparency.
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div className="jobs-actions-group">
           <Button
             variant="outline"
-            icon={<Sparkles size={16} />}
+            icon={<RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />}
             loading={isSyncing}
-            onClick={handleSyncCodewalla}
+            onClick={handleSyncAll}
           >
-            {isSyncing ? 'Syncing...' : 'Sync Codewalla Jobs'}
+            {isSyncing ? 'Synchronizing Sources...' : 'Sync Sources'}
           </Button>
 
           <Button
@@ -168,127 +212,148 @@ export const JobsPage: React.FC<JobsPageProps> = ({
             icon={<Plus size={16} />}
             onClick={() => setIsAddModalOpen(true)}
           >
-            Add / Analyze New Job
+            Add Custom Job
           </Button>
         </div>
       </div>
 
       {/* Filter and Search Bar */}
       <div className="search-filter-bar">
-        <div className="search-input-wrap">
+        <form className="search-input-wrap" onSubmit={handleSearchSubmit}>
           <Search size={16} className="search-icon" />
           <input
             type="text"
-            placeholder="Search by role, company, or technology..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
+            placeholder="Search titles, skills, or companies..."
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
           />
-        </div>
+        </form>
 
-        <div className="track-pills" style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-          <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)', fontWeight: 600 }}>Source:</span>
-          {sources.map(s => (
-            <button
-              key={s}
-              className={`track-pill ${filterSource === s ? 'track-pill-active' : ''}`}
-              onClick={() => setFilterSource(s)}
-            >
-              {s === 'Codewalla' ? '🌐 Codewalla' : s === 'Predefined' ? '💼 Predefined' : 'All Sources'}
-            </button>
-          ))}
-        </div>
+        <div className="filter-controls-row">
+          <select
+            className="filter-select"
+            value={remoteFilter}
+            onChange={e => setRemoteFilter(e.target.value)}
+          >
+            <option value="">All Work Modes</option>
+            <option value="REMOTE">Remote</option>
+            <option value="HYBRID">Hybrid</option>
+            <option value="ON_SITE">On-Site</option>
+          </select>
 
-        <div className="track-pills">
-          {tracks.map(t => (
-            <button
-              key={t}
-              className={`track-pill ${filterTrack === t ? 'track-pill-active' : ''}`}
-              onClick={() => setFilterTrack(t)}
-            >
-              {t}
-            </button>
-          ))}
+          <select
+            className="filter-select"
+            value={employmentFilter}
+            onChange={e => setEmploymentFilter(e.target.value)}
+          >
+            <option value="">All Types</option>
+            <option value="FULL_TIME">Full Time</option>
+            <option value="CONTRACT">Contract</option>
+            <option value="INTERNSHIP">Internship</option>
+          </select>
+
+          <select
+            className="filter-select"
+            value={sourceFilter}
+            onChange={e => setSourceFilter(e.target.value)}
+          >
+            <option value="">All Sources</option>
+            <option value="CODEWALLA">Codewalla</option>
+            <option value="GREENHOUSE">Greenhouse</option>
+            <option value="LEVER">Lever</option>
+            <option value="ASHBY">Ashby</option>
+          </select>
+
+          <Button variant="secondary" size="sm" onClick={() => fetchCanonicalJobs(1)}>
+            Apply
+          </Button>
         </div>
       </div>
 
-      {/* Jobs Grid */}
-      <div className="jobs-grid-display">
-        {filtered.map(job => {
-          // Check candidate match heuristic indicator
-          const candSkills = activeCandidate?.primarySkills || [];
-          const matches = job.mustHaveSkills.filter(s => candSkills.includes(s));
-          const matchPercent = Math.round((matches.length / Math.max(1, job.mustHaveSkills.length)) * 100);
+      {/* Results Header */}
+      <div className="jobs-results-meta">
+        <span className="results-count-text">
+          Showing <strong>{jobs.length}</strong> of <strong>{totalCount}</strong> opportunities
+        </span>
+      </div>
 
-          return (
-            <Card
+      {/* Loading & Error States */}
+      {loading && (
+        <div className="jobs-loading-state">
+          <RefreshCw size={28} className="animate-spin" />
+          <span>Discovering & validating canonical opportunities...</span>
+        </div>
+      )}
+
+      {error && !loading && (
+        <div className="jobs-error-banner">
+          <AlertCircle size={20} />
+          <span>{error}</span>
+          <Button variant="outline" size="sm" onClick={() => fetchCanonicalJobs(1)}>
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {/* Empty State */}
+      {!loading && !error && jobs.length === 0 && (
+        <div className="jobs-empty-state">
+          <Briefcase size={40} className="empty-icon" />
+          <h3>No matching job opportunities found</h3>
+          <p>Try broadening your search keywords or reset filter parameters.</p>
+          <Button variant="outline" size="sm" onClick={() => { setSearchQuery(''); setRemoteFilter(''); setEmploymentFilter(''); setSourceFilter(''); fetchCanonicalJobs(1); }}>
+            Reset Filters
+          </Button>
+        </div>
+      )}
+
+      {/* Canonical Jobs Grid */}
+      {!loading && jobs.length > 0 && (
+        <div className="jobs-grid-display">
+          {jobs.map(job => (
+            <JobCard
               key={job.id}
-              className="job-item-card"
-              hoverable
-              onClick={() => onSelectJobForAnalysis(job.id)}
-            >
-              <div className="job-top-meta">
-                <div style={{ display: 'flex', gap: '6px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <span className="job-company-pill">{job.company}</span>
-                  <ApplicationModeBadge
-                    mode={job.applicationMode}
-                    isCodewalla={job.company.toLowerCase().includes('codewalla') || (job.source || '').toLowerCase().includes('codewalla')}
-                    size="sm"
-                  />
-                  {job.source && (
-                    <span style={{
-                      fontSize: '0.72rem',
-                      padding: '2px 8px',
-                      borderRadius: '4px',
-                      background: job.source === 'Codewalla' ? 'rgba(99, 102, 241, 0.15)' : 'rgba(148, 163, 184, 0.1)',
-                      color: job.source === 'Codewalla' ? '#818cf8' : 'var(--text-muted)',
-                      border: `1px solid ${job.source === 'Codewalla' ? 'rgba(99, 102, 241, 0.3)' : 'rgba(255, 255, 255, 0.08)'}`,
-                      fontWeight: 600
-                    }}>
-                      Source: {job.source}
-                    </span>
-                  )}
-                </div>
-                <Badge
-                  variant={
-                    matchPercent >= 70 ? 'emerald' : matchPercent >= 40 ? 'blue' : 'amber'
-                  }
-                  size="sm"
-                >
-                  ~{matchPercent}% Skill Overlap
-                </Badge>
-              </div>
+              job={job}
+              onSelect={handleOpenJobDetail}
+            />
+          ))}
+        </div>
+      )}
 
-              <h3 className="job-title-text">{job.role}</h3>
+      {/* Pagination Controls */}
+      {totalPages > 1 && !loading && (
+        <div className="jobs-pagination-bar">
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page <= 1}
+            icon={<ChevronLeft size={16} />}
+            onClick={() => fetchCanonicalJobs(page - 1)}
+          >
+            Previous
+          </Button>
+          <span className="page-indicator">
+            Page {page} of {totalPages}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={page >= totalPages}
+            icon={<ChevronRight size={16} />}
+            onClick={() => fetchCanonicalJobs(page + 1)}
+          >
+            Next
+          </Button>
+        </div>
+      )}
 
-              <div className="job-details-row">
-                <span><MapPin size={13} /> {job.location}</span>
-                <span><Clock size={13} /> {job.experienceRequired}</span>
-              </div>
-
-              <div className="job-tags-list">
-                {job.mustHaveSkills.map(skill => {
-                  const isVerified = candSkills.includes(skill);
-                  return (
-                    <span
-                      key={skill}
-                      className={`job-skill-chip ${isVerified ? 'skill-verified' : ''}`}
-                    >
-                      {skill} {isVerified && '✓'}
-                    </span>
-                  );
-                })}
-              </div>
-
-              <div className="job-footer-row">
-                <span className="job-salary">{job.salary || 'Competitive'}</span>
-                <span className="analyze-action">
-                  Launch AI Analysis <ArrowRight size={14} />
-                </span>
-              </div>
-            </Card>
-          );
-        })}
-      </div>
+      {/* Canonical Job Detail Modal */}
+      <JobDetailModal
+        job={selectedJob}
+        isOpen={isDetailOpen}
+        onClose={() => { setIsDetailOpen(false); setSelectedJob(null); }}
+        onAnalyzeFit={onSelectJobForAnalysis}
+      />
 
       {/* Add / Parse Job Modal */}
       <Modal
@@ -301,15 +366,15 @@ export const JobsPage: React.FC<JobsPageProps> = ({
           <div className="tab-switcher">
             <button
               className={`tab-btn ${inputTab === 'paste' ? 'tab-btn-active' : ''}`}
-              onClick={() => { setInputTab('paste'); setErrorMessage(null); }}
+              onClick={() => { setInputTab('paste'); setModalError(null); }}
             >
-              <FileText size={16} /> Paste Job Description (Method A)
+              <FileText size={16} /> Paste Job Description
             </button>
             <button
               className={`tab-btn ${inputTab === 'url' ? 'tab-btn-active' : ''}`}
-              onClick={() => { setInputTab('url'); setErrorMessage(null); }}
+              onClick={() => { setInputTab('url'); setModalError(null); }}
             >
-              <Globe size={16} /> Public Job URL (Method B)
+              <Globe size={16} /> Public Job URL
             </button>
           </div>
 
@@ -333,15 +398,15 @@ export const JobsPage: React.FC<JobsPageProps> = ({
                 onChange={e => setJobUrl(e.target.value)}
               />
               <p className="helper-url-text">
-                Pilot Mama will securely inspect visible public page content. If blocked by authentication or anti-bot defenses, it will safely provide a paste-fallback.
+                Pilot Mama securely inspects visible public page content. If blocked by authentication or anti-bot defenses, it will safely provide a paste-fallback.
               </p>
             </div>
           )}
 
-          {errorMessage && (
+          {modalError && (
             <div className="modal-error-notice">
               <AlertCircle size={16} />
-              <span>{errorMessage}</span>
+              <span>{modalError}</span>
             </div>
           )}
 

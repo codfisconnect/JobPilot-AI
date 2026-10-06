@@ -1,5 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
+import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/common/Button';
 import { ThemeToggle } from '../components/theme/ThemeToggle';
 import { PilotMamaLogo } from '../components/branding/PilotMamaLogo';
@@ -18,6 +19,10 @@ export const TopBar: React.FC<TopBarProps> = ({
   isMobileMenuOpen
 }) => {
   const { activeCandidate } = useApp();
+  const { user } = useAuth();
+
+  const candidateName = user?.candidateProfile?.fullName || activeCandidate?.name;
+  const headline = (user?.candidateProfile as any)?.headline || (activeCandidate ? `${activeCandidate.yearsOfExperience}y exp • ${activeCandidate.targetRoles[0] || ''}` : null);
 
   return (
     <header className="app-topbar">
@@ -41,10 +46,10 @@ export const TopBar: React.FC<TopBarProps> = ({
         <div className="topbar-title-wrap">
           <h1 className="topbar-title">Pilot Mama</h1>
           <p className="topbar-sub">
-            <span className="highlight-name">{activeCandidate?.name || 'No Profile'}</span>
-            {activeCandidate && (
+            <span className="highlight-name">{candidateName || 'Complete your profile'}</span>
+            {headline && (
               <span className="meta-details">
-                {` • ${activeCandidate.yearsOfExperience}y exp • ${activeCandidate.targetRoles[0] || ''}`}
+                {` • ${headline}`}
               </span>
             )}
           </p>

@@ -4,11 +4,14 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { JobsPage } from "./pages/JobsPage";
 import { JobAnalysisPage } from "./pages/JobAnalysisPage";
+import { ResumesPage } from "./pages/ResumesPage";
 import { ResumeStudioPage } from "./pages/ResumeStudioPage";
 import { ApplicationsPage } from "./pages/ApplicationsPage";
-import { InterviewPage } from "./pages/InterviewPage";
-import { LearningPage } from "./pages/LearningPage";
+import { SavedJobsPage } from "./pages/SavedJobsPage";
+import { InterviewPrepPage } from "./pages/InterviewPrepPage";
+import { CareerPage } from "./pages/CareerPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { AuthPage } from "./pages/AuthPage";
 
 export const App: React.FC = () => {
   const [currentTab, setCurrentTab] = useState<string>('dashboard');
@@ -19,11 +22,13 @@ export const App: React.FC = () => {
     const tabTitles: Record<string, string> = {
       dashboard: 'Pilot Mama | Dashboard',
       profile: 'Pilot Mama | My Profile',
-      jobs: 'Pilot Mama | Jobs & Matching',
+      jobs: 'Pilot Mama | Jobs',
+      resumes: 'Pilot Mama | Resumes',
       analysis: 'Pilot Mama | Job Fit Analysis',
-      resumes: 'Pilot Mama | Resume Studio',
       applications: 'Pilot Mama | Applications Pipeline',
-      interview: 'Pilot Mama | Interview Prep',
+      'saved-jobs': 'Pilot Mama | Saved Jobs',
+      interview: 'Pilot Mama | Interview Prep Intelligence',
+      career: 'Pilot Mama | Career Intelligence & Roadmap',
       learning: 'Pilot Mama | Learning Academy',
       settings: 'Pilot Mama | Settings & Integrations'
     };
@@ -46,6 +51,10 @@ export const App: React.FC = () => {
         <ProfilePage />
       )}
 
+      {currentTab === 'resumes' && (
+        <ResumesPage onNavigate={handleNavigate} />
+      )}
+
       {currentTab === 'jobs' && (
         <JobsPage
           onSelectJobForAnalysis={jobId => handleNavigate('analysis', jobId)}
@@ -61,7 +70,7 @@ export const App: React.FC = () => {
         />
       )}
 
-      {currentTab === 'resumes' && (
+      {currentTab === 'studio' && (
         <ResumeStudioPage
           preselectedResumeId={contextId}
           onNavigate={handleNavigate}
@@ -75,19 +84,35 @@ export const App: React.FC = () => {
         />
       )}
 
+      {currentTab === 'saved-jobs' && (
+        <SavedJobsPage onNavigate={handleNavigate} />
+      )}
+
       {currentTab === 'interview' && (
-        <InterviewPage
+        <InterviewPrepPage
           preselectedJobId={contextId}
           onNavigate={handleNavigate}
         />
       )}
 
+      {currentTab === 'career' && (
+        <CareerPage
+          onNavigate={handleNavigate}
+        />
+      )}
+
       {currentTab === 'learning' && (
-        <LearningPage />
+        <CareerPage
+          onNavigate={handleNavigate}
+        />
       )}
 
       {currentTab === 'settings' && (
         <SettingsPage />
+      )}
+
+      {currentTab === 'auth' && (
+        <AuthPage onSuccess={() => handleNavigate('dashboard')} />
       )}
     </AppShell>
   );
