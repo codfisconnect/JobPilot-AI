@@ -26,7 +26,14 @@ Key milestones accomplished:
 6. **Health Telemetry**: Created `GET /api/v1/health` checking PostgreSQL connection status, database latency, and process uptime.
 7. **Frontend Auth & API Client**: Centralized `apiClient` (`frontend/src/api/client.ts`), `AuthProvider` / `useAuth` hook (`frontend/src/context/AuthContext.tsx`), and responsive `AuthPage` (`frontend/src/pages/AuthPage.tsx`).
 8. **App Shell & Theme Persistence**: Integrated user session display and sign-out controls into `Sidebar.tsx`, preserving Light/Dark theme persistence and 44px mobile touch ergonomics.
-9. **Automated Test Suites**: Built Node test runner suites for authentication unit tests and API integration tests. All 18 new automated tests and all 63 existing prototype tests pass.
+9. **Automated Test Suites**: Built Node test runner suites for authentication unit tests (`auth.test.ts`), API integration tests (`api.test.ts`), and full end-to-end authentication lifecycle integration tests (`lifecycle.test.ts`). All 26 new automated tests and all 63 existing prototype tests pass (89/89 total).
+10. **PostgreSQL 18 Verification**:
+   - PostgreSQL schema verified and migration status confirmed up-to-date on live local PostgreSQL 18 instance (`pilot_mama_dev`).
+   - Registration, login, `/me` profile retrieval verified.
+   - Refresh token rotation verified with newly issued access tokens and rotated cookies.
+   - Replay defense verified: previously rotated tokens return 401 Unauthorized.
+   - Logout token invalidation verified: refresh tokens purged from database and cookie cleared.
+   - Post-logout refresh rejection verified (returns 401 Unauthorized).
 
 ---
 
