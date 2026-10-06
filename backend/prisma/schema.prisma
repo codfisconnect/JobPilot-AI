@@ -46,11 +46,12 @@ model User {
   employerProfile  EmployerProfile?
   instituteProfile InstituteProfile?
 
-  refreshTokens RefreshToken[]
-  subscriptions Subscription[]
-  creditWallet  CreditWallet?
-  creditLedgers CreditLedger[]
-  payments      Payment[]
+  refreshTokens   RefreshToken[]
+  subscriptions   Subscription[]
+  creditWallet    CreditWallet?
+  creditLedgers   CreditLedger[]
+  payments        Payment[]
+  employerMembers EmployerMember[]
 
   @@map("users")
 }
@@ -407,8 +408,9 @@ model Company {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  sources CompanySource[]
-  jobs    Job[]
+  sources               CompanySource[]
+  jobs                  Job[]
+  employerOrganizations EmployerOrganization[]
 
   @@index([name])
   @@map("companies")
@@ -477,12 +479,15 @@ model Job {
 
   contentHash String @unique @map("content_hash")
 
-  status JobStatus @default(ACTIVE)
+  status                JobStatus          @default(ACTIVE)
+  organizationId        String?            @map("organization_id")
+  organizationJobStatus EmployerJobStatus? @map("organization_job_status")
 
   createdAt DateTime @default(now()) @map("created_at")
   updatedAt DateTime @updatedAt @map("updated_at")
 
   company           Company                       @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  organization      EmployerOrganization?         @relation(fields: [organizationId], references: [id], onDelete: SetNull)
   skills            JobSkill[]
   jobMatches        JobMatch[]
   interviewSessions InterviewPreparationSession[]
@@ -491,6 +496,7 @@ model Job {
   savedJobs         SavedJob[]
 
   @@index([companyId])
+  @@index([organizationId])
   @@index([title])
   @@index([country])
   @@index([city])
@@ -775,12 +781,13 @@ model Application {
   createdAt          DateTime          @default(now()) @map("created_at")
   updatedAt          DateTime          @updatedAt @map("updated_at")
 
-  candidateProfile CandidateProfile           @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
-  job              Job                        @relation(fields: [jobId], references: [id], onDelete: Cascade)
-  resumeVersion    ResumeVersion?             @relation(fields: [resumeVersionId], references: [id], onDelete: SetNull)
+  candidateProfile CandidateProfile            @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  job              Job                         @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  resumeVersion    ResumeVersion?              @relation(fields: [resumeVersionId], references: [id], onDelete: SetNull)
   statusHistory    ApplicationStatusHistory[]
   notes            ApplicationNote[]
   reminders        ApplicationReminder[]
+  reviews          EmployerApplicationReview[]
 
   @@unique([candidateProfileId, jobId])
   @@index([candidateProfileId])
@@ -1042,4 +1049,99 @@ model WebhookEvent {
   @@index([status])
   @@index([eventType])
   @@map("webhook_events")
+}
+
+// ==========================================
+// SPRINT 8: EMPLOYER & RECRUITER PLATFORM
+// ==========================================
+
+enum EmployerRole {
+  OWNER
+  ADMIN
+  RECRUITER
+  HIRING_MANAGER
+}
+
+enum EmployerJobStatus {
+  DRAFT
+  PUBLISHED
+  PAUSED
+  CLOSED
+}
+
+enum EmployerApplicationStage {
+  NEW
+  SCREENING
+  INTERVIEW
+  OFFER
+  HIRED
+  REJECTED
+  ARCHIVED
+}
+
+enum OrgVerificationStatus {
+  UNVERIFIED
+  PENDING
+  VERIFIED
+  REJECTED
+}
+
+model EmployerOrganization {
+  id                 String                @id @default(uuid())
+  name               String
+  slug               String                @unique
+  domain             String?
+  companyId          String?               @map("company_id")
+  verificationStatus OrgVerificationStatus @default(UNVERIFIED) @map("verification_status")
+  website            String?
+  logoUrl            String?               @map("logo_url")
+  industry           String?
+  description        String?
+  headquarters       String?
+  createdAt          DateTime              @default(now()) @map("created_at")
+  updatedAt          DateTime              @updatedAt @map("updated_at")
+
+  company Company?         @relation(fields: [companyId], references: [id], onDelete: SetNull)
+  members EmployerMember[]
+  jobs    Job[]
+
+  @@index([name])
+  @@index([companyId])
+  @@map("employer_organizations")
+}
+
+model EmployerMember {
+  id             String       @id @default(uuid())
+  organizationId String       @map("organization_id")
+  userId         String       @map("user_id")
+  role           EmployerRole @default(RECRUITER)
+  title          String?
+  joinedAt       DateTime     @default(now()) @map("joined_at")
+  createdAt      DateTime     @default(now()) @map("created_at")
+  updatedAt      DateTime     @updatedAt @map("updated_at")
+
+  organization EmployerOrganization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User                 @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("employer_members")
+}
+
+model EmployerApplicationReview {
+  id            String                   @id @default(uuid())
+  applicationId String                   @map("application_id")
+  stage         EmployerApplicationStage @default(NEW)
+  rating        Int? // 1-5 rating
+  notes         String?
+  reviewerId    String?                  @map("reviewer_id")
+  createdAt     DateTime                 @default(now()) @map("created_at")
+  updatedAt     DateTime                 @updatedAt @map("updated_at")
+
+  application Application @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+
+  @@index([applicationId])
+  @@index([stage])
+  @@map("employer_application_reviews")
 }

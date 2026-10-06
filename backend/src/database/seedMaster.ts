@@ -1,5 +1,6 @@
 import { CompanyRepository, LearningRepository } from '../services/repositories.js';
 import { CompanyRegistryItem, OnlineLearningResource, LocalTrainingInstitute } from '../types/index.js';
+import type { PlanCode } from '@prisma/client';
 
 export async function seedMasterData(): Promise<void> {
   // Seed Companies
@@ -229,7 +230,6 @@ export async function seedMasterData(): Promise<void> {
   try {
     const { prisma } = await import('./prisma.js');
     const { BILLING_CONSTANTS } = await import('../modules/billing/billing.constants.js');
-    const { PlanCode } = await import('@prisma/client');
 
     const planData = [
       BILLING_CONSTANTS.PLANS.FREE,

@@ -550,6 +550,61 @@ class ApiClient {
       method: 'POST'
     });
   }
+
+  // Sprint 8: Employer Platform APIs
+  async getEmployerOrg(): Promise<{ success: boolean; data: { organization: any; currentMember: any } }> {
+    return this.request('/employer/me');
+  }
+
+  async createEmployerOrg(data: any): Promise<{ success: boolean; data: any }> {
+    return this.request('/employer/organizations', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async getEmployerDashboard(): Promise<{ success: boolean; data: any }> {
+    return this.request('/employer/dashboard');
+  }
+
+  async getEmployerJobs(): Promise<{ success: boolean; data: any[] }> {
+    return this.request('/employer/jobs');
+  }
+
+  async createEmployerJob(data: any): Promise<{ success: boolean; data: any }> {
+    return this.request('/employer/jobs', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateEmployerJobStatus(jobId: string, action: 'publish' | 'pause' | 'close'): Promise<{ success: boolean; data: any }> {
+    return this.request(`/employer/jobs/${jobId}/${action}`, {
+      method: 'POST'
+    });
+  }
+
+  async getJobApplicants(jobId: string): Promise<{ success: boolean; data: any[] }> {
+    return this.request(`/employer/jobs/${jobId}/applications`);
+  }
+
+  async getApplicantDetail(applicationId: string): Promise<{ success: boolean; data: any }> {
+    return this.request(`/employer/applications/${applicationId}`);
+  }
+
+  async updateApplicantStage(applicationId: string, data: { stage: string; rating?: number; notes?: string }): Promise<{ success: boolean; data: any }> {
+    return this.request(`/employer/applications/${applicationId}/stage`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async addApplicantNote(applicationId: string, data: { notes: string; rating?: number }): Promise<{ success: boolean; data: any }> {
+    return this.request(`/employer/applications/${applicationId}/notes`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
 }
 
 export const apiClient = new ApiClient();
