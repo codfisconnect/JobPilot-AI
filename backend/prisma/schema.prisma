@@ -113,8 +113,11 @@ model CandidateProfile {
   skills         CandidateSkill[]
   projects       Project[]
   jobMatches     JobMatch[]
-  applications   Application[]
-  savedJobs      SavedJob[]
+  interviewSessions InterviewPreparationSession[]
+  learningPlans     LearningPlan[]
+  careerAssessments CareerTrackAssessment[]
+  applications      Application[]
+  savedJobs         SavedJob[]
 
   @@map("candidate_profiles")
 }
@@ -303,7 +306,8 @@ model ResumeVersion {
 
   resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
   jobMatches JobMatch[]
-  applications Application[]
+  interviewSessions InterviewPreparationSession[]
+  applications      Application[]
 
   @@index([resumeId])
   @@map("resume_versions")
@@ -477,6 +481,8 @@ model Job {
   company                 Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   skills                  JobSkill[]
   jobMatches              JobMatch[]
+  interviewSessions       InterviewPreparationSession[]
+  learningPlans           LearningPlan[]
   applications            Application[]
   savedJobs               SavedJob[]
 
@@ -544,6 +550,194 @@ model JobMatch {
   @@index([jobId])
   @@index([overallScore])
   @@map("job_matches")
+}
+
+// ==========================================
+// SPRINT 6: INTERVIEW & CAREER INTELLIGENCE
+// ==========================================
+
+enum InterviewQuestionType {
+  TECHNICAL
+  BEHAVIORAL
+  RESUME_BASED
+  ROLE_SPECIFIC
+  SKILL_GAP
+  GENERAL
+}
+
+enum QuestionDifficulty {
+  EASY
+  MEDIUM
+  HARD
+}
+
+enum SessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  ARCHIVED
+}
+
+model InterviewPreparationSession {
+  id                 String         @id @default(uuid())
+  candidateProfileId String         @map("candidate_profile_id")
+  jobId              String         @map("job_id")
+  resumeVersionId    String?        @map("resume_version_id")
+  status             SessionStatus  @default(IN_PROGRESS)
+  title              String         @default("Interview Preparation Session")
+  inputHash          String?        @map("input_hash")
+  createdAt          DateTime       @default(now()) @map("created_at")
+  updatedAt          DateTime       @updatedAt @map("updated_at")
+
+  candidateProfile   CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  job                Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  resumeVersion      ResumeVersion?   @relation(fields: [resumeVersionId], references: [id], onDelete: SetNull)
+  questions          InterviewQuestion[]
+
+  @@index([candidateProfileId])
+  @@index([jobId])
+  @@map("interview_preparation_sessions")
+}
+
+model InterviewQuestion {
+  id                 String                @id @default(uuid())
+  sessionId          String                @map("session_id")
+  type               InterviewQuestionType @default(TECHNICAL)
+  difficulty         QuestionDifficulty    @default(MEDIUM)
+  question           String
+  context            String?               // Why this question was chosen (JD requirement, skill gap, resume fact)
+  suggestedAnswerGuide String?             @map("suggested_answer_guide")
+  sourceSkill        String?               @map("source_skill")
+  displayOrder       Int                   @default(0) @map("display_order")
+  createdAt          DateTime              @default(now()) @map("created_at")
+
+  session            InterviewPreparationSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  answers            InterviewAnswer[]
+
+  @@index([sessionId])
+  @@index([type])
+  @@map("interview_questions")
+}
+
+model InterviewAnswer {
+  id                 String              @id @default(uuid())
+  questionId         String              @map("question_id")
+  answerText         String              @map("answer_text")
+  submittedAt        DateTime            @default(now()) @map("submitted_at")
+
+  question           InterviewQuestion   @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  evaluation         InterviewEvaluation?
+
+  @@index([questionId])
+  @@map("interview_answers")
+}
+
+model InterviewEvaluation {
+  id                 String           @id @default(uuid())
+  answerId           String           @unique @map("answer_id")
+  clarityScore       Int              @map("clarity_score") // 0-100
+  accuracyScore      Int?             @map("accuracy_score") // 0-100 (null if behavioral/general where objective truth cannot be asserted)
+  relevanceScore     Int              @map("relevance_score") // 0-100
+  structureScore     Int              @map("structure_score") // 0-100
+  overallScore       Int              @map("overall_score") // 0-100
+  strengths          String[]         @default([])
+  missingPoints      String[]         @default([]) @map("missing_points")
+  suggestions        String[]         @default([])
+  feedback           String
+  evaluatedAt        DateTime         @default(now()) @map("evaluated_at")
+
+  answer             InterviewAnswer  @relation(fields: [answerId], references: [id], onDelete: Cascade)
+
+  @@map("interview_evaluations")
+}
+
+enum LearningItemStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  COMPLETED
+}
+
+enum SkillGapClassification {
+  VERIFIED
+  PARTIAL
+  MISSING
+}
+
+model LearningPlan {
+  id                 String             @id @default(uuid())
+  candidateProfileId String             @map("candidate_profile_id")
+  jobId              String?            @map("job_id")
+  title              String
+  description        String?
+  targetRole         String?            @map("target_role")
+  createdAt          DateTime           @default(now()) @map("created_at")
+  updatedAt          DateTime           @updatedAt @map("updated_at")
+
+  candidateProfile   CandidateProfile   @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  job                Job?               @relation(fields: [jobId], references: [id], onDelete: SetNull)
+  items              LearningPlanItem[]
+
+  @@index([candidateProfileId])
+  @@index([jobId])
+  @@map("learning_plans")
+}
+
+model LearningPlanItem {
+  id                 String                 @id @default(uuid())
+  planId             String                 @map("plan_id")
+  skillName          String                 @map("skill_name")
+  classification     SkillGapClassification @default(MISSING)
+  priority           String                 @default("HIGH") // CRITICAL, HIGH, MEDIUM, LOW
+  rationale          String
+  suggestedAction    String                 @map("suggested_action")
+  status             LearningItemStatus     @default(NOT_STARTED)
+  targetDate         DateTime?              @map("target_date")
+  verifiedResources  Json?                  @map("verified_resources") // Reputable URL resources array
+  displayOrder       Int                    @default(0) @map("display_order")
+  createdAt          DateTime               @default(now()) @map("created_at")
+  updatedAt          DateTime               @updatedAt @map("updated_at")
+
+  plan               LearningPlan           @relation(fields: [planId], references: [id], onDelete: Cascade)
+  progress           LearningProgress[]
+
+  @@index([planId])
+  @@index([skillName])
+  @@map("learning_plan_items")
+}
+
+model LearningProgress {
+  id                 String             @id @default(uuid())
+  itemId             String             @map("item_id")
+  status             LearningItemStatus @default(IN_PROGRESS)
+  notes              String?
+  hoursSpent         Float              @default(0) @map("hours_spent")
+  loggedAt           DateTime           @default(now()) @map("logged_at")
+
+  item               LearningPlanItem   @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@index([itemId])
+  @@map("learning_progress")
+}
+
+model CareerTrackAssessment {
+  id                 String           @id @default(uuid())
+  candidateProfileId String           @map("candidate_profile_id")
+  currentTrack       String           @map("current_track")
+  targetTrack        String           @map("target_track")
+  readinessScore     Int              @map("readiness_score") // 0-100
+  isSameTrack        Boolean          @default(true) @map("is_same_track")
+  transitionGapExplanation String?    @map("transition_gap_explanation")
+  verifiedStrengths  String[]         @default([]) @map("verified_strengths")
+  transferableSkills String[]         @default([]) @map("transferable_skills")
+  missingPriorities  String[]         @default([]) @map("missing_priorities")
+  recommendations    String[]         @default([])
+  evidenceBasis      Json             @map("evidence_basis")
+  createdAt          DateTime         @default(now()) @map("created_at")
+  updatedAt          DateTime         @updatedAt @map("updated_at")
+
+  candidateProfile   CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+
+  @@index([candidateProfileId])
+  @@map("career_track_assessments")
 }
 
 // ==========================================

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { JobControllerV1 } from '../../controllers/v1/job.controller.js';
 import { JobMatchingControllerV1 } from '../../controllers/v1/jobMatching.controller.js';
+import { InterviewControllerV1 } from '../../modules/interviews/interview.controller.js';
 import { authenticateJwt } from '../../middleware/auth.middleware.js';
 
 export const jobRouter = Router();
@@ -15,6 +16,9 @@ jobRouter.post('/:id/match/recalculate', authenticateJwt, JobMatchingControllerV
 jobRouter.get('/:id/skill-gap', authenticateJwt, JobMatchingControllerV1.getSkillGap);
 jobRouter.post('/:id/tailor-resume', authenticateJwt, JobMatchingControllerV1.tailorResume);
 jobRouter.get('/:id/tailored-resumes', authenticateJwt, JobMatchingControllerV1.getTailoredResumes);
+
+// Sprint 6: Interview Preparation Session Creation for Target Job
+jobRouter.post('/:id/interview/sessions', authenticateJwt, InterviewControllerV1.createSessionForJob);
 
 // Ingestion trigger (restricted to authenticated admin/internal users)
 jobRouter.post('/sync', authenticateJwt, JobControllerV1.syncJobs);

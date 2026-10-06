@@ -41,6 +41,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'jobs', label: 'Jobs', icon: Briefcase },
     { id: 'applications', label: 'Applications', icon: Send },
     { id: 'saved-jobs', label: 'Saved Jobs', icon: Bookmark },
+    { id: 'interview', label: 'Interview Prep', icon: Headphones },
+    { id: 'career', label: 'Career Intelligence', icon: GraduationCap },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
