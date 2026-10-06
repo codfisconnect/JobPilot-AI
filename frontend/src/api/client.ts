@@ -509,6 +509,48 @@ class ApiClient {
       body: JSON.stringify(data)
     });
   }
+
+  // Sprint 7 Billing & Payment APIs
+  async getPlans(): Promise<any[]> {
+    return this.request<any[]>('/billing/plans');
+  }
+
+  async getMyBilling(): Promise<any> {
+    return this.request<any>('/billing/me');
+  }
+
+  async getCredits(): Promise<{ balance: number; lifetimeGranted: number; lifetimeConsumed: number; updatedAt: string }> {
+    return this.request<any>('/billing/credits');
+  }
+
+  async getLedger(limit: number = 20, offset: number = 0): Promise<{ items: any[]; total: number }> {
+    return this.request<any>(`/billing/credits/ledger?limit=${limit}&offset=${offset}`);
+  }
+
+  async createCheckout(planCode: string): Promise<any> {
+    return this.request<any>('/billing/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ planCode })
+    });
+  }
+
+  async verifyPayment(data: { providerOrderId: string; providerPaymentId: string; providerSignature: string }): Promise<any> {
+    return this.request<any>('/billing/payments/verify', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async getPaymentHistory(): Promise<any[]> {
+    return this.request<any[]>('/billing/payments');
+  }
+
+  async cancelSubscription(): Promise<any> {
+    return this.request<any>('/billing/subscription/cancel', {
+      method: 'POST'
+    });
+  }
 }
 
 export const apiClient = new ApiClient();
+

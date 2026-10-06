@@ -14,6 +14,7 @@ import { companyRouter } from './routes/v1/company.routes.js';
 import { interviewRouter } from './modules/interviews/interview.routes.js';
 import { careerRouter } from './modules/career/career.routes.js';
 import { applicationRouter, savedJobRouter } from './modules/applications/application.routes.js';
+import { billingRouter } from './modules/billing/billing.routes.js';
 import { apiRouter as prototypeApiRouter } from './routes/api.routes.js';
 import { getDb } from './database/db.js';
 import { logger } from './utils/logger.js';
@@ -32,7 +33,12 @@ app.use(cors({
 }));
 
 app.use(cookieParser());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({
+  limit: '10mb',
+  verify: (req: any, _res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // 3. V1 Production API Routes
@@ -46,6 +52,7 @@ app.use('/api/v1/applications', applicationRouter);
 app.use('/api/v1/saved-jobs', savedJobRouter);
 app.use('/api/v1/interview', interviewRouter);
 app.use('/api/v1/career', careerRouter);
+app.use('/api/v1/billing', billingRouter);
 app.use('/api/v1', healthRouter);
 
 // 4. Preserved Prototype API Routes

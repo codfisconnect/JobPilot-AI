@@ -224,4 +224,51 @@ export async function seedMasterData(): Promise<void> {
   for (const inst of institutes) {
     await LearningRepository.saveInstitute(inst);
   }
+
+  // Sprint 7: Seed Commercial Plans Idempotently
+  try {
+    const { prisma } = await import('./prisma.js');
+    const { BILLING_CONSTANTS } = await import('../modules/billing/billing.constants.js');
+    const { PlanCode } = await import('@prisma/client');
+
+    const planData = [
+      BILLING_CONSTANTS.PLANS.FREE,
+      BILLING_CONSTANTS.PLANS.BASIC,
+      BILLING_CONSTANTS.PLANS.PRO
+    ];
+
+    for (const plan of planData) {
+      await prisma.plan.upsert({
+        where: { code: plan.code as PlanCode },
+        update: {
+          name: plan.name,
+          description: plan.description,
+          price: plan.price,
+          currency: plan.currency,
+          billingInterval: plan.billingInterval as any,
+          creditAllowance: plan.creditAllowance,
+          resumeProfileLimit: plan.resumeProfileLimit,
+          features: [...plan.features],
+          sortOrder: plan.sortOrder,
+          isActive: true
+        },
+        create: {
+          code: plan.code as PlanCode,
+          name: plan.name,
+          description: plan.description,
+          price: plan.price,
+          currency: plan.currency,
+          billingInterval: plan.billingInterval as any,
+          creditAllowance: plan.creditAllowance,
+          resumeProfileLimit: plan.resumeProfileLimit,
+          features: [...plan.features],
+          sortOrder: plan.sortOrder,
+          isActive: true
+        }
+      });
+    }
+  } catch (err) {
+    console.error('Plan seeding error in seedMasterData:', err);
+  }
 }
+

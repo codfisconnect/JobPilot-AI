@@ -13,7 +13,11 @@ const envSchema = z.object({
   JWT_REFRESH_EXPIRES_IN: z.string().default('7d'),
   CORS_ORIGIN: z.string().default('http://localhost:5173'),
   // Optional prototype / integration variables
-  GEMINI_API_KEY: z.string().optional()
+  GEMINI_API_KEY: z.string().optional(),
+  // Razorpay Payment Gateway (Sprint 7)
+  RAZORPAY_KEY_ID: z.string().default('rzp_test_mockKeyIdSprint7'),
+  RAZORPAY_KEY_SECRET: z.string().default('rzp_test_mockSecretSprint7KeyMinimum32'),
+  RAZORPAY_WEBHOOK_SECRET: z.string().default('rzp_webhook_secret_pilotmama_sprint7')
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
