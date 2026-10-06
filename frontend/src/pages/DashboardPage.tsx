@@ -1,24 +1,26 @@
 import React, { useEffect, useState } from 'react';
-import { useApp } from "../context/AppContext";
 import { Card } from "../components/common/Card";
 import { Badge } from "../components/common/Badge";
 import { Button } from "../components/common/Button";
-import { ProgressBar } from "../components/common/ProgressBar";
+import { useAuth } from "../context/AuthContext";
+import { apiClient } from "../api/client";
 import {
+  User,
+  FileText,
   Briefcase,
-  CheckCircle2,
-  Send,
-  Headphones,
+  Layers,
+  GraduationCap,
+  Award,
   ArrowRight,
-  TrendingUp,
+  Upload,
+  CheckCircle2,
+  Clock,
+  Sparkles,
+  Building,
   MapPin,
   ExternalLink,
-  Sparkles,
-  Activity,
-  BookOpen
+  AlertCircle
 } from 'lucide-react';
-import { api } from "../api/index";
-import { JobDescription, ApplicationRecord, SourceHealthStatus } from "../types/index";
 import './DashboardPage.css';
 
 interface DashboardPageProps {
@@ -26,317 +28,327 @@ interface DashboardPageProps {
 }
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
-  const { activeCandidate } = useApp();
-  const [jobs, setJobs] = useState<JobDescription[]>([]);
-  const [applications, setApplications] = useState<ApplicationRecord[]>([]);
-  const [sourceHealth, setSourceHealth] = useState<SourceHealthStatus[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const [profile, setProfile] = useState<any>(null);
+  const [resumes, setResumes] = useState<any[]>([]);
+  const [recentJobs, setRecentJobs] = useState<any[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    async function loadData() {
+    async function loadProductionData() {
       try {
         setLoading(true);
-        const [jobsList, appsList, healthList] = await Promise.all([
-          api.getJobs(),
-          api.getApplications(activeCandidate?.id),
-          api.getSourceHealth().catch(() => [])
+        setError(null);
+
+        // Fetch real production endpoints
+        const [profileRes, resumesRes, jobsRes] = await Promise.all([
+          apiClient.getCandidateProfile().catch(() => null),
+          apiClient.listResumes().catch(() => []),
+          apiClient.getCanonicalJobs({ pageSize: 4 }).catch(() => ({ data: [] }))
         ]);
-        setSourceHealth(healthList || []);
 
-        // Priority 11: Sort recommendations by candidate relevance/score
-        const scoredJobs = jobsList.map(job => {
-          let score = 0;
-          if (activeCandidate) {
-            const candSkills = new Set(
-              [...activeCandidate.primarySkills, ...activeCandidate.secondarySkills, ...activeCandidate.technologies].map(s => s.toLowerCase())
-            );
-            const matchedSkills = job.mustHaveSkills.filter(s => candSkills.has(s.toLowerCase())).length;
-            const skillScore = (matchedSkills / Math.max(1, job.mustHaveSkills.length)) * 40;
-
-            // Career track alignment
-            const candTrack = (activeCandidate.targetRoles[0] || '').toLowerCase();
-            const jobTrack = (job.careerTrack || job.role).toLowerCase();
-            let trackScore = 20;
-            if (
-              (candTrack.includes('project') || candTrack.includes('delivery') || candTrack.includes('agile')) &&
-              (jobTrack.includes('project') || jobTrack.includes('delivery') || jobTrack.includes('agile') || jobTrack.includes('scrum'))
-            ) {
-              trackScore = 30;
-            } else if (
-              (candTrack.includes('qa') || candTrack.includes('test') || candTrack.includes('automation')) &&
-              (jobTrack.includes('qa') || jobTrack.includes('test') || jobTrack.includes('automation'))
-            ) {
-              trackScore = 30;
-            } else if (
-              candTrack.includes('backend') && (jobTrack.includes('backend') || jobTrack.includes('java'))
-            ) {
-              trackScore = 30;
-            }
-
-            // Experience compatibility
-            const expMatch = job.experienceRequired.match(/(\d+)/);
-            const reqExp = expMatch ? parseInt(expMatch[1], 10) : 3;
-            let expScore = 15;
-            if (activeCandidate.yearsOfExperience >= reqExp) {
-              expScore = 20;
-            } else if (reqExp - activeCandidate.yearsOfExperience <= 2) {
-              expScore = 12;
-            } else {
-              expScore = 5;
-            }
-
-            // Location compatibility
-            let locScore = 5;
-            const candLoc = activeCandidate.location.toLowerCase();
-            const jobLoc = job.location.toLowerCase();
-            if (jobLoc.includes('remote') || activeCandidate.workPreference === 'Remote' || jobLoc.includes(candLoc)) {
-              locScore = 10;
-            }
-
-            score = Math.round(skillScore + trackScore + expScore + locScore);
-          }
-          return { job, relevanceScore: score };
-        });
-
-        scoredJobs.sort((a, b) => b.relevanceScore - a.relevanceScore);
-        setJobs(scoredJobs.map(sj => sj.job));
-        setApplications(appsList);
-      } catch (err) {
-        console.error('Failed to load dashboard data:', err);
+        setProfile(profileRes);
+        setResumes(resumesRes || []);
+        setRecentJobs(jobsRes?.data || []);
+      } catch (err: any) {
+        console.error('Failed to load production overview:', err);
+        setError(err.message || 'Unable to load dashboard data');
       } finally {
         setLoading(false);
       }
     }
-    loadData();
-  }, [activeCandidate]);
 
-  // Derived stats
-  const totalAnalyzed = jobs.length;
-  const demoSubmittedCount = applications.filter(a => a.status === 'APPLIED_DEMO').length;
-  const externalStartedCount = applications.filter(a => a.status === 'APPLICATION_STARTED').length;
-  const totalAppliedCount = applications.filter(a => a.status === 'APPLIED' || a.status === 'APPLIED_DEMO').length;
-  const interviewCount = applications.filter(a => a.status === 'INTERVIEW' || a.status === 'Interview').length;
-  const strongMatchesCount = jobs.filter(j => {
-    const skills = (activeCandidate?.primarySkills || []).map(s => s.toLowerCase());
-    return j.mustHaveSkills.some(s => skills.includes(s.toLowerCase()));
-  }).length;
+    loadProductionData();
+  }, []);
+
+  // Compute real counts and completion metrics
+  const candidateName = profile?.fullName || user?.candidateProfile?.fullName || user?.email?.split('@')[0] || 'Candidate';
+  const headline = profile?.headline || 'Candidate Profile';
+  const experienceCount = profile?.experiences?.length || 0;
+  const educationCount = profile?.educations?.length || 0;
+  const skillsCount = profile?.skills?.length || 0;
+  const certificationsCount = profile?.certifications?.length || 0;
+  const projectsCount = profile?.projects?.length || 0;
+  const resumeCount = resumes.length;
+
+  // Master resume detection
+  const masterResume = resumes.find(r => r.isMaster) || resumes[0];
+  const versionCount = resumes.reduce((acc, r) => acc + (r.versions?.length || 0), 0);
+
+  // Calculate profile completeness score based on actual filled fields
+  let completionPoints = 0;
+  if (profile?.fullName) completionPoints += 15;
+  if (profile?.email) completionPoints += 10;
+  if (profile?.headline) completionPoints += 15;
+  if (profile?.summary) completionPoints += 15;
+  if (experienceCount > 0) completionPoints += 15;
+  if (skillsCount > 0) completionPoints += 15;
+  if (educationCount > 0) completionPoints += 10;
+  if (certificationsCount > 0 || projectsCount > 0) completionPoints += 5;
+  const completeness = Math.min(100, completionPoints);
+
+  if (loading) {
+    return (
+      <div className="dashboard-page">
+        <div className="jobs-loading-state" style={{ padding: '80px 20px' }}>
+          <Clock size={32} className="animate-spin text-primary" />
+          <span style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
+            Loading your Candidate Overview...
+          </span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="dashboard-page">
-      {/* Welcome Banner */}
+      {/* Production Hero Banner */}
       <div className="dash-hero">
         <div className="dash-hero-content">
           <Badge variant="indigo" size="sm">
-            AI Job Copilot Active
+            Pilot Mama Production Engine
           </Badge>
           <h2 className="dash-hero-title">
-            Welcome back, {activeCandidate?.name || 'Candidate'}
+            Welcome back, {candidateName}
           </h2>
           <p className="dash-hero-subtitle">
-            Pilot Mama has synchronized your master profile. Review top role alignments, generate tailored ATS-optimized resumes, and prep for upcoming technical interviews.
+            {profile?.summary || 'Your master candidate profile and private resume vault are active. Track your verified credentials, manage immutable resume versions, and explore live career opportunities across verified company sources.'}
           </p>
         </div>
-        <div className="dash-hero-actions">
+        <div className="dash-hero-actions" style={{ display: 'flex', gap: '10px' }}>
+          <Button
+            variant="outline"
+            icon={<User size={16} />}
+            onClick={() => onNavigate('profile')}
+          >
+            Edit Profile
+          </Button>
           <Button
             variant="primary"
-            icon={<Sparkles size={16} />}
+            icon={<Briefcase size={16} />}
             onClick={() => onNavigate('jobs')}
           >
-            Analyze New Job
+            Browse Jobs
           </Button>
         </div>
       </div>
 
-      {/* KPI Metric Cards */}
+      {/* Production KPI Metrics */}
       <div className="kpi-grid">
-        <Card className="kpi-card">
+        <Card className="kpi-card" hoverable onClick={() => onNavigate('profile')}>
           <div className="kpi-icon-wrap kpi-blue">
+            <User size={22} />
+          </div>
+          <div className="kpi-data">
+            <span className="kpi-val">{completeness}%</span>
+            <span className="kpi-label">Profile Completion</span>
+          </div>
+        </Card>
+
+        <Card className="kpi-card" hoverable onClick={() => onNavigate('resumes')}>
+          <div className="kpi-icon-wrap kpi-emerald">
+            <FileText size={22} />
+          </div>
+          <div className="kpi-data">
+            <span className="kpi-val">{resumeCount}</span>
+            <span className="kpi-label">{resumeCount === 1 ? 'Resume in Vault' : 'Resumes in Vault'} ({versionCount} Versions)</span>
+          </div>
+        </Card>
+
+        <Card className="kpi-card" hoverable onClick={() => onNavigate('profile')}>
+          <div className="kpi-icon-wrap kpi-indigo">
             <Briefcase size={22} />
           </div>
           <div className="kpi-data">
-            <span className="kpi-val">{totalAnalyzed}</span>
-            <span className="kpi-label">Jobs Discovered</span>
+            <span className="kpi-val">{experienceCount}</span>
+            <span className="kpi-label">Work Experiences</span>
           </div>
         </Card>
 
-        <Card className="kpi-card">
-          <div className="kpi-icon-wrap kpi-emerald">
-            <TrendingUp size={22} />
-          </div>
-          <div className="kpi-data">
-            <span className="kpi-val">{strongMatchesCount}</span>
-            <span className="kpi-label">Strong Matches</span>
-          </div>
-        </Card>
-
-        <Card className="kpi-card">
-          <div className="kpi-icon-wrap kpi-indigo">
-            <Send size={22} />
-          </div>
-          <div className="kpi-data">
-            <span className="kpi-val">{applications.length}</span>
-            <span className="kpi-label">Tracked Applications ({demoSubmittedCount} Demo, {externalStartedCount} Ext)</span>
-          </div>
-        </Card>
-
-        <Card className="kpi-card">
+        <Card className="kpi-card" hoverable onClick={() => onNavigate('profile')}>
           <div className="kpi-icon-wrap kpi-amber">
-            <Headphones size={22} />
+            <Layers size={22} />
           </div>
           <div className="kpi-data">
-            <span className="kpi-val">{interviewCount}</span>
-            <span className="kpi-label">Active Interviews</span>
+            <span className="kpi-val">{skillsCount}</span>
+            <span className="kpi-label">Verified Competencies</span>
           </div>
         </Card>
       </div>
 
-      {/* Live Ingestion & Source Health Status Bar */}
-      <Card className="source-health-banner">
-        <div className="health-banner-header">
-          <div className="health-banner-title">
-            <Activity size={18} className="health-icon-pulse" />
-            <span className="health-title-text">Live Ingestion & Job Connector Health</span>
-          </div>
-          <div className="health-actions">
-            <Button variant="ghost" size="sm" icon={<BookOpen size={14} />} onClick={() => onNavigate('learning')}>
-              Skill Gap & Learning Academy
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => onNavigate('settings')}>
-              Manage Sources
-            </Button>
-          </div>
+      {/* Error notice if API call failed */}
+      {error && (
+        <div className="jobs-error-banner">
+          <AlertCircle size={20} />
+          <span>{error}</span>
         </div>
-        <div className="connector-chips-grid">
-          {sourceHealth.length > 0 ? (
-            sourceHealth.map((src) => (
-              <div key={src.sourceKey} className="connector-status-chip">
-                <span className={`status-dot dot-${src.status.toLowerCase()}`} />
-                <span className="source-name">{src.name}</span>
-                <span className="source-jobs-count">({src.jobsDiscovered} jobs)</span>
-                <Badge variant={src.status === 'HEALTHY' ? 'emerald' : src.status === 'WARNING' ? 'amber' : 'rose'} size="sm">
-                  {src.status}
-                </Badge>
-              </div>
-            ))
-          ) : (
-            <div className="connector-fallback-status">
-              <span className="status-dot dot-healthy" />
-              <span>Connectors active: Codewalla, Lever, Ashby, Greenhouse (Ingestion Ready)</span>
-            </div>
-          )}
-        </div>
-      </Card>
+      )}
 
-      {/* Two Column Layout: Recommended Jobs & Recent Applications */}
+      {/* Main Overview Split */}
       <div className="dash-columns">
-        {/* Recommended Jobs */}
+        {/* Left Column: Master Resume & Quick Actions */}
         <div className="dash-col">
           <div className="section-head">
-            <h3 className="section-title">Recommended High-Match Opportunities</h3>
+            <h3 className="section-title">Master Resume & Verification Status</h3>
+            <button className="link-action" onClick={() => onNavigate('resumes')}>
+              Open Vault ({resumeCount})
+            </button>
+          </div>
+
+          <Card style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
+            {masterResume ? (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <div style={{ padding: '10px', background: 'rgba(99, 102, 241, 0.15)', borderRadius: '8px', color: '#818cf8' }}>
+                      <FileText size={24} />
+                    </div>
+                    <div>
+                      <h4 style={{ margin: 0, fontSize: '1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                        {masterResume.title || masterResume.originalFileName || 'Master Resume'}
+                      </h4>
+                      <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                        Uploaded {new Date(masterResume.uploadedAt).toLocaleDateString()} • {masterResume.fileSize ? `${Math.round(masterResume.fileSize / 1024)} KB` : 'Local Storage'}
+                      </span>
+                    </div>
+                  </div>
+                  <Badge variant={masterResume.status === 'PARSED' ? 'emerald' : 'amber'} size="sm">
+                    {masterResume.status}
+                  </Badge>
+                </div>
+
+                <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '12px 14px', borderRadius: '8px', fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
+                    <span>Truth Check Guarantee:</span>
+                    <strong style={{ color: '#34d399' }}>Zero-Fabrication Active</strong>
+                  </div>
+                  <p style={{ margin: 0, fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                    All resume extractions are verified by you prior to persisting to canonical candidate records.
+                  </p>
+                </div>
+
+                <div style={{ display: 'flex', gap: '10px', marginTop: '4px' }}>
+                  <Button variant="primary" size="sm" icon={<Upload size={14} />} onClick={() => onNavigate('resumes')}>
+                    Manage Resumes & Snapshots
+                  </Button>
+                  <Button variant="outline" size="sm" onClick={() => onNavigate('profile')}>
+                    View Master Profile
+                  </Button>
+                </div>
+              </>
+            ) : (
+              <div style={{ textAlign: 'center', padding: '24px 12px' }}>
+                <FileText size={40} style={{ color: 'var(--text-muted)', marginBottom: '12px' }} />
+                <h4 style={{ margin: '0 0 6px', color: 'var(--text-primary)' }}>No Resume Uploaded Yet</h4>
+                <p style={{ margin: '0 0 16px', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  Upload your existing PDF or DOCX resume to extract your experiences, education, and skills automatically.
+                </p>
+                <Button variant="primary" icon={<Upload size={16} />} onClick={() => onNavigate('resumes')}>
+                  Upload Resume to Vault
+                </Button>
+              </div>
+            )}
+          </Card>
+
+          {/* Quick Profile Health Card */}
+          <Card style={{ padding: '20px', marginTop: '16px' }}>
+            <h4 style={{ margin: '0 0 12px', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+              Candidate Profile Breakdown
+            </h4>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', fontSize: '0.85rem' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Professional Headline</span>
+                <span style={{ fontWeight: 600, color: profile?.headline ? '#34d399' : 'var(--text-muted)' }}>
+                  {profile?.headline ? 'Provided' : 'Pending'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Location & Contact</span>
+                <span style={{ fontWeight: 600, color: (profile?.location || profile?.phone) ? '#34d399' : 'var(--text-muted)' }}>
+                  {(profile?.location || profile?.phone) ? 'Configured' : 'Incomplete'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Work History</span>
+                <span style={{ fontWeight: 600, color: experienceCount > 0 ? '#34d399' : 'var(--text-muted)' }}>
+                  {experienceCount} {experienceCount === 1 ? 'position' : 'positions'}
+                </span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0' }}>
+                <span style={{ color: 'var(--text-secondary)' }}>Academic Credentials</span>
+                <span style={{ fontWeight: 600, color: educationCount > 0 ? '#34d399' : 'var(--text-muted)' }}>
+                  {educationCount} degrees listed
+                </span>
+              </div>
+            </div>
+          </Card>
+        </div>
+
+        {/* Right Column: Live Discovered Opportunities */}
+        <div className="dash-col">
+          <div className="section-head">
+            <h3 className="section-title">Latest Verified Job Openings</h3>
             <button className="link-action" onClick={() => onNavigate('jobs')}>
-              View All ({jobs.length})
+              View All Openings
             </button>
           </div>
 
           <div className="jobs-list-flow">
-            {jobs.slice(0, 4).map(job => (
-              <Card key={job.id} className="job-overview-card" hoverable onClick={() => onNavigate('jobs', job.id)}>
-                <div className="job-card-top">
-                  <div>
-                    <span className="job-company">{job.company}</span>
-                    <h4 className="job-role">{job.role}</h4>
-                  </div>
-                  <Badge variant="emerald" size="sm">
-                    {job.careerTrack}
-                  </Badge>
-                </div>
-
-                <div className="job-meta">
-                  <span className="meta-item">
-                    <MapPin size={14} /> {job.location}
-                  </span>
-                  <span className="meta-item">
-                    Exp: {job.experienceRequired}
-                  </span>
-                </div>
-
-                <div className="job-skills-strip">
-                  {job.mustHaveSkills.slice(0, 4).map(skill => (
-                    <span key={skill} className="skill-chip">
-                      {skill}
-                    </span>
-                  ))}
-                  {job.mustHaveSkills.length > 4 && (
-                    <span className="skill-chip-more">+{job.mustHaveSkills.length - 4}</span>
-                  )}
-                </div>
-
-                <div className="job-card-bottom">
-                  <span className="salary-tag">{job.salary || 'Competitive'}</span>
-                  <span className="action-link">
-                    Evaluate & Match <ArrowRight size={14} />
-                  </span>
-                </div>
-              </Card>
-            ))}
-          </div>
-        </div>
-
-        {/* Recent Applications Timeline */}
-        <div className="dash-col">
-          <div className="section-head">
-            <h3 className="section-title">Application Status Tracker</h3>
-            <button className="link-action" onClick={() => onNavigate('applications')}>
-              View Applications ({applications.length})
-            </button>
-          </div>
-
-          {applications.length === 0 ? (
-            <Card className="empty-panel">
-              <p>No applications logged yet for this candidate.</p>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => onNavigate('jobs')}
-              >
-                Explore & Apply
-              </Button>
-            </Card>
-          ) : (
-            <div className="applications-flow">
-              {applications.slice(0, 4).map(app => (
-                <Card key={app.id} className="app-history-card" hoverable onClick={() => onNavigate('applications', app.id)}>
-                  <div className="app-history-header">
+            {recentJobs.length > 0 ? (
+              recentJobs.map(job => (
+                <Card key={job.id} className="job-overview-card" hoverable onClick={() => onNavigate('jobs', job.id)}>
+                  <div className="job-card-top">
                     <div>
-                      <h4 className="app-role">{app.role}</h4>
-                      <span className="app-company">{app.company}</span>
+                      <span className="job-company">{job.company?.name || 'Company'}</span>
+                      <h4 className="job-role">{job.title}</h4>
                     </div>
-                    <Badge
-                      variant={
-                        app.status === 'Interview'
-                          ? 'emerald'
-                          : app.status === 'Applied'
-                          ? 'blue'
-                          : 'amber'
-                      }
-                      size="sm"
-                    >
-                      {app.status}
+                    <Badge variant="indigo" size="sm">
+                      {job.sourceName || job.sourceType}
                     </Badge>
                   </div>
 
-                  <div className="app-sub-info">
-                    <span>Applied: {app.applicationDate}</span>
-                    {app.resumeVersionName && (
-                      <span className="resume-version-badge">
-                        Resume: {app.resumeVersionName}
-                      </span>
-                    )}
+                  <div className="job-meta">
+                    <span className="meta-item">
+                      <MapPin size={14} /> {job.location || job.city || 'Location unlisted'}
+                    </span>
+                    <span className="meta-item">
+                      {job.remoteType?.replace('_', ' ')}
+                    </span>
+                  </div>
+
+                  {job.skills && job.skills.length > 0 && (
+                    <div className="job-skills-strip">
+                      {job.skills.slice(0, 4).map((s: any) => (
+                        <span key={s.id || s.name} className="skill-chip">
+                          {s.name}
+                        </span>
+                      ))}
+                      {job.skills.length > 4 && (
+                        <span className="skill-chip-more">+{job.skills.length - 4}</span>
+                      )}
+                    </div>
+                  )}
+
+                  <div className="job-card-bottom">
+                    <span className="salary-tag">
+                      {job.salaryMin ? `${job.salaryCurrency || '$'}${Number(job.salaryMin).toLocaleString()}` : 'Competitive'}
+                    </span>
+                    <span className="action-link">
+                      View Details <ArrowRight size={14} />
+                    </span>
                   </div>
                 </Card>
-              ))}
-            </div>
-          )}
+              ))
+            ) : (
+              <Card className="empty-panel">
+                <p>No job openings discovered yet in the canonical database.</p>
+                <Button variant="outline" size="sm" onClick={() => onNavigate('jobs')}>
+                  Discover Opportunities
+                </Button>
+              </Card>
+            )}
+          </div>
         </div>
       </div>
     </div>

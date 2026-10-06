@@ -36,11 +36,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'profile', label: 'My Profile', icon: User },
-    { id: 'jobs', label: 'Jobs & Matching', icon: Briefcase },
-    { id: 'resumes', label: 'Resume Studio', icon: FileText },
-    { id: 'applications', label: 'Applications', icon: Send },
-    { id: 'interview', label: 'Interview Prep', icon: Headphones },
-    { id: 'learning', label: 'Learning Academy', icon: GraduationCap },
+    { id: 'resumes', label: 'Resumes', icon: FileText },
+    { id: 'jobs', label: 'Jobs', icon: Briefcase },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -78,31 +75,6 @@ export const Sidebar: React.FC<SidebarProps> = ({
           )}
         </div>
 
-      {/* Candidate Selector Switcher (Demo Mode) */}
-      <div className="demo-switcher-box">
-        <div className="switcher-header">
-          <Users size={14} />
-          <span>Active Profile</span>
-        </div>
-        <select
-          className="switcher-select"
-          value={activeCandidate?.id || ''}
-          onChange={e => {
-            const found = candidates.find(c => c.id === e.target.value);
-            if (found) setActiveCandidate(found);
-          }}
-        >
-          {candidates.map(c => (
-            <option key={c.id} value={c.id}>
-              {c.name} ({c.targetRoles[0] || 'Profile'})
-            </option>
-          ))}
-        </select>
-        {activeCandidate?.isDemo && (
-          <span className="demo-badge">Demo Mode Active</span>
-        )}
-      </div>
-
       {/* Nav Menu */}
       <nav className="sidebar-nav">
         {menuItems.map(item => {
@@ -124,8 +96,8 @@ export const Sidebar: React.FC<SidebarProps> = ({
       {/* Footer Info & Auth */}
       <div className="sidebar-footer">
         <div className="footer-card">
-          <p className="footer-title">Pilot Mama Copilot</p>
-          <p className="footer-sub">Smart Matching & Tailored Resumes</p>
+          <p className="footer-title">Pilot Mama Platform</p>
+          <p className="footer-sub">Candidate & Job Discovery Engine</p>
         </div>
 
         {user ? (

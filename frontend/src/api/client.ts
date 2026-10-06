@@ -303,6 +303,32 @@ class ApiClient {
       body: JSON.stringify({ sourceType })
     });
   }
+
+  // Sprint 4 Job Matching, Skill Gap & AI Tailoring APIs
+  async getJobMatch(jobId: string): Promise<any> {
+    return this.request<any>(`/jobs/${jobId}/match`);
+  }
+
+  async recalculateJobMatch(jobId: string): Promise<any> {
+    return this.request<any>(`/jobs/${jobId}/match/recalculate`, {
+      method: 'POST'
+    });
+  }
+
+  async getJobSkillGap(jobId: string): Promise<any> {
+    return this.request<any>(`/jobs/${jobId}/skill-gap`);
+  }
+
+  async tailorResume(jobId: string, mode: 'FULL' | 'FOCUSED' | 'TARGETED' = 'TARGETED'): Promise<any> {
+    return this.request<any>(`/jobs/${jobId}/tailor-resume`, {
+      method: 'POST',
+      body: JSON.stringify({ mode })
+    });
+  }
+
+  async getTailoredResumes(jobId: string): Promise<any[]> {
+    return this.request<any[]>(`/jobs/${jobId}/tailored-resumes`);
+  }
 }
 
 export const apiClient = new ApiClient();

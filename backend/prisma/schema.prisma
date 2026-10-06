@@ -112,6 +112,7 @@ model CandidateProfile {
   certifications Certification[]
   skills         CandidateSkill[]
   projects       Project[]
+  jobMatches     JobMatch[]
 
   @@map("candidate_profiles")
 }
@@ -299,6 +300,7 @@ model ResumeVersion {
   createdAt         DateTime       @default(now()) @map("created_at")
 
   resume Resume @relation(fields: [resumeId], references: [id], onDelete: Cascade)
+  jobMatches JobMatch[]
 
   @@index([resumeId])
   @@map("resume_versions")
@@ -471,6 +473,7 @@ model Job {
 
   company                 Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
   skills                  JobSkill[]
+  jobMatches              JobMatch[]
 
   @@index([companyId])
   @@index([title])
@@ -500,4 +503,42 @@ model JobSkill {
   @@index([skillId])
   @@map("job_skills")
 }
+
+enum MatchCategory {
+  STRONG_MATCH
+  GOOD_MATCH
+  PARTIAL_MATCH
+  LOW_MATCH
+}
+
+model JobMatch {
+  id                 String        @id @default(uuid())
+  candidateProfileId String        @map("candidate_profile_id")
+  jobId              String        @map("job_id")
+  resumeVersionId    String?       @map("resume_version_id")
+  
+  overallScore       Int           @map("overall_score") // 0-100
+  category           MatchCategory @default(PARTIAL_MATCH)
+  breakdown          Json          // { skillScore, experienceScore, roleScore, locationScore, seniorityScore }
+  truthCheck         Json          // { greenCount, yellowCount, redCount, items }
+  careerTrack        Json          // { isSameTrack, candidateTrack, jobTrack, transitionRisk }
+  atsAnalysis        Json?         @map("ats_analysis") // { estimatedScore, structureScore, keywordScore, formattingRisk }
+  
+  inputHash          String        @map("input_hash")
+  engineVersion      String        @default("1.0.0") @map("engine_version")
+  
+  createdAt          DateTime      @default(now()) @map("created_at")
+  updatedAt          DateTime      @updatedAt @map("updated_at")
+
+  candidateProfile CandidateProfile @relation(fields: [candidateProfileId], references: [id], onDelete: Cascade)
+  job              Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+  resumeVersion    ResumeVersion?   @relation(fields: [resumeVersionId], references: [id], onDelete: SetNull)
+
+  @@unique([candidateProfileId, jobId, inputHash])
+  @@index([candidateProfileId])
+  @@index([jobId])
+  @@index([overallScore])
+  @@map("job_matches")
+}
+
 

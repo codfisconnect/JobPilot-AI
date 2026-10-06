@@ -8,9 +8,10 @@ interface JobDetailModalProps {
   job: CanonicalJob | null;
   isOpen: boolean;
   onClose: () => void;
+  onAnalyzeFit?: (jobId: string) => void;
 }
 
-export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onClose }) => {
+export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onClose, onAnalyzeFit }) => {
   if (!job) return null;
 
   const targetUrl = job.applicationUrl || job.sourceUrl;
@@ -126,8 +127,19 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onC
             <Button variant="secondary" onClick={onClose}>
               Close
             </Button>
+            {onAnalyzeFit && (
+              <Button
+                variant="primary"
+                onClick={() => {
+                  onClose();
+                  onAnalyzeFit(job.id);
+                }}
+              >
+                Analyze Fit
+              </Button>
+            )}
             <Button
-              variant="primary"
+              variant="outline"
               icon={<ExternalLink size={16} />}
               onClick={() => window.open(targetUrl, '_blank', 'noopener,noreferrer')}
             >

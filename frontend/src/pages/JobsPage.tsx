@@ -352,6 +352,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
         job={selectedJob}
         isOpen={isDetailOpen}
         onClose={() => { setIsDetailOpen(false); setSelectedJob(null); }}
+        onAnalyzeFit={onSelectJobForAnalysis}
       />
 
       {/* Add / Parse Job Modal */}

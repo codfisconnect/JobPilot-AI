@@ -4,6 +4,7 @@ import { DashboardPage } from "./pages/DashboardPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { JobsPage } from "./pages/JobsPage";
 import { JobAnalysisPage } from "./pages/JobAnalysisPage";
+import { ResumesPage } from "./pages/ResumesPage";
 import { ResumeStudioPage } from "./pages/ResumeStudioPage";
 import { ApplicationsPage } from "./pages/ApplicationsPage";
 import { InterviewPage } from "./pages/InterviewPage";
@@ -20,9 +21,9 @@ export const App: React.FC = () => {
     const tabTitles: Record<string, string> = {
       dashboard: 'Pilot Mama | Dashboard',
       profile: 'Pilot Mama | My Profile',
-      jobs: 'Pilot Mama | Jobs & Matching',
+      jobs: 'Pilot Mama | Jobs',
+      resumes: 'Pilot Mama | Resumes',
       analysis: 'Pilot Mama | Job Fit Analysis',
-      resumes: 'Pilot Mama | Resume Studio',
       applications: 'Pilot Mama | Applications Pipeline',
       interview: 'Pilot Mama | Interview Prep',
       learning: 'Pilot Mama | Learning Academy',
@@ -47,6 +48,10 @@ export const App: React.FC = () => {
         <ProfilePage />
       )}
 
+      {currentTab === 'resumes' && (
+        <ResumesPage onNavigate={handleNavigate} />
+      )}
+
       {currentTab === 'jobs' && (
         <JobsPage
           onSelectJobForAnalysis={jobId => handleNavigate('analysis', jobId)}
@@ -62,7 +67,7 @@ export const App: React.FC = () => {
         />
       )}
 
-      {currentTab === 'resumes' && (
+      {currentTab === 'studio' && (
         <ResumeStudioPage
           preselectedResumeId={contextId}
           onNavigate={handleNavigate}
