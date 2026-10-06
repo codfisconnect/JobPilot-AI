@@ -330,6 +330,120 @@ class ApiClient {
     return this.request<any[]>(`/jobs/${jobId}/tailored-resumes`);
   }
 
+  // Sprint 5 Application Intelligence & Saved Jobs APIs
+  async listApplications(params: { status?: string; search?: string; page?: number; pageSize?: number } = {}): Promise<{ data: any[]; pagination: any }> {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        query.append(k, String(v));
+      }
+    });
+    const qs = query.toString();
+    const headers = new Headers();
+    if (this.accessToken) {
+      headers.set('Authorization', `Bearer ${this.accessToken}`);
+    }
+    const res = await fetch(`${API_V1_BASE}/applications${qs ? `?${qs}` : ''}`, {
+      headers,
+      credentials: 'include'
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.success === false) {
+      throw json.error || new Error(json.message || 'Failed to fetch applications');
+    }
+    return { data: json.data || [], pagination: json.pagination };
+  }
+
+  async getApplicationById(id: string): Promise<any> {
+    return this.request<any>(`/applications/${id}`);
+  }
+
+  async createApplication(data: { jobId: string; resumeVersionId?: string; status?: string; externalUrl?: string; notesSummary?: string }): Promise<any> {
+    return this.request<any>('/applications', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateApplication(id: string, data: any): Promise<any> {
+    return this.request<any>(`/applications/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteApplication(id: string): Promise<any> {
+    return this.request<any>(`/applications/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async updateApplicationStatus(id: string, status: string, reason?: string): Promise<any> {
+    return this.request<any>(`/applications/${id}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ status, reason })
+    });
+  }
+
+  async getApplicationStatusHistory(id: string): Promise<any[]> {
+    return this.request<any[]>(`/applications/${id}/history`);
+  }
+
+  async getApplicationNotes(id: string): Promise<any[]> {
+    return this.request<any[]>(`/applications/${id}/notes`);
+  }
+
+  async addApplicationNote(id: string, content: string): Promise<any> {
+    return this.request<any>(`/applications/${id}/notes`, {
+      method: 'POST',
+      body: JSON.stringify({ content })
+    });
+  }
+
+  async deleteApplicationNote(id: string, noteId: string): Promise<any> {
+    return this.request<any>(`/applications/${id}/notes/${noteId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async getApplicationReminders(id: string): Promise<any[]> {
+    return this.request<any[]>(`/applications/${id}/reminders`);
+  }
+
+  async addApplicationReminder(id: string, title: string, dueDate: string): Promise<any> {
+    return this.request<any>(`/applications/${id}/reminders`, {
+      method: 'POST',
+      body: JSON.stringify({ title, dueDate })
+    });
+  }
+
+  async deleteApplicationReminder(id: string, reminderId: string): Promise<any> {
+    return this.request<any>(`/applications/${id}/reminders/${reminderId}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async getApplicationStats(): Promise<any> {
+    return this.request<any>('/applications/stats');
+  }
+
+  async listSavedJobs(): Promise<any[]> {
+    return this.request<any[]>('/saved-jobs');
+  }
+
+  async saveJob(jobId: string, notes?: string): Promise<any> {
+    return this.request<any>(`/saved-jobs/${jobId}`, {
+      method: 'POST',
+      body: JSON.stringify({ notes })
+    });
+  }
+
+  async removeSavedJob(jobId: string): Promise<any> {
+    return this.request<any>(`/saved-jobs/${jobId}`, {
+      method: 'DELETE'
+    });
+  }
+
   // Sprint 6 Interview Intelligence APIs
   async createInterviewSession(jobId: string, resumeVersionId?: string): Promise<any> {
     return this.request<any>(`/jobs/${jobId}/interview/sessions`, {
@@ -398,4 +512,3 @@ class ApiClient {
 }
 
 export const apiClient = new ApiClient();
-

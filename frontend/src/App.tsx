@@ -7,6 +7,7 @@ import { JobAnalysisPage } from "./pages/JobAnalysisPage";
 import { ResumesPage } from "./pages/ResumesPage";
 import { ResumeStudioPage } from "./pages/ResumeStudioPage";
 import { ApplicationsPage } from "./pages/ApplicationsPage";
+import { SavedJobsPage } from "./pages/SavedJobsPage";
 import { InterviewPrepPage } from "./pages/InterviewPrepPage";
 import { CareerPage } from "./pages/CareerPage";
 import { SettingsPage } from "./pages/SettingsPage";
@@ -25,6 +26,7 @@ export const App: React.FC = () => {
       resumes: 'Pilot Mama | Resumes',
       analysis: 'Pilot Mama | Job Fit Analysis',
       applications: 'Pilot Mama | Applications Pipeline',
+      'saved-jobs': 'Pilot Mama | Saved Jobs',
       interview: 'Pilot Mama | Interview Prep Intelligence',
       career: 'Pilot Mama | Career Intelligence & Roadmap',
       learning: 'Pilot Mama | Learning Academy',
@@ -80,6 +82,10 @@ export const App: React.FC = () => {
           preselectedAppId={contextId}
           onNavigate={handleNavigate}
         />
+      )}
+
+      {currentTab === 'saved-jobs' && (
+        <SavedJobsPage onNavigate={handleNavigate} />
       )}
 
       {currentTab === 'interview' && (
