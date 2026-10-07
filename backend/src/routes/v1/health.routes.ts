@@ -29,3 +29,23 @@ healthRouter.get('/health', async (req, res) => {
     }
   });
 });
+
+healthRouter.get('/ready', async (req, res) => {
+  const dbHealth = await checkDatabaseConnection();
+  if (!dbHealth.connected) {
+    return res.status(503).json({
+      success: false,
+      error: { code: 'DATABASE_UNAVAILABLE', message: 'Readiness check failed: Database unreachable' }
+    });
+  }
+
+  res.status(200).json({
+    success: true,
+    data: {
+      status: 'ready',
+      version: '1.0.0',
+      uptime: Math.floor(process.uptime()),
+      timestamp: new Date().toISOString()
+    }
+  });
+});

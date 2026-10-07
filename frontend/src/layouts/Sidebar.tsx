@@ -13,6 +13,7 @@ import {
   Sparkles,
   Users,
   GraduationCap,
+  CreditCard,
   LogOut,
   LogIn
 } from 'lucide-react';
@@ -43,6 +44,9 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'saved-jobs', label: 'Saved Jobs', icon: Bookmark },
     { id: 'interview', label: 'Interview Prep', icon: Headphones },
     { id: 'career', label: 'Career Intelligence', icon: GraduationCap },
+    { id: 'agent', label: 'AI Career Copilot', icon: Sparkles },
+    { id: 'employer', label: 'Employer Portal', icon: Users },
+    { id: 'pricing', label: 'Plans & Credits', icon: CreditCard },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
 
@@ -132,6 +136,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
             >
               <LogIn size={15} />
               <span>Sign In / Register</span>
+            </button>
+          </div>
+        )}
+
+        {user?.role === 'ADMIN' && (
+          <div style={{ marginTop: '0.5rem' }}>
+            <button
+              onClick={() => handleItemClick('admin')}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '6px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: 'var(--radius-sm)',
+                color: '#f87171',
+                cursor: 'pointer'
+              }}
+            >
+              Platform Admin Portal →
             </button>
           </div>
         )}
