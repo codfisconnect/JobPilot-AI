@@ -1,4 +1,27 @@
 import type { User, AuthResponse, ApiError } from '../types/auth';
+import type { CanonicalJob } from '../types/job.types';
+import type {
+  AdminCandidateItem,
+  AdminResumeItem,
+  AdminJobItem,
+  AdminApplicationItem,
+  AdminEmployerItem,
+  AdminPaymentItem,
+  AdminSubscriptionItem,
+  AdminCreditsData
+} from '../types/admin';
+
+export interface ApiResponsePagination {
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: ApiResponsePagination;
+}
 
 const API_V1_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://jobpilot-ai-backend-a8h6.onrender.com/api/v1' : '/api/v1');
 
@@ -38,6 +61,36 @@ class ApiClient {
     }
 
     return json.data as T;
+  }
+
+  private async requestPaginated<T>(endpoint: string, options: RequestInit = {}): Promise<PaginatedResponse<T>> {
+    const headers = new Headers(options.headers || {});
+    headers.set('Content-Type', 'application/json');
+
+    if (this.accessToken) {
+      headers.set('Authorization', `Bearer ${this.accessToken}`);
+    }
+
+    const res = await fetch(`${API_V1_BASE}${endpoint}`, {
+      ...options,
+      headers,
+      credentials: 'include'
+    });
+
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok || json.success === false) {
+      const error: ApiError = json.error || {
+        code: `HTTP_${res.status}`,
+        message: json.message || 'An unexpected error occurred'
+      };
+      throw error;
+    }
+
+    return {
+      data: (json.data || []) as T[],
+      pagination: json.pagination
+    };
   }
 
   // Authentication API methods
@@ -270,7 +323,7 @@ class ApiClient {
   }
 
   // Sprint 3 Canonical Job Engine Methods
-  async getCanonicalJobs(params: Record<string, any> = {}): Promise<{ data: any[]; pagination: any }> {
+  async getCanonicalJobs(params: Record<string, any> = {}): Promise<PaginatedResponse<CanonicalJob>> {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') {
@@ -509,6 +562,235 @@ class ApiClient {
       body: JSON.stringify(data)
     });
   }
+
+  // Sprint 7 Billing & Payment APIs
+  async getPlans(): Promise<any[]> {
+    return this.request<any[]>('/billing/plans');
+  }
+
+  async getMyBilling(): Promise<any> {
+    return this.request<any>('/billing/me');
+  }
+
+  async getCredits(): Promise<{ balance: number; lifetimeGranted: number; lifetimeConsumed: number; updatedAt: string }> {
+    return this.request<any>('/billing/credits');
+  }
+
+  async getLedger(limit: number = 20, offset: number = 0): Promise<{ items: any[]; total: number }> {
+    return this.request<any>(`/billing/credits/ledger?limit=${limit}&offset=${offset}`);
+  }
+
+  async createCheckout(planCode: string): Promise<any> {
+    return this.request<any>('/billing/checkout', {
+      method: 'POST',
+      body: JSON.stringify({ planCode })
+    });
+  }
+
+  async verifyPayment(data: { providerOrderId: string; providerPaymentId: string; providerSignature: string }): Promise<any> {
+    return this.request<any>('/billing/payments/verify', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async getPaymentHistory(): Promise<any[]> {
+    return this.request<any[]>('/billing/payments');
+  }
+
+  async cancelSubscription(): Promise<any> {
+    return this.request<any>('/billing/subscription/cancel', {
+      method: 'POST'
+    });
+  }
+
+  // Sprint 8: Employer Platform APIs
+  async getEmployerOrg(): Promise<{ success: boolean; data: { organization: any; currentMember: any } }> {
+    return this.request('/employer/me');
+  }
+
+  async createEmployerOrg(data: any): Promise<{ success: boolean; data: any }> {
+    return this.request('/employer/organizations', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async getEmployerDashboard(): Promise<{ success: boolean; data: any }> {
+    return this.request('/employer/dashboard');
+  }
+
+  async getEmployerJobs(): Promise<{ success: boolean; data: any[] }> {
+    return this.request('/employer/jobs');
+  }
+
+  async createEmployerJob(data: any): Promise<{ success: boolean; data: any }> {
+    return this.request('/employer/jobs', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateEmployerJobStatus(jobId: string, action: 'publish' | 'pause' | 'close'): Promise<{ success: boolean; data: any }> {
+    return this.request(`/employer/jobs/${jobId}/${action}`, {
+      method: 'POST'
+    });
+  }
+
+  async getJobApplicants(jobId: string): Promise<{ success: boolean; data: any[] }> {
+    return this.request(`/employer/jobs/${jobId}/applications`);
+  }
+
+  async getApplicantDetail(applicationId: string): Promise<{ success: boolean; data: any }> {
+    return this.request(`/employer/applications/${applicationId}`);
+  }
+
+  async updateApplicantStage(applicationId: string, data: { stage: string; rating?: number; notes?: string }): Promise<{ success: boolean; data: any }> {
+    return this.request(`/employer/applications/${applicationId}/stage`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async addApplicantNote(applicationId: string, data: { notes: string; rating?: number }): Promise<{ success: boolean; data: any }> {
+    return this.request(`/employer/applications/${applicationId}/notes`, {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  // Sprint 9: AI Career Agent APIs
+  async createAgentSession(title?: string): Promise<{ success: boolean; data: any }> {
+    return this.request('/agent/sessions', {
+      method: 'POST',
+      body: JSON.stringify({ title })
+    });
+  }
+
+  async getAgentSessions(): Promise<{ success: boolean; data: any[] }> {
+    return this.request('/agent/sessions');
+  }
+
+  async getAgentSession(sessionId: string): Promise<{ success: boolean; data: any }> {
+    return this.request(`/agent/sessions/${sessionId}`);
+  }
+
+  async sendAgentMessage(sessionId: string, message: string): Promise<{ success: boolean; data: { message: any; action?: any } }> {
+    return this.request(`/agent/sessions/${sessionId}/messages`, {
+      method: 'POST',
+      body: JSON.stringify({ message })
+    });
+  }
+
+  async approveAgentAction(actionId: string): Promise<{ success: boolean; data: any }> {
+    return this.request(`/agent/actions/${actionId}/approve`, {
+      method: 'POST'
+    });
+  }
+
+  async rejectAgentAction(actionId: string, reason?: string): Promise<{ success: boolean; data: any }> {
+    return this.request(`/agent/actions/${actionId}/reject`, {
+      method: 'POST',
+      body: JSON.stringify({ reason })
+    });
+  }
+
+  // Admin V1 Platform APIs
+  async getAdminDashboard(): Promise<any> {
+    return this.request<any>('/admin/dashboard');
+  }
+
+  async getAdminCandidates(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<PaginatedResponse<AdminCandidateItem>> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    const query = qs.toString();
+    return this.requestPaginated<AdminCandidateItem>(`/admin/candidates${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminCandidateById(id: string): Promise<any> {
+    return this.request<any>(`/admin/candidates/${id}`);
+  }
+
+  async getAdminResumes(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<AdminResumeItem>> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    if (params.status) qs.append('status', params.status);
+    const query = qs.toString();
+    return this.requestPaginated<AdminResumeItem>(`/admin/resumes${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminJobs(params: { page?: number; pageSize?: number; search?: string; status?: string; source?: string; company?: string } = {}): Promise<PaginatedResponse<AdminJobItem>> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    if (params.status) qs.append('status', params.status);
+    if (params.source) qs.append('source', params.source);
+    if (params.company) qs.append('company', params.company);
+    const query = qs.toString();
+    return this.requestPaginated<AdminJobItem>(`/admin/jobs${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminApplications(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<AdminApplicationItem>> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    if (params.status) qs.append('status', params.status);
+    const query = qs.toString();
+    return this.requestPaginated<AdminApplicationItem>(`/admin/applications${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminEmployers(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<PaginatedResponse<AdminEmployerItem>> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    const query = qs.toString();
+    return this.requestPaginated<AdminEmployerItem>(`/admin/employers${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminPayments(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<AdminPaymentItem>> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    if (params.status) qs.append('status', params.status);
+    const query = qs.toString();
+    return this.requestPaginated<AdminPaymentItem>(`/admin/payments${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminSubscriptions(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<AdminSubscriptionItem>> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    if (params.status) qs.append('status', params.status);
+    const query = qs.toString();
+    return this.requestPaginated<AdminSubscriptionItem>(`/admin/subscriptions${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminCredits(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<{ data: AdminCreditsData; pagination: ApiResponsePagination }> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    const query = qs.toString();
+    const res = await this.requestPaginated<never>(`/admin/credits${query ? `?${query}` : ''}`);
+    return {
+      data: res.data as unknown as AdminCreditsData,
+      pagination: res.pagination
+    };
+  }
+
+  async getAdminHealth(): Promise<any> {
+    return this.request<any>('/admin/health');
+  }
 }
 
 export const apiClient = new ApiClient();
+

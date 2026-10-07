@@ -11,10 +11,19 @@ import { SavedJobsPage } from "./pages/SavedJobsPage";
 import { InterviewPrepPage } from "./pages/InterviewPrepPage";
 import { CareerPage } from "./pages/CareerPage";
 import { SettingsPage } from "./pages/SettingsPage";
+import { PricingPage } from "./pages/PricingPage";
+import { EmployerPage } from "./pages/EmployerPage";
+import { CareerAgentPage } from "./pages/CareerAgentPage";
 import { AuthPage } from "./pages/AuthPage";
+import { AdminRoot } from "./pages/admin/AdminRoot";
 
 export const App: React.FC = () => {
-  const [currentTab, setCurrentTab] = useState<string>('dashboard');
+  const [currentTab, setCurrentTab] = useState<string>(() => {
+    if (window.location.pathname.startsWith('/admin')) {
+      return 'admin';
+    }
+    return 'dashboard';
+  });
   const [contextId, setContextId] = useState<string | undefined>(undefined);
 
   // Update browser document title based on active section
@@ -30,7 +39,9 @@ export const App: React.FC = () => {
       interview: 'Pilot Mama | Interview Prep Intelligence',
       career: 'Pilot Mama | Career Intelligence & Roadmap',
       learning: 'Pilot Mama | Learning Academy',
-      settings: 'Pilot Mama | Settings & Integrations'
+      pricing: 'Pilot Mama | Plans, Credits & Premium',
+      settings: 'Pilot Mama | Settings & Integrations',
+      admin: 'Pilot Mama | Platform Admin Dashboard'
     };
     document.title = tabTitles[currentTab] || 'Pilot Mama — AI Job Application Copilot';
   }, [currentTab]);
@@ -40,6 +51,11 @@ export const App: React.FC = () => {
     setContextId(id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+  // Dedicated Administrative Portal Layout (isolated from candidate navigation)
+  if (currentTab === 'admin') {
+    return <AdminRoot onExitAdmin={() => handleNavigate('dashboard')} />;
+  }
 
   return (
     <AppShell currentTab={currentTab} onSelectTab={tab => handleNavigate(tab)}>
@@ -103,6 +119,24 @@ export const App: React.FC = () => {
 
       {currentTab === 'learning' && (
         <CareerPage
+          onNavigate={handleNavigate}
+        />
+      )}
+
+      {currentTab === 'employer' && (
+        <EmployerPage
+          onNavigate={handleNavigate}
+        />
+      )}
+
+      {currentTab === 'agent' && (
+        <CareerAgentPage
+          onNavigate={handleNavigate}
+        />
+      )}
+
+      {currentTab === 'pricing' && (
+        <PricingPage
           onNavigate={handleNavigate}
         />
       )}
