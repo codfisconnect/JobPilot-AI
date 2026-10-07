@@ -40,6 +40,36 @@ class ApiClient {
     return json.data as T;
   }
 
+  private async requestPaginated<T>(endpoint: string, options: RequestInit = {}): Promise<{ data: T[]; pagination: any }> {
+    const headers = new Headers(options.headers || {});
+    headers.set('Content-Type', 'application/json');
+
+    if (this.accessToken) {
+      headers.set('Authorization', `Bearer ${this.accessToken}`);
+    }
+
+    const res = await fetch(`${API_V1_BASE}${endpoint}`, {
+      ...options,
+      headers,
+      credentials: 'include'
+    });
+
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok || json.success === false) {
+      const error: ApiError = json.error || {
+        code: `HTTP_${res.status}`,
+        message: json.message || 'An unexpected error occurred'
+      };
+      throw error;
+    }
+
+    return {
+      data: (json.data || []) as T[],
+      pagination: json.pagination
+    };
+  }
+
   // Authentication API methods
   async register(data: { email: string; password: string; fullName?: string; role?: string }): Promise<AuthResponse> {
     const res = await this.request<AuthResponse>('/auth/register', {
@@ -653,7 +683,7 @@ class ApiClient {
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
     if (params.search) qs.append('search', params.search);
     const query = qs.toString();
-    return this.request<{ data: any[]; pagination: any }>(`/admin/candidates${query ? `?${query}` : ''}`);
+    return this.requestPaginated<any>(`/admin/candidates${query ? `?${query}` : ''}`);
   }
 
   async getAdminCandidateById(id: string): Promise<any> {
@@ -667,7 +697,7 @@ class ApiClient {
     if (params.search) qs.append('search', params.search);
     if (params.status) qs.append('status', params.status);
     const query = qs.toString();
-    return this.request<{ data: any[]; pagination: any }>(`/admin/resumes${query ? `?${query}` : ''}`);
+    return this.requestPaginated<any>(`/admin/resumes${query ? `?${query}` : ''}`);
   }
 
   async getAdminJobs(params: { page?: number; pageSize?: number; search?: string; status?: string; source?: string; company?: string } = {}): Promise<{ data: any[]; pagination: any }> {
@@ -679,7 +709,7 @@ class ApiClient {
     if (params.source) qs.append('source', params.source);
     if (params.company) qs.append('company', params.company);
     const query = qs.toString();
-    return this.request<{ data: any[]; pagination: any }>(`/admin/jobs${query ? `?${query}` : ''}`);
+    return this.requestPaginated<any>(`/admin/jobs${query ? `?${query}` : ''}`);
   }
 
   async getAdminApplications(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<{ data: any[]; pagination: any }> {
@@ -689,7 +719,7 @@ class ApiClient {
     if (params.search) qs.append('search', params.search);
     if (params.status) qs.append('status', params.status);
     const query = qs.toString();
-    return this.request<{ data: any[]; pagination: any }>(`/admin/applications${query ? `?${query}` : ''}`);
+    return this.requestPaginated<any>(`/admin/applications${query ? `?${query}` : ''}`);
   }
 
   async getAdminEmployers(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<{ data: any[]; pagination: any }> {
@@ -698,7 +728,7 @@ class ApiClient {
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
     if (params.search) qs.append('search', params.search);
     const query = qs.toString();
-    return this.request<{ data: any[]; pagination: any }>(`/admin/employers${query ? `?${query}` : ''}`);
+    return this.requestPaginated<any>(`/admin/employers${query ? `?${query}` : ''}`);
   }
 
   async getAdminPayments(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<{ data: any[]; pagination: any }> {
@@ -708,7 +738,7 @@ class ApiClient {
     if (params.search) qs.append('search', params.search);
     if (params.status) qs.append('status', params.status);
     const query = qs.toString();
-    return this.request<{ data: any[]; pagination: any }>(`/admin/payments${query ? `?${query}` : ''}`);
+    return this.requestPaginated<any>(`/admin/payments${query ? `?${query}` : ''}`);
   }
 
   async getAdminSubscriptions(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<{ data: any[]; pagination: any }> {
@@ -718,7 +748,7 @@ class ApiClient {
     if (params.search) qs.append('search', params.search);
     if (params.status) qs.append('status', params.status);
     const query = qs.toString();
-    return this.request<{ data: any[]; pagination: any }>(`/admin/subscriptions${query ? `?${query}` : ''}`);
+    return this.requestPaginated<any>(`/admin/subscriptions${query ? `?${query}` : ''}`);
   }
 
   async getAdminCredits(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<any> {
@@ -727,7 +757,7 @@ class ApiClient {
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
     if (params.search) qs.append('search', params.search);
     const query = qs.toString();
-    return this.request<any>(`/admin/credits${query ? `?${query}` : ''}`);
+    return this.requestPaginated<any>(`/admin/credits${query ? `?${query}` : ''}`);
   }
 
   async getAdminHealth(): Promise<any> {
