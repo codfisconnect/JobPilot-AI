@@ -1,5 +1,17 @@
 import type { User, AuthResponse, ApiError } from '../types/auth';
 
+export interface ApiResponsePagination {
+  total: number;
+  page: number;
+  pageSize: number;
+  totalPages: number;
+}
+
+export interface PaginatedResponse<T> {
+  data: T[];
+  pagination: ApiResponsePagination;
+}
+
 const API_V1_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://jobpilot-ai-backend-a8h6.onrender.com/api/v1' : '/api/v1');
 
 class ApiClient {
@@ -40,7 +52,7 @@ class ApiClient {
     return json.data as T;
   }
 
-  private async requestPaginated<T>(endpoint: string, options: RequestInit = {}): Promise<{ data: T[]; pagination: any }> {
+  private async requestPaginated<T>(endpoint: string, options: RequestInit = {}): Promise<PaginatedResponse<T>> {
     const headers = new Headers(options.headers || {});
     headers.set('Content-Type', 'application/json');
 
@@ -300,7 +312,7 @@ class ApiClient {
   }
 
   // Sprint 3 Canonical Job Engine Methods
-  async getCanonicalJobs(params: Record<string, any> = {}): Promise<{ data: any[]; pagination: any }> {
+  async getCanonicalJobs(params: Record<string, any> = {}): Promise<PaginatedResponse<any>> {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') {
@@ -677,7 +689,7 @@ class ApiClient {
     return this.request<any>('/admin/dashboard');
   }
 
-  async getAdminCandidates(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<{ data: any[]; pagination: any }> {
+  async getAdminCandidates(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<PaginatedResponse<any>> {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
@@ -690,7 +702,7 @@ class ApiClient {
     return this.request<any>(`/admin/candidates/${id}`);
   }
 
-  async getAdminResumes(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<{ data: any[]; pagination: any }> {
+  async getAdminResumes(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<any>> {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
@@ -700,7 +712,7 @@ class ApiClient {
     return this.requestPaginated<any>(`/admin/resumes${query ? `?${query}` : ''}`);
   }
 
-  async getAdminJobs(params: { page?: number; pageSize?: number; search?: string; status?: string; source?: string; company?: string } = {}): Promise<{ data: any[]; pagination: any }> {
+  async getAdminJobs(params: { page?: number; pageSize?: number; search?: string; status?: string; source?: string; company?: string } = {}): Promise<PaginatedResponse<any>> {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
@@ -712,7 +724,7 @@ class ApiClient {
     return this.requestPaginated<any>(`/admin/jobs${query ? `?${query}` : ''}`);
   }
 
-  async getAdminApplications(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<{ data: any[]; pagination: any }> {
+  async getAdminApplications(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<any>> {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
@@ -722,7 +734,7 @@ class ApiClient {
     return this.requestPaginated<any>(`/admin/applications${query ? `?${query}` : ''}`);
   }
 
-  async getAdminEmployers(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<{ data: any[]; pagination: any }> {
+  async getAdminEmployers(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<PaginatedResponse<any>> {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
@@ -731,7 +743,7 @@ class ApiClient {
     return this.requestPaginated<any>(`/admin/employers${query ? `?${query}` : ''}`);
   }
 
-  async getAdminPayments(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<{ data: any[]; pagination: any }> {
+  async getAdminPayments(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<any>> {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
@@ -741,7 +753,7 @@ class ApiClient {
     return this.requestPaginated<any>(`/admin/payments${query ? `?${query}` : ''}`);
   }
 
-  async getAdminSubscriptions(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<{ data: any[]; pagination: any }> {
+  async getAdminSubscriptions(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<any>> {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
@@ -751,7 +763,7 @@ class ApiClient {
     return this.requestPaginated<any>(`/admin/subscriptions${query ? `?${query}` : ''}`);
   }
 
-  async getAdminCredits(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<any> {
+  async getAdminCredits(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<PaginatedResponse<any>> {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
