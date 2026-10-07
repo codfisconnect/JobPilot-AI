@@ -6,7 +6,8 @@ import {
   resumesFilterSchema,
   applicationsFilterSchema,
   paymentsFilterSchema,
-  subscriptionsFilterSchema
+  subscriptionsFilterSchema,
+  candidateIdParamSchema
 } from './admin.schemas.js';
 
 export class AdminController {
@@ -51,7 +52,8 @@ export class AdminController {
 
   async getCandidateById(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const data = await adminService.getCandidateById(req.params.id);
+      const { id } = candidateIdParamSchema.parse(req.params);
+      const data = await adminService.getCandidateById(id);
       res.status(200).json({
         success: true,
         data,

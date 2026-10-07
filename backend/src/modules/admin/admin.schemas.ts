@@ -27,3 +27,7 @@ export const paymentsFilterSchema = paginationQuerySchema.extend({
 export const subscriptionsFilterSchema = paginationQuerySchema.extend({
   status: z.enum(['ACTIVE', 'PAST_DUE', 'CANCELED', 'EXPIRED', 'TRIALING', 'ALL']).optional()
 });
+
+export const candidateIdParamSchema = z.object({
+  id: z.string().uuid()
+});
