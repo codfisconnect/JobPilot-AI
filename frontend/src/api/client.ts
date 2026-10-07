@@ -1,4 +1,15 @@
 import type { User, AuthResponse, ApiError } from '../types/auth';
+import type { CanonicalJob } from '../types/job.types';
+import type {
+  AdminCandidateItem,
+  AdminResumeItem,
+  AdminJobItem,
+  AdminApplicationItem,
+  AdminEmployerItem,
+  AdminPaymentItem,
+  AdminSubscriptionItem,
+  AdminCreditsData
+} from '../types/admin';
 
 export interface ApiResponsePagination {
   total: number;
@@ -312,7 +323,7 @@ class ApiClient {
   }
 
   // Sprint 3 Canonical Job Engine Methods
-  async getCanonicalJobs(params: Record<string, any> = {}): Promise<PaginatedResponse<any>> {
+  async getCanonicalJobs(params: Record<string, any> = {}): Promise<PaginatedResponse<CanonicalJob>> {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') {
@@ -689,30 +700,30 @@ class ApiClient {
     return this.request<any>('/admin/dashboard');
   }
 
-  async getAdminCandidates(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<PaginatedResponse<any>> {
+  async getAdminCandidates(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<PaginatedResponse<AdminCandidateItem>> {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
     if (params.search) qs.append('search', params.search);
     const query = qs.toString();
-    return this.requestPaginated<any>(`/admin/candidates${query ? `?${query}` : ''}`);
+    return this.requestPaginated<AdminCandidateItem>(`/admin/candidates${query ? `?${query}` : ''}`);
   }
 
   async getAdminCandidateById(id: string): Promise<any> {
     return this.request<any>(`/admin/candidates/${id}`);
   }
 
-  async getAdminResumes(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<any>> {
+  async getAdminResumes(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<AdminResumeItem>> {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
     if (params.search) qs.append('search', params.search);
     if (params.status) qs.append('status', params.status);
     const query = qs.toString();
-    return this.requestPaginated<any>(`/admin/resumes${query ? `?${query}` : ''}`);
+    return this.requestPaginated<AdminResumeItem>(`/admin/resumes${query ? `?${query}` : ''}`);
   }
 
-  async getAdminJobs(params: { page?: number; pageSize?: number; search?: string; status?: string; source?: string; company?: string } = {}): Promise<PaginatedResponse<any>> {
+  async getAdminJobs(params: { page?: number; pageSize?: number; search?: string; status?: string; source?: string; company?: string } = {}): Promise<PaginatedResponse<AdminJobItem>> {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
@@ -721,55 +732,59 @@ class ApiClient {
     if (params.source) qs.append('source', params.source);
     if (params.company) qs.append('company', params.company);
     const query = qs.toString();
-    return this.requestPaginated<any>(`/admin/jobs${query ? `?${query}` : ''}`);
+    return this.requestPaginated<AdminJobItem>(`/admin/jobs${query ? `?${query}` : ''}`);
   }
 
-  async getAdminApplications(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<any>> {
+  async getAdminApplications(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<AdminApplicationItem>> {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
     if (params.search) qs.append('search', params.search);
     if (params.status) qs.append('status', params.status);
     const query = qs.toString();
-    return this.requestPaginated<any>(`/admin/applications${query ? `?${query}` : ''}`);
+    return this.requestPaginated<AdminApplicationItem>(`/admin/applications${query ? `?${query}` : ''}`);
   }
 
-  async getAdminEmployers(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<PaginatedResponse<any>> {
+  async getAdminEmployers(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<PaginatedResponse<AdminEmployerItem>> {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
     if (params.search) qs.append('search', params.search);
     const query = qs.toString();
-    return this.requestPaginated<any>(`/admin/employers${query ? `?${query}` : ''}`);
+    return this.requestPaginated<AdminEmployerItem>(`/admin/employers${query ? `?${query}` : ''}`);
   }
 
-  async getAdminPayments(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<any>> {
-    const qs = new URLSearchParams();
-    if (params.page) qs.append('page', String(params.page));
-    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
-    if (params.search) qs.append('search', params.search);
-    if (params.status) qs.append('status', params.status);
-    const query = qs.toString();
-    return this.requestPaginated<any>(`/admin/payments${query ? `?${query}` : ''}`);
-  }
-
-  async getAdminSubscriptions(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<any>> {
+  async getAdminPayments(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<AdminPaymentItem>> {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
     if (params.search) qs.append('search', params.search);
     if (params.status) qs.append('status', params.status);
     const query = qs.toString();
-    return this.requestPaginated<any>(`/admin/subscriptions${query ? `?${query}` : ''}`);
+    return this.requestPaginated<AdminPaymentItem>(`/admin/payments${query ? `?${query}` : ''}`);
   }
 
-  async getAdminCredits(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<PaginatedResponse<any>> {
+  async getAdminSubscriptions(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<AdminSubscriptionItem>> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    if (params.status) qs.append('status', params.status);
+    const query = qs.toString();
+    return this.requestPaginated<AdminSubscriptionItem>(`/admin/subscriptions${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminCredits(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<{ data: AdminCreditsData; pagination: ApiResponsePagination }> {
     const qs = new URLSearchParams();
     if (params.page) qs.append('page', String(params.page));
     if (params.pageSize) qs.append('pageSize', String(params.pageSize));
     if (params.search) qs.append('search', params.search);
     const query = qs.toString();
-    return this.requestPaginated<any>(`/admin/credits${query ? `?${query}` : ''}`);
+    const res = await this.requestPaginated<never>(`/admin/credits${query ? `?${query}` : ''}`);
+    return {
+      data: res.data as unknown as AdminCreditsData,
+      pagination: res.pagination
+    };
   }
 
   async getAdminHealth(): Promise<any> {
