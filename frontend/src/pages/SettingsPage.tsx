@@ -70,24 +70,24 @@ export const SettingsPage: React.FC = () => {
         <Card className="settings-card">
           <div className="card-top-icon">
             <Database size={20} className="icon-emerald" />
-            <h3 className="section-title">Local SQLite Storage</h3>
+            <h3 className="section-title">Production Database</h3>
           </div>
           <p className="settings-desc">
-            Zero-infrastructure, self-contained embedded SQLite database engine using pure WebAssembly / sql.js.
+            Hardened relational database engine powered by PostgreSQL with Prisma ORM and strict tenant isolation.
           </p>
 
           <div className="db-stats-list">
             <div className="db-stat-item">
               <span>Database Engine</span>
-              <code>SQLite 3 (sql.js WASM)</code>
+              <code>PostgreSQL 16 (Prisma ORM)</code>
             </div>
             <div className="db-stat-item">
-              <span>Database Path</span>
-              <code>database/jobpilot.sqlite</code>
+              <span>Tenant Isolation</span>
+              <code>Candidate Ownership Guard</code>
             </div>
             <div className="db-stat-item">
               <span>Backend API</span>
-              <code>Node.js + Express + TypeScript</code>
+              <code>Node.js + Express + TypeScript (/api/v1)</code>
             </div>
             <div className="db-stat-item">
               <span>Frontend Client</span>
@@ -95,6 +95,7 @@ export const SettingsPage: React.FC = () => {
             </div>
           </div>
         </Card>
+
 
         {/* Chrome Extension Instructions */}
         <Card className="settings-card" style={{ gridColumn: 'span 2' }}>

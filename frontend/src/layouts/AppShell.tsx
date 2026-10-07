@@ -5,6 +5,7 @@ import { Modal } from '../components/common/Modal';
 import { Button } from '../components/common/Button';
 import { UploadCloud, CheckCircle, AlertCircle } from 'lucide-react';
 import { api } from '../api';
+import { apiClient } from '../api/client';
 import { useApp } from '../context/AppContext';
 import './AppShell.css';
 
@@ -50,19 +51,33 @@ export const AppShell: React.FC<AppShellProps> = ({
     try {
       setIsUploading(true);
       setUploadError(null);
-      const newCand = await api.uploadResume(uploadFile);
-      await refreshCandidates();
-      setActiveCandidate(newCand);
-      setIsUploadOpen(false);
-      setUploadFile(null);
-      showToast(`Master profile successfully extracted for ${newCand.name}!`);
-      onSelectTab('profile');
+
+      // Attempt V1 production upload first
+      try {
+        await apiClient.uploadResume(uploadFile, uploadFile.name);
+        await refreshCandidates();
+        setIsUploadOpen(false);
+        setUploadFile(null);
+        showToast('Master resume uploaded successfully to production vault!');
+        onSelectTab('resumes');
+        return;
+      } catch (v1Err: any) {
+        // Fallback to transitional api if unauthenticated or in demo mode
+        const newCand = await api.uploadResume(uploadFile);
+        await refreshCandidates();
+        setActiveCandidate(newCand);
+        setIsUploadOpen(false);
+        setUploadFile(null);
+        showToast(`Master profile successfully extracted for ${newCand.name}!`);
+        onSelectTab('profile');
+      }
     } catch (err: any) {
       setUploadError(err.message || 'Failed to upload and parse resume');
     } finally {
       setIsUploading(false);
     }
   };
+
 
   return (
     <div className="app-layout">

@@ -76,17 +76,67 @@ describe('Sprint 1 Production API & RBAC Integration Tests', () => {
     });
   });
 
-  describe('Preserved Prototype Routes', () => {
-    it('should still serve /api/jobs and /api/candidates from prototype router', async () => {
+  describe('Secured Prototype & Transitional Security Boundary', () => {
+    it('should serve public /api/jobs without authentication', async () => {
       const jobsRes = await request(app).get('/api/jobs');
       assert.strictEqual(jobsRes.status, 200);
       assert.strictEqual(jobsRes.body.success, true);
       assert.ok(Array.isArray(jobsRes.body.data));
+    });
 
+    it('should reject anonymous access to legacy /api/candidates with 401 UNAUTHORIZED', async () => {
       const candidatesRes = await request(app).get('/api/candidates');
-      assert.strictEqual(candidatesRes.status, 200);
-      assert.strictEqual(candidatesRes.body.success, true);
-      assert.ok(Array.isArray(candidatesRes.body.data));
+      assert.strictEqual(candidatesRes.status, 401);
+      assert.strictEqual(candidatesRes.body.success, false);
+      assert.strictEqual(candidatesRes.body.error.code, 'UNAUTHORIZED');
+    });
+
+    it('should reject anonymous access to legacy /api/applications with 401 UNAUTHORIZED', async () => {
+      const appsRes = await request(app).get('/api/applications');
+      assert.strictEqual(appsRes.status, 401);
+      assert.strictEqual(appsRes.body.success, false);
+      assert.strictEqual(appsRes.body.error.code, 'UNAUTHORIZED');
+    });
+
+    it('should reject anonymous access to legacy /api/resumes with 401 UNAUTHORIZED', async () => {
+      const resumesRes = await request(app).get('/api/resumes');
+      assert.strictEqual(resumesRes.status, 401);
+      assert.strictEqual(resumesRes.body.success, false);
+      assert.strictEqual(resumesRes.body.error.code, 'UNAUTHORIZED');
+    });
+
+    it('should block Candidate A from accessing Candidate B profile with 403 FORBIDDEN', async () => {
+      const tokenCandidateA = signAccessToken({
+        userId: 'candidate_user_A',
+        email: 'userA@test.com',
+        role: UserRole.CANDIDATE
+      });
+
+      const idorRes = await request(app)
+        .get('/api/candidates/candidate_user_B')
+        .set('Authorization', `Bearer ${tokenCandidateA}`);
+
+      assert.strictEqual(idorRes.status, 403);
+      assert.strictEqual(idorRes.body.success, false);
+      assert.strictEqual(idorRes.body.error.code, 'FORBIDDEN');
+    });
+
+    it('should block Candidate A from modifying Candidate B profile with 403 FORBIDDEN', async () => {
+      const tokenCandidateA = signAccessToken({
+        userId: 'candidate_user_A',
+        email: 'userA@test.com',
+        role: UserRole.CANDIDATE
+      });
+
+      const idorRes = await request(app)
+        .put('/api/candidates/candidate_user_B')
+        .set('Authorization', `Bearer ${tokenCandidateA}`)
+        .send({ name: 'Hacked Name' });
+
+      assert.strictEqual(idorRes.status, 403);
+      assert.strictEqual(idorRes.body.success, false);
+      assert.strictEqual(idorRes.body.error.code, 'FORBIDDEN');
     });
   });
 });
+
