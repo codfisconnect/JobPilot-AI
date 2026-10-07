@@ -139,6 +139,31 @@ export const Sidebar: React.FC<SidebarProps> = ({
             </button>
           </div>
         )}
+
+        {user?.role === 'ADMIN' && (
+          <div style={{ marginTop: '0.5rem' }}>
+            <button
+              onClick={() => handleItemClick('admin')}
+              style={{
+                width: '100%',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: '6px',
+                padding: '6px',
+                fontSize: '0.75rem',
+                fontWeight: 700,
+                background: 'rgba(239, 68, 68, 0.1)',
+                border: '1px solid rgba(239, 68, 68, 0.3)',
+                borderRadius: 'var(--radius-sm)',
+                color: '#f87171',
+                cursor: 'pointer'
+              }}
+            >
+              Platform Admin Portal →
+            </button>
+          </div>
+        )}
       </div>
     </aside>
     </>
