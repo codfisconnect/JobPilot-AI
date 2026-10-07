@@ -18,13 +18,66 @@ import { AuthPage } from "./pages/AuthPage";
 import { AdminRoot } from "./pages/admin/AdminRoot";
 
 export const App: React.FC = () => {
-  const [currentTab, setCurrentTab] = useState<string>(() => {
-    if (window.location.pathname.startsWith('/admin')) {
+  const getTabFromPath = (path: string): string => {
+    const cleanPath = path.toLowerCase().replace(/\/$/, '');
+    if (cleanPath.startsWith('/admin')) {
       return 'admin';
     }
+    if (cleanPath === '/login' || cleanPath === '/register' || cleanPath === '/auth') {
+      return 'auth';
+    }
+    if (cleanPath === '/jobs') {
+      return 'jobs';
+    }
+    if (cleanPath === '/resumes') {
+      return 'resumes';
+    }
+    if (cleanPath === '/applications') {
+      return 'applications';
+    }
+    if (cleanPath === '/profile') {
+      return 'profile';
+    }
+    if (cleanPath === '/settings') {
+      return 'settings';
+    }
+    if (cleanPath === '/saved-jobs') {
+      return 'saved-jobs';
+    }
+    if (cleanPath === '/interview') {
+      return 'interview';
+    }
+    if (cleanPath === '/career') {
+      return 'career';
+    }
+    if (cleanPath === '/learning') {
+      return 'learning';
+    }
+    if (cleanPath === '/pricing') {
+      return 'pricing';
+    }
+    if (cleanPath === '/employer') {
+      return 'employer';
+    }
+    if (cleanPath === '/agent') {
+      return 'agent';
+    }
     return 'dashboard';
+  };
+
+  const [currentTab, setCurrentTab] = useState<string>(() => {
+    return getTabFromPath(window.location.pathname);
   });
   const [contextId, setContextId] = useState<string | undefined>(undefined);
+
+  // Sync route on popstate (browser back/forward)
+  React.useEffect(() => {
+    const handlePopState = () => {
+      setCurrentTab(getTabFromPath(window.location.pathname));
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   // Update browser document title based on active section
   React.useEffect(() => {
@@ -50,6 +103,29 @@ export const App: React.FC = () => {
     setCurrentTab(tab);
     setContextId(id);
     window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Update browser URL bar cleanly without page reload
+    const tabPaths: Record<string, string> = {
+      dashboard: '/',
+      admin: '/admin',
+      auth: '/login',
+      jobs: '/jobs',
+      resumes: '/resumes',
+      applications: '/applications',
+      profile: '/profile',
+      settings: '/settings',
+      'saved-jobs': '/saved-jobs',
+      interview: '/interview',
+      career: '/career',
+      learning: '/learning',
+      pricing: '/pricing',
+      employer: '/employer',
+      agent: '/agent'
+    };
+    const targetPath = tabPaths[tab];
+    if (targetPath && window.location.pathname !== targetPath) {
+      window.history.pushState({}, '', targetPath);
+    }
   };
 
   // Dedicated Administrative Portal Layout (isolated from candidate navigation)
