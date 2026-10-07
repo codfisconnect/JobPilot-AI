@@ -641,6 +641,98 @@ class ApiClient {
       body: JSON.stringify({ reason })
     });
   }
+
+  // Admin V1 Platform APIs
+  async getAdminDashboard(): Promise<any> {
+    return this.request<any>('/admin/dashboard');
+  }
+
+  async getAdminCandidates(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<{ data: any[]; pagination: any }> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    const query = qs.toString();
+    return this.request<{ data: any[]; pagination: any }>(`/admin/candidates${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminCandidateById(id: string): Promise<any> {
+    return this.request<any>(`/admin/candidates/${id}`);
+  }
+
+  async getAdminResumes(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<{ data: any[]; pagination: any }> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    if (params.status) qs.append('status', params.status);
+    const query = qs.toString();
+    return this.request<{ data: any[]; pagination: any }>(`/admin/resumes${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminJobs(params: { page?: number; pageSize?: number; search?: string; status?: string; source?: string; company?: string } = {}): Promise<{ data: any[]; pagination: any }> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    if (params.status) qs.append('status', params.status);
+    if (params.source) qs.append('source', params.source);
+    if (params.company) qs.append('company', params.company);
+    const query = qs.toString();
+    return this.request<{ data: any[]; pagination: any }>(`/admin/jobs${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminApplications(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<{ data: any[]; pagination: any }> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    if (params.status) qs.append('status', params.status);
+    const query = qs.toString();
+    return this.request<{ data: any[]; pagination: any }>(`/admin/applications${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminEmployers(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<{ data: any[]; pagination: any }> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    const query = qs.toString();
+    return this.request<{ data: any[]; pagination: any }>(`/admin/employers${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminPayments(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<{ data: any[]; pagination: any }> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    if (params.status) qs.append('status', params.status);
+    const query = qs.toString();
+    return this.request<{ data: any[]; pagination: any }>(`/admin/payments${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminSubscriptions(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<{ data: any[]; pagination: any }> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    if (params.status) qs.append('status', params.status);
+    const query = qs.toString();
+    return this.request<{ data: any[]; pagination: any }>(`/admin/subscriptions${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminCredits(params: { page?: number; pageSize?: number; search?: string } = {}): Promise<any> {
+    const qs = new URLSearchParams();
+    if (params.page) qs.append('page', String(params.page));
+    if (params.pageSize) qs.append('pageSize', String(params.pageSize));
+    if (params.search) qs.append('search', params.search);
+    const query = qs.toString();
+    return this.request<any>(`/admin/credits${query ? `?${query}` : ''}`);
+  }
+
+  async getAdminHealth(): Promise<any> {
+    return this.request<any>('/admin/health');
+  }
 }
 
 export const apiClient = new ApiClient();
