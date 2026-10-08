@@ -38,17 +38,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'profile', label: 'My Profile', icon: User },
-    { id: 'resumes', label: 'Resumes', icon: FileText },
+    { id: 'resumes', label: 'My Resume', icon: FileText },
     { id: 'jobs', label: 'Jobs', icon: Briefcase },
     { id: 'applications', label: 'Applications', icon: Send },
-    { id: 'saved-jobs', label: 'Saved Jobs', icon: Bookmark },
+    { id: 'career', label: 'Career', icon: GraduationCap },
     { id: 'interview', label: 'Interview Prep', icon: Headphones },
-    { id: 'career', label: 'Career Intelligence', icon: GraduationCap },
-    { id: 'agent', label: 'AI Career Copilot', icon: Sparkles },
-    { id: 'employer', label: 'Employer Portal', icon: Users },
-    { id: 'pricing', label: 'Plans & Credits', icon: CreditCard },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
+
 
   const handleItemClick = (id: string) => {
     onSelectTab(id);

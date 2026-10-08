@@ -39,14 +39,11 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
   const navItems = [
     { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
     { id: 'candidates', label: 'Candidates', icon: Users },
-    { id: 'resumes', label: 'Resumes', icon: FileText },
     { id: 'jobs', label: 'Jobs', icon: Briefcase },
     { id: 'applications', label: 'Applications', icon: Send },
     { id: 'employers', label: 'Employers', icon: Building2 },
     { id: 'payments', label: 'Payments', icon: CreditCard },
-    { id: 'subscriptions', label: 'Subscriptions', icon: Layers },
-    { id: 'credits', label: 'Credits & Ledger', icon: Coins },
-    { id: 'health', label: 'System Health', icon: Activity },
+    { id: 'health', label: 'System', icon: Activity },
   ];
 
   const handleNavClick = (id: string) => {

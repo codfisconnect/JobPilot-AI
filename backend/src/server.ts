@@ -78,9 +78,14 @@ if (!isTestEnv) {
     .then((dbStatus) => {
       if (dbStatus.connected) {
         logger.info(`PostgreSQL connected successfully (${dbStatus.latencyMs}ms)`);
+        // Idempotently provision initial platform administrator if configured
+        import('./database/adminSeed.js')
+          .then(m => m.provisionDefaultAdmin())
+          .catch(() => {});
       } else {
         logger.warn('PostgreSQL database notice on startup:', { error: dbStatus.error });
       }
+
 
       app.listen(PORT, () => {
         logger.info(`Pilot Mama backend listening on port ${PORT} [${env.NODE_ENV}]`);
