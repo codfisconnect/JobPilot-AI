@@ -16,10 +16,14 @@ import { EmployerPage } from "./pages/EmployerPage";
 import { CareerAgentPage } from "./pages/CareerAgentPage";
 import { AuthPage } from "./pages/AuthPage";
 import { AdminRoot } from "./pages/admin/AdminRoot";
+import { AdminLoginPage } from "./pages/admin/AdminLoginPage";
 
 export const App: React.FC = () => {
   const getTabFromPath = (path: string): string => {
     const cleanPath = path.toLowerCase().replace(/\/$/, '');
+    if (cleanPath === '/admin/login') {
+      return 'admin-login';
+    }
     if (cleanPath.startsWith('/admin')) {
       return 'admin';
     }
@@ -47,20 +51,8 @@ export const App: React.FC = () => {
     if (cleanPath === '/interview') {
       return 'interview';
     }
-    if (cleanPath === '/career') {
+    if (cleanPath === '/career' || cleanPath === '/learning') {
       return 'career';
-    }
-    if (cleanPath === '/learning') {
-      return 'learning';
-    }
-    if (cleanPath === '/pricing') {
-      return 'pricing';
-    }
-    if (cleanPath === '/employer') {
-      return 'employer';
-    }
-    if (cleanPath === '/agent') {
-      return 'agent';
     }
     return 'dashboard';
   };
@@ -129,8 +121,36 @@ export const App: React.FC = () => {
   };
 
   // Dedicated Administrative Portal Layout (isolated from candidate navigation)
+  if (currentTab === 'admin-login') {
+    return (
+      <AdminLoginPage
+        onSuccess={() => {
+          handleNavigate('admin');
+        }}
+        onExit={() => {
+          handleNavigate('dashboard');
+        }}
+      />
+    );
+  }
+
   if (currentTab === 'admin') {
-    return <AdminRoot onExitAdmin={() => handleNavigate('dashboard')} />;
+    // Extract section from /admin/:section if present
+    const path = window.location.pathname.toLowerCase().replace(/\/$/, '');
+    let initialSection = 'dashboard';
+    if (path.startsWith('/admin/')) {
+      const sub = path.replace('/admin/', '');
+      if (['candidates', 'jobs', 'applications', 'employers', 'payments', 'system', 'health'].includes(sub)) {
+        initialSection = sub === 'system' ? 'health' : sub;
+      }
+    }
+
+    return (
+      <AdminRoot
+        initialSection={initialSection}
+        onExitAdmin={() => handleNavigate('dashboard')}
+      />
+    );
   }
 
   return (

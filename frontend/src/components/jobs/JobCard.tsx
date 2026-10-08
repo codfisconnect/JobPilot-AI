@@ -57,11 +57,8 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onOpenSourceUrl
           <span className="job-company-name">{job.company?.name || 'Company'}</span>
         </div>
         <div className="job-badges-row">
-          <span className={`source-badge ${getSourceBadgeClass(job.sourceType)}`}>
-            {job.sourceName || job.sourceType}
-          </span>
           <span className={`remote-badge ${getRemoteBadgeClass(job.remoteType)}`}>
-            {job.remoteType.replace('_', ' ')}
+            {job.remoteType ? job.remoteType.replace('_', ' ') : 'Flexible'}
           </span>
         </div>
       </div>
@@ -116,7 +113,7 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onOpenSourceUrl
             }
           }}
         >
-          Apply / Source
+          View / Apply
         </Button>
       </div>
     </Card>
