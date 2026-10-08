@@ -101,28 +101,34 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         // Fallback for transitional development / prototype
       }
 
-      // 2. Transitional fallback to legacy candidate list if token is present
-      try {
-        const list = await api.getCandidates();
-        if (Array.isArray(list) && list.length > 0) {
-          setCandidates(list);
-          const savedCandidateId = localStorage.getItem('jobpilot_active_candidate_id');
-          const found = savedCandidateId ? list.find(c => c.id === savedCandidateId) : null;
-          const candidateToSet = found || list[0];
-          setActiveCandidate(candidateToSet);
-          localStorage.setItem('jobpilot_active_candidate_id', candidateToSet.id);
+      // 2. Transitional fallback strictly limited to local development mode (never executes in production)
+      if (import.meta.env.DEV && !import.meta.env.PROD) {
+        try {
+          const list = await api.getCandidates();
+          if (Array.isArray(list) && list.length > 0) {
+            setCandidates(list);
+            const savedCandidateId = localStorage.getItem('jobpilot_active_candidate_id');
+            const found = savedCandidateId ? list.find(c => c.id === savedCandidateId) : null;
+            const candidateToSet = found || list[0];
+            setActiveCandidate(candidateToSet);
+            localStorage.setItem('jobpilot_active_candidate_id', candidateToSet.id);
+            return;
+          }
+        } catch {
+          // Dev fallback failed
         }
-      } catch {
-        // If unauthenticated or no candidate profile exists yet, clear active state gracefully
-        setCandidates([]);
-        setActiveCandidate(null);
       }
+
+      // In production or when unauthenticated, maintain clean state
+      setCandidates([]);
+      setActiveCandidate(null);
     } catch (err) {
       console.warn('Notice loading candidate context:', err);
     } finally {
       setIsLoading(false);
     }
   };
+
 
 
   useEffect(() => {

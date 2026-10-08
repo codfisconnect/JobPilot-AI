@@ -62,15 +62,20 @@ export const AppShell: React.FC<AppShellProps> = ({
         onSelectTab('resumes');
         return;
       } catch (v1Err: any) {
-        // Fallback to transitional api if unauthenticated or in demo mode
-        const newCand = await api.uploadResume(uploadFile);
-        await refreshCandidates();
-        setActiveCandidate(newCand);
-        setIsUploadOpen(false);
-        setUploadFile(null);
-        showToast(`Master profile successfully extracted for ${newCand.name}!`);
-        onSelectTab('profile');
+        // Fallback to transitional api strictly limited to local dev environment
+        if (import.meta.env.DEV && !import.meta.env.PROD) {
+          const newCand = await api.uploadResume(uploadFile);
+          await refreshCandidates();
+          setActiveCandidate(newCand);
+          setIsUploadOpen(false);
+          setUploadFile(null);
+          showToast(`Master profile successfully extracted for ${newCand.name}!`);
+          onSelectTab('profile');
+          return;
+        }
+        throw v1Err;
       }
+
     } catch (err: any) {
       setUploadError(err.message || 'Failed to upload and parse resume');
     } finally {
