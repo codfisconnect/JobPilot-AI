@@ -23,9 +23,9 @@ export interface PaginatedResponse<T> {
   pagination: ApiResponsePagination;
 }
 
-const API_V1_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://jobpilot-ai-backend-a8h6.onrender.com/api/v1' : '/api/v1');
+const API_V1_BASE = (import.meta.env?.VITE_API_URL) || (import.meta.env?.PROD ? 'https://jobpilot-ai-backend-a8h6.onrender.com/api/v1' : '/api/v1');
 
-class ApiClient {
+export class ApiClient {
   private accessToken: string | null = null;
 
   setToken(token: string | null) {
