@@ -23,9 +23,9 @@ export interface PaginatedResponse<T> {
   pagination: ApiResponsePagination;
 }
 
-const API_V1_BASE = import.meta.env.VITE_API_URL || (import.meta.env.PROD ? 'https://jobpilot-ai-backend-a8h6.onrender.com/api/v1' : '/api/v1');
+const API_V1_BASE = (import.meta.env?.VITE_API_URL) || (import.meta.env?.PROD ? 'https://jobpilot-ai-backend-a8h6.onrender.com/api/v1' : '/api/v1');
 
-class ApiClient {
+export class ApiClient {
   private accessToken: string | null = null;
 
   setToken(token: string | null) {
@@ -36,7 +36,7 @@ class ApiClient {
     return this.accessToken;
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<T> {
     const headers = new Headers(options.headers || {});
     headers.set('Content-Type', 'application/json');
 
@@ -49,6 +49,15 @@ class ApiClient {
       headers,
       credentials: 'include' // Important for HttpOnly refresh cookie exchange
     });
+
+    if (res.status === 401 && !isRetry && endpoint !== '/auth/refresh' && endpoint !== '/auth/login') {
+      try {
+        await this.refresh();
+        return this.request<T>(endpoint, options, true);
+      } catch (refreshErr) {
+        // Refresh failed; proceed to parse and throw original 401 error
+      }
+    }
 
     const json = await res.json().catch(() => ({}));
 
@@ -63,7 +72,7 @@ class ApiClient {
     return json.data as T;
   }
 
-  private async requestPaginated<T>(endpoint: string, options: RequestInit = {}): Promise<PaginatedResponse<T>> {
+  private async requestPaginated<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<PaginatedResponse<T>> {
     const headers = new Headers(options.headers || {});
     headers.set('Content-Type', 'application/json');
 
@@ -76,6 +85,15 @@ class ApiClient {
       headers,
       credentials: 'include'
     });
+
+    if (res.status === 401 && !isRetry) {
+      try {
+        await this.refresh();
+        return this.requestPaginated<T>(endpoint, options, true);
+      } catch (refreshErr) {
+        // Refresh failed; proceed to throw 401
+      }
+    }
 
     const json = await res.json().catch(() => ({}));
 
@@ -270,7 +288,7 @@ class ApiClient {
     });
   }
 
-  async uploadResume(file: File, title?: string): Promise<any> {
+  async uploadResume(file: File, title?: string, isRetry: boolean = false): Promise<any> {
     const formData = new FormData();
     formData.append('resume', file);
     if (title) formData.append('title', title);
@@ -286,6 +304,15 @@ class ApiClient {
       credentials: 'include',
       body: formData
     });
+
+    if (res.status === 401 && !isRetry) {
+      try {
+        await this.refresh();
+        return this.uploadResume(file, title, true);
+      } catch (refreshErr) {
+        // Refresh failed; proceed to throw 401
+      }
+    }
 
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
