@@ -23,6 +23,8 @@ import {
   Target,
   GraduationCap
 } from 'lucide-react';
+import { CandidateDashboardWelcome } from "../components/dashboard/CandidateDashboardWelcome";
+import { DashboardReadiness } from "../components/dashboard/dashboardWelcome.types";
 import './DashboardPage.css';
 
 interface DashboardPageProps {
@@ -42,84 +44,154 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     REJECTED: 0
   });
   const [skillGaps, setSkillGaps] = useState<any[]>([]);
+  const [readiness, setReadiness] = useState<DashboardReadiness>({
+    profile: false,
+    resume: false,
+    jobs: false,
+    applications: false,
+    careerIntelligence: false,
+    isReady: false,
+    error: null
+  });
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    async function loadCandidateDashboard() {
-      try {
-        setLoading(true);
-        setError(null);
+  const loadCandidateDashboard = React.useCallback(async () => {
+    let active = true;
+    try {
+      setLoading(true);
+      setError(null);
+      setReadiness({
+        profile: false,
+        resume: false,
+        jobs: false,
+        applications: false,
+        careerIntelligence: false,
+        isReady: false,
+        error: null
+      });
 
-        // Fetch candidate data in parallel
-        const [profileRes, resumesRes, jobsRes, appsRes] = await Promise.all([
-          apiClient.getCandidateProfile().catch(() => null),
-          apiClient.listResumes().catch(() => []),
-          apiClient.getCanonicalJobs({ pageSize: 5 }).catch(() => ({ data: [] })),
-          apiClient.listApplications({ pageSize: 100 }).catch(() => ({ data: [] }))
-        ]);
+      // Track individual asynchronous completion progressively
+      let profData: any = null;
+      let resData: any[] = [];
+      let jobsData: any[] = [];
+      let appsData: any = null;
 
-        setProfile(profileRes);
-        setResumes(resumesRes || []);
-
-        const jobs = jobsRes?.data || [];
-        setRecommendedJobs(jobs.slice(0, 4));
-
-        // Compute application pipeline counts
-        const appList = appsRes?.data || [];
-        const counts = {
-          SAVED: 0,
-          APPLIED: 0,
-          INTERVIEW: 0,
-          OFFER: 0,
-          REJECTED: 0
-        };
-
-        appList.forEach((app: any) => {
-          const s = (app.status || '').toUpperCase();
-          if (s === 'SAVED') counts.SAVED++;
-          else if (s === 'APPLIED' || s === 'APPLICATION_STARTED') counts.APPLIED++;
-          else if (s.includes('INTERVIEW') || s === 'HR_SCREEN' || s === 'TECHNICAL') counts.INTERVIEW++;
-          else if (s === 'OFFER') counts.OFFER++;
-          else if (s === 'REJECTED') counts.REJECTED++;
+      const profilePromise = apiClient.getCandidateProfile()
+        .then(res => {
+          if (!active) return;
+          profData = res;
+          setProfile(res);
+          setReadiness(prev => ({ ...prev, profile: true }));
+        })
+        .catch(() => {
+          if (!active) return;
+          setReadiness(prev => ({ ...prev, profile: true }));
         });
-        setAppStats(counts);
 
-        // Extract top candidate skills to compute top 2-3 actionable skill gaps
-        const candidateSkills = new Set(
-          (profileRes?.skills || []).map((s: any) => (s.skill?.name || s.name || '').toLowerCase())
-        );
+      const resumesPromise = apiClient.listResumes()
+        .then(res => {
+          if (!active) return;
+          resData = res || [];
+          setResumes(resData);
+          setReadiness(prev => ({ ...prev, resume: true }));
+        })
+        .catch(() => {
+          if (!active) return;
+          setReadiness(prev => ({ ...prev, resume: true }));
+        });
 
-        const gapMap = new Map<string, number>();
-        jobs.forEach((job: any) => {
-          (job.skills || []).forEach((sk: any) => {
-            const skillName = sk.name || sk.skill?.name;
-            if (skillName && !candidateSkills.has(skillName.toLowerCase())) {
-              gapMap.set(skillName, (gapMap.get(skillName) || 0) + 1);
-            }
+      const jobsPromise = apiClient.getCanonicalJobs({ pageSize: 5 })
+        .then(res => {
+          if (!active) return;
+          jobsData = res?.data || [];
+          setRecommendedJobs(jobsData.slice(0, 4));
+          setReadiness(prev => ({ ...prev, jobs: true }));
+        })
+        .catch(() => {
+          if (!active) return;
+          setReadiness(prev => ({ ...prev, jobs: true }));
+        });
+
+      const appsPromise = apiClient.listApplications({ pageSize: 100 })
+        .then(res => {
+          if (!active) return;
+          appsData = res?.data || [];
+          const counts = {
+            SAVED: 0,
+            APPLIED: 0,
+            INTERVIEW: 0,
+            OFFER: 0,
+            REJECTED: 0
+          };
+          appsData.forEach((app: any) => {
+            const s = (app.status || '').toUpperCase();
+            if (s === 'SAVED') counts.SAVED++;
+            else if (s === 'APPLIED' || s === 'APPLICATION_STARTED') counts.APPLIED++;
+            else if (s.includes('INTERVIEW') || s === 'HR_SCREEN' || s === 'TECHNICAL') counts.INTERVIEW++;
+            else if (s === 'OFFER') counts.OFFER++;
+            else if (s === 'REJECTED') counts.REJECTED++;
           });
+          setAppStats(counts);
+          setReadiness(prev => ({ ...prev, applications: true }));
+        })
+        .catch(() => {
+          if (!active) return;
+          setReadiness(prev => ({ ...prev, applications: true }));
         });
 
-        const sortedGaps = Array.from(gapMap.entries())
-          .sort((a, b) => b[1] - a[1])
-          .slice(0, 3)
-          .map(([name, count]) => ({
-            name,
-            count,
-            recommendation: `Recommended: Complete a guided project or study ${name} fundamentals`
-          }));
+      // Wait for essential initial datasets to resolve
+      await Promise.all([profilePromise, resumesPromise, jobsPromise, appsPromise]);
 
-        setSkillGaps(sortedGaps);
-      } catch (err: any) {
-        console.error('Failed to load candidate dashboard:', err);
-        setError(err.message || 'Unable to load dashboard data');
-      } finally {
-        setLoading(false);
-      }
+      if (!active) return;
+
+      // Extract top candidate skills to compute top 2-3 actionable skill gaps
+      const candidateSkills = new Set(
+        (profData?.skills || []).map((s: any) => (s.skill?.name || s.name || '').toLowerCase())
+      );
+
+      const gapMap = new Map<string, number>();
+      jobsData.forEach((job: any) => {
+        (job.skills || []).forEach((sk: any) => {
+          const skillName = sk.name || sk.skill?.name;
+          if (skillName && !candidateSkills.has(skillName.toLowerCase())) {
+            gapMap.set(skillName, (gapMap.get(skillName) || 0) + 1);
+          }
+        });
+      });
+
+      const sortedGaps = Array.from(gapMap.entries())
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 3)
+        .map(([name, count]) => ({
+          name,
+          count,
+          recommendation: `Recommended: Complete a guided project or study ${name} fundamentals`
+        }));
+
+      setSkillGaps(sortedGaps);
+      setReadiness(prev => ({ ...prev, careerIntelligence: true, isReady: true }));
+      setLoading(false);
+    } catch (err: any) {
+      if (!active) return;
+      console.error('Failed to load candidate dashboard:', err);
+      const errMsg = err?.message || 'Unable to prepare career workspace';
+      setError(errMsg);
+      setReadiness(prev => ({ ...prev, error: errMsg }));
+      setLoading(false);
     }
 
-    loadCandidateDashboard();
+    return () => {
+      active = false;
+    };
   }, []);
+
+  useEffect(() => {
+    const cleanup = loadCandidateDashboard();
+    return () => {
+      cleanup.then(fn => fn?.());
+    };
+  }, [loadCandidateDashboard, user?.id]);
 
   // Compute profile completeness score based on candidate fields
   let completionPoints = 0;
@@ -167,21 +239,20 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     };
   }
 
-  if (loading) {
-    return (
-      <div className="dashboard-page">
-        <div className="jobs-loading-state" style={{ padding: '80px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px' }}>
-          <Clock size={32} className="animate-spin text-primary" />
-          <span style={{ fontSize: '1rem', fontWeight: 600, color: 'var(--text-secondary)' }}>
-            Loading your career dashboard...
-          </span>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className="dashboard-page">
+    <div className="dashboard-page" style={{ position: 'relative' }}>
+      {/* Premium First-Load Welcome Experience (Smoothly transitions out upon genuine readiness) */}
+      {(!readiness.isReady || readiness.error) && (
+        <CandidateDashboardWelcome
+          readiness={readiness}
+          onRetry={loadCandidateDashboard}
+          onContinueAnyway={() => {
+            setReadiness(prev => ({ ...prev, isReady: true, error: null }));
+            setLoading(false);
+          }}
+        />
+      )}
+
       {/* Action-Oriented Hero Banner */}
       <div className="dash-hero">
         <div className="dash-hero-content">
