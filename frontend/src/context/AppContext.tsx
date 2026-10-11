@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { CandidateProfile } from "../types/index";
 import { apiClient } from "../api/client";
 import { api } from "../api/index";
+import { useAuth } from './AuthContext';
 
 interface AppContextType {
   activeCandidate: CandidateProfile | null;
@@ -16,6 +17,7 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [candidates, setCandidates] = useState<CandidateProfile[]>([]);
   const [activeCandidate, setActiveCandidate] = useState<CandidateProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -37,7 +39,28 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
   };
 
-  const refreshCandidates = async () => {
+  const refreshCandidates = useCallback(async () => {
+    // If auth is still resolving, hold off until auth state is determined
+    if (isAuthLoading) {
+      return;
+    }
+
+    // ADMIN users: do not initialize candidate context or trigger candidate APIs
+    if (isAuthenticated && user?.role === 'ADMIN') {
+      setCandidates([]);
+      setActiveCandidate(null);
+      setIsLoading(false);
+      return;
+    }
+
+    // Unauthenticated users: do not make protected candidate API requests, maintain clean empty state
+    if (!isAuthenticated) {
+      setCandidates([]);
+      setActiveCandidate(null);
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
 
@@ -91,7 +114,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             updatedAt: v1Profile.updatedAt || new Date().toISOString()
           };
 
-
           setCandidates([adapted]);
           setActiveCandidate(adapted);
           localStorage.setItem('jobpilot_active_candidate_id', adapted.id);
@@ -127,13 +149,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     } finally {
       setIsLoading(false);
     }
-  };
-
-
+  }, [isAuthLoading, isAuthenticated, user?.role]);
 
   useEffect(() => {
     refreshCandidates();
-  }, []);
+  }, [refreshCandidates]);
 
   return (
     <AppContext.Provider

@@ -19,6 +19,8 @@ interface AdminRootProps {
 export const AdminRoot: React.FC<AdminRootProps> = ({ onExitAdmin, initialSection = 'dashboard' }) => {
   const { user, isAuthenticated, isLoading } = useAuth();
   const [activeSection, setActiveSection] = useState(initialSection);
+  const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string | undefined>(undefined);
+  const [selectedSourceId, setSelectedSourceId] = useState<string | undefined>(undefined);
 
   // Sync if initialSection changes from URL navigation
   React.useEffect(() => {
@@ -26,6 +28,17 @@ export const AdminRoot: React.FC<AdminRootProps> = ({ onExitAdmin, initialSectio
       setActiveSection(initialSection);
     }
   }, [initialSection]);
+
+  const navigateToSection = (section: string, meta?: { company?: string; sourceId?: string }) => {
+    setActiveSection(section);
+    if (meta?.company) setSelectedCompanyFilter(meta.company);
+    if (meta?.sourceId) setSelectedSourceId(meta.sourceId);
+
+    const path = section === 'dashboard' ? '/admin' : `/admin/${section === 'health' ? 'system' : section}`;
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, '', path);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -66,20 +79,6 @@ export const AdminRoot: React.FC<AdminRootProps> = ({ onExitAdmin, initialSectio
       </div>
     );
   }
-
-  const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string | undefined>(undefined);
-  const [selectedSourceId, setSelectedSourceId] = useState<string | undefined>(undefined);
-
-  const navigateToSection = (section: string, meta?: { company?: string; sourceId?: string }) => {
-    setActiveSection(section);
-    if (meta?.company) setSelectedCompanyFilter(meta.company);
-    if (meta?.sourceId) setSelectedSourceId(meta.sourceId);
-
-    const path = section === 'dashboard' ? '/admin' : `/admin/${section === 'health' ? 'system' : section}`;
-    if (window.location.pathname !== path) {
-      window.history.pushState({}, '', path);
-    }
-  };
 
   return (
     <AdminLayout
