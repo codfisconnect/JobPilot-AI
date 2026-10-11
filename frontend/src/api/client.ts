@@ -870,6 +870,14 @@ export class ApiClient {
       method: 'DELETE'
     });
   }
+
+  async getAdminJobSourceById(id: string): Promise<any> {
+    return this.request<any>(`/admin/job-sources/${id}`);
+  }
+
+  async getAdminJobDetail(id: string): Promise<any> {
+    return this.request<any>(`/admin/jobs/${id}`);
+  }
 }
 
 export const apiClient = new ApiClient();

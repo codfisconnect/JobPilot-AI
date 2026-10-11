@@ -26,6 +26,7 @@ adminRouter.get('/candidates', (req, res, next) => adminController.getCandidates
 adminRouter.get('/candidates/:id', (req, res, next) => adminController.getCandidateById(req, res, next));
 adminRouter.get('/resumes', (req, res, next) => adminController.getResumes(req, res, next));
 adminRouter.get('/jobs', (req, res, next) => adminController.getJobs(req, res, next));
+adminRouter.get('/jobs/:id', (req, res, next) => adminController.getJobById(req, res, next));
 adminRouter.get('/applications', (req, res, next) => adminController.getApplications(req, res, next));
 adminRouter.get('/employers', (req, res, next) => adminController.getEmployers(req, res, next));
 adminRouter.get('/payments', (req, res, next) => adminController.getPayments(req, res, next));

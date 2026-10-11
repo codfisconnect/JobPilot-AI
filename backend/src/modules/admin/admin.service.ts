@@ -28,6 +28,14 @@ export class AdminService {
     return adminRepository.getJobs(params);
   }
 
+  async getJobById(id: string) {
+    const job = await adminRepository.getJobById(id);
+    if (!job) {
+      throw new NotFoundError(`Job with ID '${id}' not found`);
+    }
+    return job;
+  }
+
   async getApplications(params: { page: number; pageSize: number; search?: string; status?: string }) {
     return adminRepository.getApplications(params);
   }
