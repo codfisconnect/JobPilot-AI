@@ -20,7 +20,9 @@ const envSchema = z.object({
   RAZORPAY_WEBHOOK_SECRET: z.string().default('rzp_webhook_secret_pilotmama_sprint7'),
   // Dedicated Administrator Provisioning (Part 28)
   ADMIN_EMAIL: z.string().email().default('admin@pilotmama.io'),
-  ADMIN_PASSWORD: z.string().min(8).default('Admin@PilotMama2026!')
+  ADMIN_PASSWORD: z.string().min(8).default('Admin@PilotMama2026!'),
+  // Production-grade Job Source Scheduler Secret
+  JOB_SYNC_CRON_SECRET: z.string().optional().default('')
 });
 
 

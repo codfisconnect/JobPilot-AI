@@ -451,12 +451,12 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
               <thead>
                 <tr>
                   <th>Company</th>
-                  <th>Source URL</th>
-                  <th>Detected Type</th>
+                  <th>Source Type</th>
                   <th>Jobs</th>
                   <th>Last Sync</th>
-                  <th>Last Successful Sync</th>
+                  <th>Next Scheduled Sync</th>
                   <th>Status</th>
+                  <th>Created / Updated / Expired</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -485,18 +485,6 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
                       </td>
 
                       <td>
-                        <a
-                          href={src.sourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-primary, #818cf8)', textDecoration: 'none', fontSize: '0.85rem', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                        >
-                          <span>{src.sourceUrl}</span>
-                          <ExternalLink size={12} />
-                        </a>
-                      </td>
-
-                      <td>
                         <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.07)', fontSize: '0.78rem', fontWeight: 600, color: '#e2e8f0' }}>
                           {src.sourceType}
                         </span>
@@ -509,14 +497,19 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
                       </td>
 
                       <td>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary, #94a3b8)' }}>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary, #94a3b8)' }}>
                           {formatRelativeTime(src.lastSyncAt)}
-                        </span>
+                        </div>
+                        {src.lastSuccessfulSyncAt && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
+                            Success: {formatRelativeTime(src.lastSuccessfulSyncAt)}
+                          </div>
+                        )}
                       </td>
 
                       <td>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary, #94a3b8)' }}>
-                          {formatRelativeTime(src.lastSuccessfulSyncAt)}
+                        <span style={{ fontSize: '0.85rem', color: '#facc15' }}>
+                          {src.lastSyncAt ? 'Every 6 hrs' : 'Pending First Sync'}
                         </span>
                       </td>
 
@@ -535,6 +528,12 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
                           <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }} />
                           {src.healthStatus}
                         </span>
+                      </td>
+
+                      <td>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-primary, #f8fafc)' }}>
+                          <span style={{ color: '#4ade80' }}>+{src.jobsCreated ?? 0}</span> / <span style={{ color: '#818cf8' }}>~{src.jobsUpdated ?? 0}</span> / <span style={{ color: '#f87171' }}>-{src.jobsExpired ?? 0}</span>
+                        </div>
                       </td>
 
                       <td>
@@ -660,11 +659,17 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px', fontSize: '0.85rem' }}>
               <div><strong>Original Careers URL:</strong> <a href={selectedSourceDetail.sourceUrl} target="_blank" rel="noreferrer" style={{ color: '#818cf8', wordBreak: 'break-all' }}>{selectedSourceDetail.sourceUrl}</a></div>
               <div><strong>Detected Jobs Endpoint:</strong> <span style={{ color: '#cbd5e1', wordBreak: 'break-all' }}>{selectedSourceDetail.jobsEndpoint || 'Direct Page'}</span></div>
+              <div><strong>Automatic Sync:</strong> <span style={{ color: selectedSourceDetail.enabled ? '#4ade80' : '#f87171', fontWeight: 600 }}>{selectedSourceDetail.enabled ? 'Enabled' : 'Disabled'}</span></div>
+              <div><strong>Schedule:</strong> Every 6 hours</div>
               <div><strong>Parser Type:</strong> {selectedSourceDetail.parserType}</div>
               <div><strong>Health Status:</strong> {selectedSourceDetail.healthStatus}</div>
               <div><strong>Jobs Discovered:</strong> {selectedSourceDetail.jobsFound || 0}</div>
+              <div><strong>Jobs Created:</strong> +{selectedSourceDetail.jobsCreated || 0}</div>
+              <div><strong>Jobs Updated:</strong> ~{selectedSourceDetail.jobsUpdated || 0}</div>
+              <div><strong>Jobs Expired:</strong> -{selectedSourceDetail.jobsExpired || 0}</div>
               <div><strong>Last Sync:</strong> {formatRelativeTime(selectedSourceDetail.lastSyncAt)}</div>
-              <div><strong>Last Successful:</strong> {formatRelativeTime(selectedSourceDetail.lastSuccessfulSyncAt)}</div>
+              <div><strong>Next Scheduled Sync:</strong> {selectedSourceDetail.lastSyncAt ? 'In ~6 hours' : 'Pending'}</div>
+              <div><strong>Last Successful Sync:</strong> {formatRelativeTime(selectedSourceDetail.lastSuccessfulSyncAt)}</div>
               {selectedSourceDetail.lastSyncError && (
                 <div style={{ color: '#f87171' }}><strong>Last Error:</strong> {selectedSourceDetail.lastSyncError}</div>
               )}

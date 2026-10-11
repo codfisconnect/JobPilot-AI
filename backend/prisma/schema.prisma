@@ -465,6 +465,10 @@ model JobSourceConfiguration {
   jobsFound            Int          @default(0) @map("jobs_found")
   jobsCreated          Int          @default(0) @map("jobs_created")
   jobsUpdated          Int          @default(0) @map("jobs_updated")
+  jobsExpired          Int          @default(0) @map("jobs_expired")
+  syncInProgress       Boolean      @default(false) @map("sync_in_progress")
+  syncLockToken        String?      @map("sync_lock_token")
+  lastSyncStartedAt    DateTime?    @map("last_sync_started_at")
   createdAt            DateTime     @default(now()) @map("created_at")
   updatedAt            DateTime     @updatedAt @map("updated_at")
 
