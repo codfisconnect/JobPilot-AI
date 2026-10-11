@@ -29,7 +29,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onC
           </div>
           <div className="source-transparency-pill">
             <ShieldCheck size={14} />
-            <span>Verified Source: <strong>{job.sourceName || job.sourceType}</strong></span>
+            <span>Verified Career Opening</span>
           </div>
         </div>
 
@@ -115,12 +115,11 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onC
           <p className="detail-body-text">{job.description}</p>
         </div>
 
-        {/* Source Transparency & Action Footer */}
+        {/* Candidate Action Footer */}
         <div className="job-detail-footer">
           <div className="source-disclaimer">
             <p>
-              Pilot Mama discovered this opportunity via <strong>{job.sourceName}</strong>.
-              All external links open directly in employer career sites. Candidate data is never sent automatically.
+              Verified career opportunity. External links open directly on employer career sites with zero automated submission.
             </p>
           </div>
           <div className="detail-actions">
@@ -135,7 +134,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onC
                   onAnalyzeFit(job.id);
                 }}
               >
-                Analyze Fit
+                Analyze Job Fit
               </Button>
             )}
             <Button
@@ -143,7 +142,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onC
               icon={<ExternalLink size={16} />}
               onClick={() => window.open(targetUrl, '_blank', 'noopener,noreferrer')}
             >
-              Open on {job.sourceName || 'Source'}
+              Apply on Company Site
             </Button>
           </div>
         </div>

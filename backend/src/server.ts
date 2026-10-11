@@ -14,8 +14,12 @@ import { companyRouter } from './routes/v1/company.routes.js';
 import { interviewRouter } from './modules/interviews/interview.routes.js';
 import { careerRouter } from './modules/career/career.routes.js';
 import { applicationRouter, savedJobRouter } from './modules/applications/application.routes.js';
+import { billingRouter } from './modules/billing/billing.routes.js';
+import { employerRouter } from './modules/employer/employer.routes.js';
+import { agentRouter } from './modules/agent/agent.routes.js';
+import { adminRouter } from './modules/admin/admin.routes.js';
 import { apiRouter as prototypeApiRouter } from './routes/api.routes.js';
-import { getDb } from './database/db.js';
+import { checkDatabaseConnection } from './database/prisma.js';
 import { logger } from './utils/logger.js';
 
 export const app = express();
@@ -32,7 +36,12 @@ app.use(cors({
 }));
 
 app.use(cookieParser());
-app.use(express.json({ limit: '10mb' }));
+app.use(express.json({
+  limit: '10mb',
+  verify: (req: any, _res, buf) => {
+    req.rawBody = buf;
+  }
+}));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // 3. V1 Production API Routes
@@ -46,6 +55,10 @@ app.use('/api/v1/applications', applicationRouter);
 app.use('/api/v1/saved-jobs', savedJobRouter);
 app.use('/api/v1/interview', interviewRouter);
 app.use('/api/v1/career', careerRouter);
+app.use('/api/v1/billing', billingRouter);
+app.use('/api/v1/employer', employerRouter);
+app.use('/api/v1/agent', agentRouter);
+app.use('/api/v1/admin', adminRouter);
 app.use('/api/v1', healthRouter);
 
 // 4. Preserved Prototype API Routes
@@ -61,21 +74,26 @@ const PORT = env.PORT;
 const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.TEST_MODE) || process.argv.some(arg => arg.includes('test'));
 
 if (!isTestEnv) {
-  getDb()
-    .then(async () => {
-      try {
-        const { seedMasterData } = await import('./database/seedMaster.js');
-        await seedMasterData();
-      } catch (seedErr) {
-        logger.warn('Prototype master data seeding notice:', { error: (seedErr as any)?.message });
+  checkDatabaseConnection()
+    .then((dbStatus) => {
+      if (dbStatus.connected) {
+        logger.info(`PostgreSQL connected successfully (${dbStatus.latencyMs}ms)`);
+        // Idempotently provision initial platform administrator if configured
+        import('./database/adminSeed.js')
+          .then(m => m.provisionDefaultAdmin())
+          .catch(() => {});
+      } else {
+        logger.warn('PostgreSQL database notice on startup:', { error: dbStatus.error });
       }
+
 
       app.listen(PORT, () => {
         logger.info(`Pilot Mama backend listening on port ${PORT} [${env.NODE_ENV}]`);
       });
     })
-    .catch(err => {
-      logger.error('Failed to initialize prototype database on startup:', err);
+    .catch((err) => {
+      logger.error('Failed to initialize server on startup:', err);
       process.exit(1);
     });
 }
+

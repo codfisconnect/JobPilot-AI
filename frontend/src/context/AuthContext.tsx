@@ -6,8 +6,8 @@ interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (credentials: { email: string; password: string }) => Promise<void>;
-  register: (data: { email: string; password: string; fullName?: string }) => Promise<void>;
+  login: (credentials: { email: string; password: string }) => Promise<User>;
+  register: (data: { email: string; password: string; fullName?: string }) => Promise<User>;
   logout: () => Promise<void>;
   error: string | null;
   clearError: () => void;
@@ -55,6 +55,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setError(null);
       const res = await apiClient.login(credentials);
       setUser(res.user);
+      return res.user;
     } catch (err: any) {
       const apiErr = err as ApiError;
       const msg = apiErr.message || 'Invalid email or password';
@@ -71,6 +72,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setError(null);
       const res = await apiClient.register(data);
       setUser(res.user);
+      return res.user;
     } catch (err: any) {
       const apiErr = err as ApiError;
       const msg = apiErr.message || 'Registration failed';

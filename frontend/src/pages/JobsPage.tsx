@@ -188,31 +188,22 @@ export const JobsPage: React.FC<JobsPageProps> = ({
 
   return (
     <div className="jobs-page">
-      {/* Header & Main Ingestion Controls */}
+      {/* Header & Main Controls */}
       <div className="jobs-header-row">
         <div>
-          <h2 className="jobs-page-title">Production Job Discovery Engine</h2>
+          <h2 className="jobs-page-title">Explore Career Opportunities</h2>
           <p className="jobs-page-sub">
-            Real-time multi-source job aggregation across Codewalla, Greenhouse, Lever, and Ashby with automated deduplication & source transparency.
+            Verified job openings tailored to your career preferences. Find relevant roles and apply with confidence.
           </p>
         </div>
 
         <div className="jobs-actions-group">
           <Button
-            variant="outline"
-            icon={<RefreshCw size={16} className={isSyncing ? 'animate-spin' : ''} />}
-            loading={isSyncing}
-            onClick={handleSyncAll}
-          >
-            {isSyncing ? 'Synchronizing Sources...' : 'Sync Sources'}
-          </Button>
-
-          <Button
             variant="primary"
             icon={<Plus size={16} />}
             onClick={() => setIsAddModalOpen(true)}
           >
-            Add Custom Job
+            Add Target Job
           </Button>
         </div>
       </div>
@@ -223,7 +214,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
           <Search size={16} className="search-icon" />
           <input
             type="text"
-            placeholder="Search titles, skills, or companies..."
+            placeholder="Search roles, skills, or companies..."
             value={searchQuery}
             onChange={e => setSearchQuery(e.target.value)}
           />
@@ -246,26 +237,14 @@ export const JobsPage: React.FC<JobsPageProps> = ({
             value={employmentFilter}
             onChange={e => setEmploymentFilter(e.target.value)}
           >
-            <option value="">All Types</option>
+            <option value="">All Employment Types</option>
             <option value="FULL_TIME">Full Time</option>
             <option value="CONTRACT">Contract</option>
             <option value="INTERNSHIP">Internship</option>
           </select>
 
-          <select
-            className="filter-select"
-            value={sourceFilter}
-            onChange={e => setSourceFilter(e.target.value)}
-          >
-            <option value="">All Sources</option>
-            <option value="CODEWALLA">Codewalla</option>
-            <option value="GREENHOUSE">Greenhouse</option>
-            <option value="LEVER">Lever</option>
-            <option value="ASHBY">Ashby</option>
-          </select>
-
           <Button variant="secondary" size="sm" onClick={() => fetchCanonicalJobs(1)}>
-            Apply
+            Search
           </Button>
         </div>
       </div>
