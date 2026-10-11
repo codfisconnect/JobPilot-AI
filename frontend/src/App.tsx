@@ -140,8 +140,8 @@ export const App: React.FC = () => {
     let initialSection = 'dashboard';
     if (path.startsWith('/admin/')) {
       const sub = path.replace('/admin/', '');
-      if (['candidates', 'jobs', 'applications', 'employers', 'payments', 'system', 'health'].includes(sub)) {
-        initialSection = sub === 'system' ? 'health' : sub;
+      if (['job-sources', 'job_sources', 'candidates', 'jobs', 'applications', 'employers', 'payments', 'system', 'health'].includes(sub)) {
+        initialSection = sub === 'system' ? 'health' : (sub === 'job_sources' ? 'job-sources' : sub);
       }
     }
 

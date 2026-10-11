@@ -817,6 +817,67 @@ export class ApiClient {
   async getAdminHealth(): Promise<any> {
     return this.request<any>('/admin/health');
   }
+
+  // Job Sources Management (Universal Discovery & Onboarding)
+  async discoverJobSource(url: string): Promise<any> {
+    const headers = new Headers();
+    headers.set('Content-Type', 'application/json');
+    if (this.accessToken) headers.set('Authorization', `Bearer ${this.accessToken}`);
+
+    const res = await fetch(`${API_V1_BASE}/admin/job-sources/discover`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ url }),
+      credentials: 'include'
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.success === false) {
+      throw new Error(json.error || json.message || 'Discovery failed');
+    }
+    return json;
+  }
+
+  async getAdminJobSources(): Promise<any[]> {
+    return this.request<any[]>('/admin/job-sources');
+  }
+
+  async syncAdminJobSource(id: string): Promise<any> {
+    const headers = new Headers();
+    headers.set('Content-Type', 'application/json');
+    if (this.accessToken) headers.set('Authorization', `Bearer ${this.accessToken}`);
+
+    const res = await fetch(`${API_V1_BASE}/admin/job-sources/${id}/sync`, {
+      method: 'POST',
+      headers,
+      credentials: 'include'
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.success === false) {
+      throw new Error(json.error || json.message || 'Sync failed');
+    }
+    return json;
+  }
+
+  async updateAdminJobSource(id: string, data: any): Promise<any> {
+    return this.request<any>(`/admin/job-sources/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteAdminJobSource(id: string): Promise<any> {
+    return this.request<any>(`/admin/job-sources/${id}`, {
+      method: 'DELETE'
+    });
+  }
+
+  async getAdminJobSourceById(id: string): Promise<any> {
+    return this.request<any>(`/admin/job-sources/${id}`);
+  }
+
+  async getAdminJobDetail(id: string): Promise<any> {
+    return this.request<any>(`/admin/jobs/${id}`);
+  }
 }
 
 export const apiClient = new ApiClient();

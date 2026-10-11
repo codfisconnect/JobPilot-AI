@@ -113,6 +113,23 @@ export class AdminController {
     }
   }
 
+  async getJobById(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const data = await adminService.getJobById(id);
+      res.status(200).json({
+        success: true,
+        data,
+        meta: {
+          requestId: (req as any).id,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   async getApplications(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const query = applicationsFilterSchema.parse(req.query);

@@ -20,7 +20,11 @@ export class AdminRepository {
       totalEmployers,
       activeSubscriptions,
       paymentsSummary,
-      creditsSummary
+      creditsSummary,
+      connectedJobSources,
+      recentSyncs,
+      recentApplications,
+      recentRegistrations
     ] = await Promise.all([
       // Total candidates registered
       prisma.user.count({
@@ -71,6 +75,35 @@ export class AdminRepository {
           lifetimeGranted: true,
           lifetimeConsumed: true
         }
+      }),
+      // Connected Job Sources count
+      prisma.jobSourceConfiguration.count(),
+      // Recent Job Source Syncs
+      prisma.jobSourceConfiguration.findMany({
+        take: 5,
+        orderBy: { lastSyncAt: 'desc' },
+        include: { company: true }
+      }),
+      // Recent Applications
+      prisma.application.findMany({
+        take: 5,
+        orderBy: { createdAt: 'desc' },
+        include: {
+          candidateProfile: { select: { fullName: true } },
+          job: { select: { title: true, company: { select: { name: true } } } }
+        }
+      }),
+      // Recent Candidate Registrations
+      prisma.user.findMany({
+        take: 5,
+        where: { role: UserRole.CANDIDATE },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          id: true,
+          email: true,
+          createdAt: true,
+          candidateProfile: { select: { fullName: true } }
+        }
       })
     ]);
 
@@ -83,6 +116,7 @@ export class AdminRepository {
       totalApplications,
       totalEmployers,
       activeSubscriptions,
+      connectedJobSources,
       paymentsSummary: {
         totalRevenue: Number(paymentsSummary._sum.amount || 0),
         successfulPaymentsCount: paymentsSummary._count.id || 0
@@ -91,6 +125,11 @@ export class AdminRepository {
         totalBalance: creditsSummary._sum.balance || 0,
         lifetimeGranted: creditsSummary._sum.lifetimeGranted || 0,
         lifetimeConsumed: creditsSummary._sum.lifetimeConsumed || 0
+      },
+      recentActivity: {
+        recentSyncs,
+        recentApplications,
+        recentRegistrations
       }
     };
   }
@@ -418,6 +457,18 @@ export class AdminRepository {
           firstSeenAt: true,
           lastSeenAt: true,
           createdAt: true,
+          salaryMin: true,
+          salaryMax: true,
+          salaryCurrency: true,
+          experienceMin: true,
+          experienceMax: true,
+          postedAt: true,
+          description: true,
+          responsibilities: true,
+          requirements: true,
+          preferredQualifications: true,
+          externalJobId: true,
+          applicationUrl: true,
           company: {
             select: {
               id: true,
@@ -446,6 +497,18 @@ export class AdminRepository {
         sourceType: j.sourceType,
         sourceName: j.sourceName,
         sourceUrl: j.sourceUrl,
+        applicationUrl: j.applicationUrl,
+        externalJobId: j.externalJobId,
+        salaryMin: j.salaryMin,
+        salaryMax: j.salaryMax,
+        salaryCurrency: j.salaryCurrency,
+        experienceMin: j.experienceMin,
+        experienceMax: j.experienceMax,
+        postedAt: j.postedAt,
+        description: j.description,
+        responsibilities: j.responsibilities,
+        requirements: j.requirements,
+        preferredQualifications: j.preferredQualifications,
         firstSeenAt: j.firstSeenAt,
         lastSeenAt: j.lastSeenAt,
         createdAt: j.createdAt,
@@ -458,6 +521,19 @@ export class AdminRepository {
       pageSize,
       totalPages: Math.ceil(total / pageSize)
     };
+  }
+
+  async getJobById(jobId: string) {
+    return prisma.job.findUnique({
+      where: { id: jobId },
+      include: {
+        company: true,
+        skills: { include: { skill: true } },
+        _count: {
+          select: { applications: true }
+        }
+      }
+    });
   }
 
   // 5. Applications

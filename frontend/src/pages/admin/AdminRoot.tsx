@@ -8,6 +8,7 @@ import { AdminApplications } from './AdminApplications';
 import { AdminEmployers } from './AdminEmployers';
 import { AdminPayments } from './AdminPayments';
 import { AdminHealth } from './AdminHealth';
+import { AdminJobSources } from './AdminJobSources';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
 interface AdminRootProps {
@@ -66,21 +67,37 @@ export const AdminRoot: React.FC<AdminRootProps> = ({ onExitAdmin, initialSectio
     );
   }
 
+  const [selectedCompanyFilter, setSelectedCompanyFilter] = useState<string | undefined>(undefined);
+  const [selectedSourceId, setSelectedSourceId] = useState<string | undefined>(undefined);
+
+  const navigateToSection = (section: string, meta?: { company?: string; sourceId?: string }) => {
+    setActiveSection(section);
+    if (meta?.company) setSelectedCompanyFilter(meta.company);
+    if (meta?.sourceId) setSelectedSourceId(meta.sourceId);
+
+    const path = section === 'dashboard' ? '/admin' : `/admin/${section === 'health' ? 'system' : section}`;
+    if (window.location.pathname !== path) {
+      window.history.pushState({}, '', path);
+    }
+  };
+
   return (
     <AdminLayout
       activeSection={activeSection}
-      onSelectSection={section => {
-        setActiveSection(section);
-        const path = section === 'dashboard' ? '/admin' : `/admin/${section === 'health' ? 'system' : section}`;
-        if (window.location.pathname !== path) {
-          window.history.pushState({}, '', path);
-        }
-      }}
+      onSelectSection={section => navigateToSection(section)}
       onExitAdmin={onExitAdmin}
     >
-      {activeSection === 'dashboard' && <AdminDashboardOverview />}
+      {activeSection === 'dashboard' && (
+        <AdminDashboardOverview onNavigateSection={sec => navigateToSection(sec)} />
+      )}
+      {(activeSection === 'job-sources' || activeSection === 'job_sources') && (
+        <AdminJobSources
+          onViewJobs={compName => navigateToSection('jobs', { company: compName })}
+          preselectedSourceId={selectedSourceId}
+        />
+      )}
       {activeSection === 'candidates' && <AdminCandidates />}
-      {activeSection === 'jobs' && <AdminJobs />}
+      {activeSection === 'jobs' && <AdminJobs initialCompanyFilter={selectedCompanyFilter} />}
       {activeSection === 'applications' && <AdminApplications />}
       {activeSection === 'employers' && <AdminEmployers />}
       {activeSection === 'payments' && <AdminPayments />}
