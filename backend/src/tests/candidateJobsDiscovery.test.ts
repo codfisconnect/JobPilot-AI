@@ -1,4 +1,4 @@
-import { describe, it } from 'node:test';
+import { describe, it, after } from 'node:test';
 import assert from 'node:assert';
 import supertest from 'supertest';
 import { app } from '../server.js';
@@ -32,40 +32,49 @@ describe('Candidate Jobs Discovery & Exploration Suite (Regression for 0 Jobs Bu
     });
     assert.ok(candidateToken, 'Candidate token generated');
 
+    // Clean up any residual old test jobs
+    await prisma.job.deleteMany({
+      where: {
+        contentHash: {
+          in: ['hash_test_job_1', 'hash_test_job_2', 'hash_test_job_3', 'hash_test_job_4', 'hash_test_job_5', 'hash_test_job_6']
+        }
+      }
+    }).catch(() => {});
+
     // Create or retrieve 2 test companies and seed jobs if needed
     testCompanyA = await prisma.company.upsert({
-      where: { officialDomain: 'codfis-test.com' },
+      where: { officialDomain: 'candidate-test-corp-a.com' },
       create: {
-        name: 'Codfis Technologies Test',
-        officialDomain: 'codfis-test.com'
+        name: 'Candidate Test Corp A',
+        officialDomain: 'candidate-test-corp-a.com'
       },
       update: {}
     });
 
     testCompanyB = await prisma.company.upsert({
-      where: { officialDomain: 'synechron-test.com' },
+      where: { officialDomain: 'candidate-test-corp-b.com' },
       create: {
-        name: 'Synechron Test',
-        officialDomain: 'synechron-test.com'
+        name: 'Candidate Test Corp B',
+        officialDomain: 'candidate-test-corp-b.com'
       },
       update: {}
     });
 
-    // Ensure we have at least 6 canonical jobs for pagination tests
-    for (let i = 1; i <= 6; i++) {
+    // Ensure we have at least 10 canonical jobs for pagination tests
+    for (let i = 1; i <= 10; i++) {
       await prisma.job.upsert({
-        where: { contentHash: `hash_test_job_${i}` },
+        where: { contentHash: `hash_candidate_test_job_${i}` },
         create: {
           title: i % 2 === 0 ? `Senior Software Engineer ${i}` : `Staff Product Designer ${i}`,
           description: 'Test job description for regression testing',
           companyId: i % 2 === 0 ? testCompanyA.id : testCompanyB.id,
           sourceType: i % 2 === 0 ? 'JSON_API' : 'EMBEDDED_DATA',
-          sourceName: i % 2 === 0 ? 'Codfis Test Source' : 'Synechron Test Source',
+          sourceName: i % 2 === 0 ? 'Candidate Test Source A' : 'Candidate Test Source B',
           sourceUrl: `https://test.example.com/careers/source_${i}`,
           remoteType: i % 2 === 0 ? 'REMOTE' : 'ON_SITE',
           employmentType: 'FULL_TIME',
           status: 'ACTIVE',
-          contentHash: `hash_test_job_${i}`,
+          contentHash: `hash_candidate_test_job_${i}`,
           applicationUrl: `https://test.example.com/jobs/${i}`,
           firstSeenAt: new Date(),
           lastSeenAt: new Date()
@@ -175,5 +184,26 @@ describe('Candidate Jobs Discovery & Exploration Suite (Regression for 0 Jobs Bu
     assert.ok(detailRes.body.data.title);
     assert.ok(detailRes.body.data.company);
     assert.ok(detailRes.body.data.company.name);
+  });
+
+  after(async () => {
+    // Clean up seeded candidate test jobs and companies
+    try {
+      await prisma.job.deleteMany({
+        where: {
+          contentHash: {
+            startsWith: 'hash_candidate_test_job_'
+          }
+        }
+      });
+      if (testCompanyA) {
+        await prisma.company.delete({ where: { id: testCompanyA.id } }).catch(() => {});
+      }
+      if (testCompanyB) {
+        await prisma.company.delete({ where: { id: testCompanyB.id } }).catch(() => {});
+      }
+    } catch {
+      // Ignore cleanup error
+    }
   });
 });
