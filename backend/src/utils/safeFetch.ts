@@ -259,7 +259,7 @@ export async function safeFetchUrl(
       };
     } catch (err: any) {
       clearTimeout(timer);
-      if (timedOut || err.name === 'AbortError') {
+      if (timedOut || controller.signal.aborted || err.name === 'AbortError' || err.cause?.name === 'AbortError') {
         throw new Error(`Fetch timed out after ${timeoutMs}ms for ${currentUrl}`);
       }
       throw err;

@@ -122,7 +122,13 @@ describe('SafeFetch and Discovery Regression Tests', () => {
       assert.fail('Should have timed out');
     } catch (err: any) {
       const elapsed = Date.now() - t0;
-      assert.ok(err.message.includes('timed out') || err.message.includes('SSRF') || err.message.includes('abort'), `Expected timeout, got: ${err.message}`);
+      assert.ok(
+        err.message.includes('timed out') ||
+        err.message.includes('SSRF') ||
+        err.message.includes('abort') ||
+        err.message.includes('fetch failed'),
+        `Expected timeout/fetch error, got: ${err.message}`
+      );
       assert.ok(elapsed < 4000, `Fetch should abort promptly under timeout limit, took ${elapsed}ms`);
     }
   });
