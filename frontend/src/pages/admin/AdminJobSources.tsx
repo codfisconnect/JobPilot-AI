@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import './AdminPages.css';
 
+import { normalizeApiError, NormalizedError } from '../../utils/errorUtils';
+
 interface AdminJobSourcesProps {
   onViewJobs?: (companyName?: string) => void;
   preselectedSourceId?: string;
@@ -35,7 +37,7 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
   const [urlInput, setUrlInput] = useState('');
   const [discovering, setDiscovering] = useState(false);
   const [discoveryStep, setDiscoveryStep] = useState(0);
-  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const [discoveryError, setDiscoveryError] = useState<NormalizedError | null>(null);
   const [discoverySuccess, setDiscoverySuccess] = useState<any | null>(null);
 
   // Discovery step labels matching requirement
@@ -111,8 +113,8 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
       setDiscoverySuccess(res);
       setUrlInput('');
       await loadSources();
-    } catch (err: any) {
-      setDiscoveryError(err.message || 'Could not find a structured jobs feed on this page.');
+    } catch (err: unknown) {
+      setDiscoveryError(normalizeApiError(err, 'Could not find a structured jobs feed on this page.'));
     } finally {
       setDiscovering(false);
     }
@@ -136,8 +138,9 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
 
       setSyncModalResult(res.sync);
       await loadSources();
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to sync source');
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Failed to sync source');
+      setActionError(normalized.message);
     } finally {
       setSyncingId(null);
       setSyncStep(null);
@@ -149,8 +152,9 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
       setLoadingDetail(true);
       const detail = await apiClient.getAdminJobSourceById(id);
       setSelectedSourceDetail(detail.data || detail);
-    } catch (err: any) {
-      setActionError('Failed to load job source detail: ' + err.message);
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Failed to load job source detail');
+      setActionError(normalized.message);
     } finally {
       setLoadingDetail(false);
     }
@@ -160,8 +164,9 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
     try {
       await apiClient.updateAdminJobSource(source.id, { enabled: !source.enabled });
       await loadSources();
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to update source');
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Failed to update source');
+      setActionError(normalized.message);
     }
   };
 
@@ -170,8 +175,9 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
     try {
       await apiClient.deleteAdminJobSource(id);
       await loadSources();
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to delete source');
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Failed to delete source');
+      setActionError(normalized.message);
     }
   };
 
@@ -350,8 +356,20 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, marginBottom: '6px' }}>
               <XCircle size={18} />
               <span>Discovery Notice</span>
+              {discoveryError.code && (
+                <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.2)', marginLeft: '6px' }}>
+                  {discoveryError.code}
+                </span>
+              )}
             </div>
-            <p style={{ margin: '0 0 10px', fontSize: '0.88rem' }}>{discoveryError}</p>
+            <p style={{ margin: '0 0 10px', fontSize: '0.88rem' }}>
+              Discovery failed: {discoveryError.message}
+            </p>
+            {discoveryError.details && (
+              <pre style={{ margin: '0 0 12px', padding: '8px', background: 'rgba(0, 0, 0, 0.25)', borderRadius: '4px', fontSize: '0.75rem', overflowX: 'auto', whiteSpace: 'pre-wrap', color: '#fca5a5' }}>
+                {discoveryError.details}
+              </pre>
+            )}
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 type="button"

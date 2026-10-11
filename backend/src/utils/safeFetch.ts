@@ -122,7 +122,16 @@ export async function validateSafeUrl(rawUrl: string): Promise<{ safe: boolean; 
 
   // 4. DNS resolution check: resolve hostname and ensure none of the IP addresses point to private/loopback
   try {
-    const addresses = await dns.promises.lookup(hostname, { all: true });
+    let dnsTimer: NodeJS.Timeout | undefined;
+    const dnsPromise = dns.promises.lookup(hostname, { all: true });
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      dnsTimer = setTimeout(() => reject(new Error(`DNS resolution timed out for ${hostname}`)), 4000);
+    });
+
+    const addresses = await Promise.race([dnsPromise, timeoutPromise]).finally(() => {
+      if (dnsTimer) clearTimeout(dnsTimer);
+    });
+
     if (!addresses || addresses.length === 0) {
       return { safe: false, error: `Hostname '${hostname}' could not be resolved via DNS.` };
     }
@@ -165,7 +174,11 @@ export async function safeFetchUrl(
     }
 
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    let timedOut = false;
+    const timer = setTimeout(() => {
+      timedOut = true;
+      controller.abort();
+    }, timeoutMs);
 
     try {
       const response = await fetch(currentUrl, {
@@ -180,10 +193,9 @@ export async function safeFetchUrl(
         signal: controller.signal
       });
 
-      clearTimeout(timer);
-
       // Handle redirect status codes (301, 302, 303, 307, 308)
       if ([301, 302, 303, 307, 308].includes(response.status)) {
+        clearTimeout(timer);
         const locationHeader = response.headers.get('location');
         if (!locationHeader) {
           throw new Error(`Redirect response (${response.status}) missing Location header.`);
@@ -202,24 +214,32 @@ export async function safeFetchUrl(
       const contentType = response.headers.get('content-type') || '';
 
       // Stream / buffer response with strict size limit
+      // Note: timer remains ACTIVE during body read phase, ensuring a hard upper bound on total fetch duration!
       const reader = response.body?.getReader();
       const chunks: Uint8Array[] = [];
       let totalBytes = 0;
 
       if (reader) {
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          if (value) {
-            totalBytes += value.length;
-            if (totalBytes > maxBytes) {
-              await reader.cancel();
-              throw new Error(`Response size exceeded maximum allowed limit of ${maxBytes} bytes.`);
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            if (value) {
+              totalBytes += value.length;
+              if (totalBytes > maxBytes) {
+                await reader.cancel();
+                throw new Error(`Response size exceeded maximum allowed limit of ${maxBytes} bytes.`);
+              }
+              chunks.push(value);
             }
-            chunks.push(value);
           }
+        } catch (streamErr: any) {
+          try { await reader.cancel(); } catch {}
+          throw streamErr;
         }
       }
+
+      clearTimeout(timer);
 
       const text = Buffer.concat(chunks).toString('utf-8');
 
@@ -239,7 +259,7 @@ export async function safeFetchUrl(
       };
     } catch (err: any) {
       clearTimeout(timer);
-      if (err.name === 'AbortError') {
+      if (timedOut || controller.signal.aborted || err.name === 'AbortError' || err.cause?.name === 'AbortError') {
         throw new Error(`Fetch timed out after ${timeoutMs}ms for ${currentUrl}`);
       }
       throw err;
