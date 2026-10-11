@@ -79,31 +79,15 @@ export class JobSourceDiscoveryService {
           companyName = ogSiteName.trim();
         } else {
           const ogTitle = $('meta[property="og:title"]').attr('content');
-          if (ogTitle && ogTitle.includes('—')) {
-            const candidate = ogTitle.split('—').pop()?.trim();
-            if (candidate) companyName = candidate;
-          } else if (ogTitle && ogTitle.includes('|')) {
-            const candidate = ogTitle.split('|').pop()?.trim();
-            if (candidate) companyName = candidate;
-          } else if (ogTitle && ogTitle.includes('-')) {
-            const candidate = ogTitle.split('-').pop()?.trim();
-            if (candidate) companyName = candidate;
+          if (ogTitle) {
+            companyName = this.cleanCompanyCandidate(ogTitle, companyName);
           }
         }
 
         // 3. Document <title>
         const titleText = $('title').text().trim();
-        if (titleText) {
-          if (titleText.includes('—')) {
-            const candidate = titleText.split('—').pop()?.trim();
-            if (candidate && candidate.length < 50) companyName = candidate;
-          } else if (titleText.includes('|')) {
-            const candidate = titleText.split('|').pop()?.trim();
-            if (candidate && candidate.length < 50) companyName = candidate;
-          } else if (titleText.includes(' - ')) {
-            const candidate = titleText.split(' - ').pop()?.trim();
-            if (candidate && candidate.length < 50) companyName = candidate;
-          }
+        if (titleText && (!companyName || companyName === domain.split('.')[0])) {
+          companyName = this.cleanCompanyCandidate(titleText, companyName);
         }
       } catch (err: any) {
         logger.warn(`[JobSourceDiscoveryService] HTML metadata extraction error: ${err.message}`);
@@ -116,6 +100,39 @@ export class JobSourceDiscoveryService {
     }
 
     return { companyName, domain };
+  }
+
+  /**
+   * Cleans raw title or OG strings to extract a reliable company name.
+   */
+  private static cleanCompanyCandidate(raw: string, fallback: string): string {
+    if (!raw) return fallback;
+    let clean = raw.trim();
+
+    // Check for "Careers at [Company]" or "Jobs at [Company]"
+    const atMatch = clean.match(/(?:careers|jobs|working|openings)\s+at\s+([^|\-—:]+)/i);
+    if (atMatch && atMatch[1]?.trim()) {
+      return atMatch[1].trim();
+    }
+
+    // Split on delimiters
+    const parts = clean.split(/[|\-—:]/).map(p => p.trim()).filter(Boolean);
+    for (const part of parts) {
+      const lower = part.toLowerCase();
+      // Skip parts that are solely generic terms
+      if (
+        lower === 'careers' || lower === 'jobs' || lower === 'openings' ||
+        lower === 'positions' || lower === 'join us' || lower.includes('jobs & culture') ||
+        lower.includes('culture & jobs') || lower.includes('home')
+      ) {
+        continue;
+      }
+      if (part.length >= 2 && part.length <= 40) {
+        return part;
+      }
+    }
+
+    return fallback;
   }
 
   /**

@@ -432,6 +432,84 @@ export class HtmlJobDiscoveryService {
     }
 
     // -------------------------------------------------------------
+    // STRATEGY 1B: Direct Job Card Anchors
+    // For modern SPA/React/Next.js pages where repeated jobs are structured
+    // as cards linking to external ATS systems (Workday, Greenhouse, Lever, etc.)
+    // or specific job detail URLs on or off origin.
+    // -------------------------------------------------------------
+    const directJobCards: ExtractedHtmlJob[] = [];
+    const seenCardUrls = new Set<string>();
+
+    const atsAndJobRegex = /(?:myworkdayjobs\.com|greenhouse\.io|lever\.co|smartrecruiters\.com|ashbyhq\.com|jobvite\.com|workable\.com|breezy\.hr|icims\.com|taleo\.net|\/job\/|\/jobs\/)/i;
+
+    $('a').each((_, aEl) => {
+      const href = $(aEl).attr('href');
+      if (!href) return;
+
+      let resolvedUrl: string;
+      try {
+        resolvedUrl = new URL(href, baseUrl.origin).toString();
+      } catch {
+        resolvedUrl = href;
+      }
+
+      if (seenCardUrls.has(resolvedUrl)) return;
+
+      if (atsAndJobRegex.test(resolvedUrl)) {
+        // Exclude general marketing/overview pages
+        const lowerUrl = resolvedUrl.toLowerCase();
+        if (
+          lowerUrl.includes('/expertise/') || lowerUrl.includes('/services/') ||
+          lowerUrl.includes('/solutions/') || lowerUrl.includes('/case-studies/') ||
+          lowerUrl.endsWith('/careers') || lowerUrl.endsWith('/jobs')
+        ) {
+          return;
+        }
+
+        const $a = $(aEl);
+        // Find nearest enclosing card container or use anchor itself
+        const $card = $a.closest('div[class*="rounded"], div[class*="border"], div[class*="card"], li, article');
+        const container = $card.length ? $card : $a;
+
+        const titleEl = container.find('h1, h2, h3, h4, h5, [class*="title"]').first();
+        const candidateTitle = titleEl.text().trim() || $a.text().replace(/\s+/g, ' ').trim();
+        const scoredTitle = this.scoreTitleText(candidateTitle);
+
+        if (scoredTitle.isTitle) {
+          seenCardUrls.add(resolvedUrl);
+          const rawCardText = container.text().replace(/\s+/g, ' ').trim();
+          const meta = this.extractFieldsFromText(rawCardText);
+          const cleanDesc = this.cleanHtmlToText(container.html() || rawCardText);
+
+          directJobCards.push({
+            externalJobId: resolvedUrl,
+            title: candidateTitle,
+            location: meta.location,
+            workMode: meta.workMode,
+            employmentType: meta.employmentType,
+            experience: meta.experience,
+            salary: meta.salary,
+            description: cleanDesc.length > 50 ? cleanDesc : rawCardText,
+            applicationUrl: resolvedUrl,
+            detailUrl: resolvedUrl,
+            confidence: 85
+          });
+        }
+      }
+    });
+
+    if (directJobCards.length >= 2) {
+      logger.info(`[HtmlJobDiscoveryService] Direct Job Card Anchors matched with ${directJobCards.length} jobs`);
+      return {
+        strategy: 'REPEATED_DOM_STRUCTURE',
+        jobs: directJobCards,
+        jobLinksFound: directJobCards.length,
+        jobDetailPagesVisited: 0,
+        confidence: 85
+      };
+    }
+
+    // -------------------------------------------------------------
     // STRATEGY 2: Detail Page Crawling
     // When the jobs page contains links to individual job detail pages
     // -------------------------------------------------------------
@@ -450,12 +528,15 @@ export class HtmlJobDiscoveryService {
           return;
         }
 
-        // Avoid common non-job paths
+        // Avoid common non-job paths and corporate service/marketing/case-study sections
         const pathLower = fullUrl.pathname.toLowerCase();
         if (
           pathLower.endsWith('.pdf') || pathLower.endsWith('.jpg') || pathLower.endsWith('.png') ||
           pathLower === '/' || pathLower === '/about' || pathLower === '/contact' || pathLower === '/blog' ||
-          pathLower === '/privacy' || pathLower === '/terms' || pathLower.includes('wp-admin')
+          pathLower === '/privacy' || pathLower === '/terms' || pathLower.includes('wp-admin') ||
+          pathLower.includes('/expertise/') || pathLower.includes('/services/') ||
+          pathLower.includes('/solutions/') || pathLower.includes('/case-studies/') ||
+          pathLower.includes('/insights/') || pathLower.includes('/industries/')
         ) {
           return;
         }
