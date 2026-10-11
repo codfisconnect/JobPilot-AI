@@ -409,9 +409,10 @@ model Company {
   createdAt      DateTime  @default(now()) @map("created_at")
   updatedAt      DateTime  @updatedAt @map("updated_at")
 
-  sources               CompanySource[]
-  jobs                  Job[]
-  employerOrganizations EmployerOrganization[]
+  sources                 CompanySource[]
+  jobSourceConfigurations JobSourceConfiguration[]
+  jobs                    Job[]
+  employerOrganizations   EmployerOrganization[]
 
   @@index([name])
   @@map("companies")
@@ -435,10 +436,45 @@ model CompanySource {
 
   company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
 
+  jobSourceConfigurations JobSourceConfiguration[]
+
   @@unique([companyId, sourceType, externalIdentifier])
   @@index([companyId])
   @@index([sourceType])
   @@map("company_sources")
+}
+
+model JobSourceConfiguration {
+  id                   String       @id @default(uuid())
+  companyId            String       @map("company_id")
+  companySourceId      String?      @map("company_source_id")
+  sourceUrl            String       @map("source_url")
+  jobsEndpoint         String?      @map("jobs_endpoint")
+  sourceType           String       @default("GENERIC") @map("source_type") // DIRECT_JSON, JSON_API, HTML, EMBEDDED_DATA, JSON_LD, DYNAMIC_API, GREENHOUSE, etc.
+  parserType           String       @default("AUTO") @map("parser_type")
+  httpMethod           String       @default("GET") @map("http_method")
+  headersConfig        Json?        @map("headers_config")
+  mappingConfig        Json?        @map("mapping_config")
+  discoveryMetadata    Json?        @map("discovery_metadata")
+  enabled              Boolean      @default(true)
+  healthStatus         SourceHealth @default(HEALTHY) @map("health_status")
+  lastDiscoveryAt      DateTime?    @map("last_discovery_at")
+  lastSyncAt           DateTime?    @map("last_sync_at")
+  lastSuccessfulSyncAt DateTime?    @map("last_successful_sync_at")
+  lastSyncError        String?      @map("last_sync_error")
+  jobsFound            Int          @default(0) @map("jobs_found")
+  jobsCreated          Int          @default(0) @map("jobs_created")
+  jobsUpdated          Int          @default(0) @map("jobs_updated")
+  createdAt            DateTime     @default(now()) @map("created_at")
+  updatedAt            DateTime     @updatedAt @map("updated_at")
+
+  company       Company        @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  companySource CompanySource? @relation(fields: [companySourceId], references: [id], onDelete: SetNull)
+
+  @@index([companyId])
+  @@index([sourceUrl])
+  @@index([jobsEndpoint])
+  @@map("job_source_configurations")
 }
 
 model Job {

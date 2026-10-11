@@ -1,0 +1,538 @@
+import * as cheerio from 'cheerio';
+import { safeFetchUrl } from '../utils/safeFetch.js';
+import { FieldMapperService, DiscoveredFieldMapping } from './fieldMapper.service.js';
+import { AiFieldMapperService } from './aiFieldMapper.service.js';
+import { CompanyRepository } from '../repositories/company.repository.js';
+import { JobRepositoryV1 } from '../repositories/job.repository.js';
+import { JobNormalizationService } from './jobNormalization.service.js';
+import { prisma } from '../database/prisma.js';
+import { logger } from '../utils/logger.js';
+import { SourceHealth } from '@prisma/client';
+
+export interface DiscoveryResult {
+  detectedType: 'DIRECT_JSON' | 'JSON_API' | 'HTML' | 'EMBEDDED_DATA' | 'JSON_LD' | 'DYNAMIC_API' | 'SPECIALIZED_ATS';
+  sourceUrl: string;
+  jobsEndpoint: string;
+  companyName: string;
+  officialDomain: string;
+  jobCount: number;
+  mappingConfig: DiscoveredFieldMapping;
+  sampleJobs: any[];
+}
+
+export interface SyncOutcome {
+  created: number;
+  updated: number;
+  skipped: number;
+  failed: number;
+}
+
+export interface FullOnboardResult {
+  success: boolean;
+  sourceConfigurationId: string;
+  companyId: string;
+  companyName: string;
+  discovery: DiscoveryResult;
+  sync: SyncOutcome;
+  error?: string;
+}
+
+export class JobSourceDiscoveryService {
+  /**
+   * Resolves company name and official domain from URL and HTML metadata.
+   */
+  public static extractCompanyMetadata(
+    pageUrl: string,
+    html?: string,
+    jsonPayload?: any
+  ): { companyName: string; domain: string } {
+    const parsed = new URL(pageUrl);
+    let domain = parsed.hostname.toLowerCase();
+    if (domain.startsWith('www.')) {
+      domain = domain.slice(4);
+    }
+
+    let companyName = domain.split('.')[0];
+    companyName = companyName.charAt(0).toUpperCase() + companyName.slice(1);
+
+    if (html) {
+      try {
+        const $ = cheerio.load(html);
+
+        // 1. JSON-LD Organization or JobPosting
+        $('script[type="application/ld+json"]').each((_, el) => {
+          try {
+            const parsedLd = JSON.parse($(el).html() || '{}');
+            if (parsedLd['@type'] === 'Organization' && parsedLd.name) {
+              companyName = parsedLd.name;
+            } else if (parsedLd.hiringOrganization && parsedLd.hiringOrganization.name) {
+              companyName = parsedLd.hiringOrganization.name;
+            }
+          } catch {}
+        });
+
+        // 2. OpenGraph site name or title
+        const ogSiteName = $('meta[property="og:site_name"]').attr('content');
+        if (ogSiteName && ogSiteName.trim().length > 1) {
+          companyName = ogSiteName.trim();
+        } else {
+          const ogTitle = $('meta[property="og:title"]').attr('content');
+          if (ogTitle && ogTitle.includes('—')) {
+            const candidate = ogTitle.split('—').pop()?.trim();
+            if (candidate) companyName = candidate;
+          } else if (ogTitle && ogTitle.includes('|')) {
+            const candidate = ogTitle.split('|').pop()?.trim();
+            if (candidate) companyName = candidate;
+          } else if (ogTitle && ogTitle.includes('-')) {
+            const candidate = ogTitle.split('-').pop()?.trim();
+            if (candidate) companyName = candidate;
+          }
+        }
+
+        // 3. Document <title>
+        const titleText = $('title').text().trim();
+        if (titleText) {
+          if (titleText.includes('—')) {
+            const candidate = titleText.split('—').pop()?.trim();
+            if (candidate && candidate.length < 50) companyName = candidate;
+          } else if (titleText.includes('|')) {
+            const candidate = titleText.split('|').pop()?.trim();
+            if (candidate && candidate.length < 50) companyName = candidate;
+          } else if (titleText.includes(' - ')) {
+            const candidate = titleText.split(' - ').pop()?.trim();
+            if (candidate && candidate.length < 50) companyName = candidate;
+          }
+        }
+      } catch (err: any) {
+        logger.warn(`[JobSourceDiscoveryService] HTML metadata extraction error: ${err.message}`);
+      }
+    }
+
+    // Specific domain enhancements
+    if (domain === 'codfis.com' && !companyName.toLowerCase().includes('technologies')) {
+      companyName = 'Codfis Technologies';
+    }
+
+    return { companyName, domain };
+  }
+
+  /**
+   * Discovers and parses endpoints from HTML scripts, fetch calls, or links.
+   */
+  public static extractEndpointCandidatesFromHtml(pageUrl: string, html: string): string[] {
+    const candidates: Set<string> = new Set();
+    const baseUrl = new URL(pageUrl);
+
+    // Regex for fetch, axios, XMLHttpRequest, or quoted API endpoints
+    const apiRegex = /(?:fetch|axios(?:\.get)?|url|endpoint)\s*\(\s*['"`]([^'"`]+)['"`]/gi;
+    let match: RegExpExecArray | null;
+    while ((match = apiRegex.exec(html)) !== null) {
+      const candidatePath = match[1].trim();
+      if (candidatePath && !candidatePath.startsWith('data:') && !candidatePath.endsWith('.js') && !candidatePath.endsWith('.css')) {
+        try {
+          const resolved = new URL(candidatePath, baseUrl.origin).toString();
+          candidates.add(resolved);
+        } catch {}
+      }
+    }
+
+    // Look for string literals containing /jobs or /careers or /api
+    const literalRegex = /['"`](\/(?:api\/)?(?:jobs|careers|openings|positions)(?:\.[a-z]+)?)['"`]/gi;
+    while ((match = literalRegex.exec(html)) !== null) {
+      const candidatePath = match[1].trim();
+      try {
+        const resolved = new URL(candidatePath, baseUrl.origin).toString();
+        candidates.add(resolved);
+      } catch {}
+    }
+
+    return Array.from(candidates);
+  }
+
+  /**
+   * Main discovery entrypoint: executes Strategies A through D.
+   */
+  public static async discoverSource(rawUrl: string): Promise<DiscoveryResult> {
+    logger.info(`[JobSourceDiscoveryService] Starting discovery for: ${rawUrl}`);
+
+    // Step 1: Fetch initial page safely with SSRF protection
+    const initialResponse = await safeFetchUrl(rawUrl);
+    const contentType = (initialResponse.contentType || '').toLowerCase();
+    const responseText = initialResponse.text.trim();
+
+    // Strategy A: Direct JSON response
+    if (contentType.includes('application/json') || (responseText.startsWith('{') && responseText.endsWith('}')) || (responseText.startsWith('[') && responseText.endsWith(']'))) {
+      try {
+        const jsonPayload = JSON.parse(responseText);
+        const { jobs, rootPath } = FieldMapperService.extractJobsArray(jsonPayload);
+        if (jobs.length > 0) {
+          const { companyName, domain } = this.extractCompanyMetadata(initialResponse.finalUrl, undefined, jsonPayload);
+          let mapping = FieldMapperService.inferDeterministicMapping(jobs);
+          mapping.rootJobsPath = rootPath;
+
+          // If key fields are missing, try AI mapping fallback
+          if (!mapping.titleField) {
+            const aiMapping = await AiFieldMapperService.inferMappingWithAi(jobs[0]);
+            mapping = { ...aiMapping, ...mapping };
+          }
+
+          return {
+            detectedType: 'DIRECT_JSON',
+            sourceUrl: rawUrl,
+            jobsEndpoint: initialResponse.finalUrl,
+            companyName,
+            officialDomain: domain,
+            jobCount: jobs.length,
+            mappingConfig: mapping,
+            sampleJobs: jobs.slice(0, 3)
+          };
+        }
+      } catch (err: any) {
+        logger.warn(`[JobSourceDiscoveryService] Strategy A JSON parse failed: ${err.message}`);
+      }
+    }
+
+    // Response is HTML
+    const html = responseText;
+    const { companyName, domain } = this.extractCompanyMetadata(initialResponse.finalUrl, html);
+
+    // Strategy D: Embedded Data / JSON-LD in HTML
+    try {
+      const $ = cheerio.load(html);
+      const jsonLdJobs: any[] = [];
+      $('script[type="application/ld+json"]').each((_, el) => {
+        try {
+          const parsed = JSON.parse($(el).html() || '{}');
+          if (parsed['@type'] === 'JobPosting') {
+            jsonLdJobs.push(parsed);
+          } else if (Array.isArray(parsed['@graph'])) {
+            parsed['@graph'].forEach((item: any) => {
+              if (item['@type'] === 'JobPosting') jsonLdJobs.push(item);
+            });
+          }
+        } catch {}
+      });
+
+      if (jsonLdJobs.length > 0) {
+        let mapping = FieldMapperService.inferDeterministicMapping(jsonLdJobs);
+        return {
+          detectedType: 'JSON_LD',
+          sourceUrl: rawUrl,
+          jobsEndpoint: initialResponse.finalUrl,
+          companyName,
+          officialDomain: domain,
+          jobCount: jsonLdJobs.length,
+          mappingConfig: mapping,
+          sampleJobs: jsonLdJobs.slice(0, 3)
+        };
+      }
+    } catch {}
+
+    // Strategy B: HTML referencing JSON API (discovered endpoints)
+    const discoveredEndpoints = this.extractEndpointCandidatesFromHtml(initialResponse.finalUrl, html);
+    logger.info(`[JobSourceDiscoveryService] Discovered ${discoveredEndpoints.length} candidate endpoints from HTML`);
+
+    for (const endpoint of discoveredEndpoints) {
+      try {
+        const epRes = await safeFetchUrl(endpoint, { timeoutMs: 7000 });
+        if (epRes.status === 200) {
+          const jsonPayload = JSON.parse(epRes.text);
+          const { jobs, rootPath } = FieldMapperService.extractJobsArray(jsonPayload);
+          if (jobs.length > 0) {
+            let mapping = FieldMapperService.inferDeterministicMapping(jobs);
+            mapping.rootJobsPath = rootPath;
+
+            if (!mapping.titleField) {
+              const aiMapping = await AiFieldMapperService.inferMappingWithAi(jobs[0]);
+              mapping = { ...aiMapping, ...mapping };
+            }
+
+            return {
+              detectedType: 'JSON_API',
+              sourceUrl: rawUrl,
+              jobsEndpoint: endpoint,
+              companyName,
+              officialDomain: domain,
+              jobCount: jobs.length,
+              mappingConfig: mapping,
+              sampleJobs: jobs.slice(0, 3)
+            };
+          }
+        }
+      } catch (e: any) {
+        // Continue trying other candidates
+      }
+    }
+
+    // Strategy C: Common JSON Endpoints (controlled probing)
+    const baseOrigin = new URL(initialResponse.finalUrl).origin;
+    const probePaths = [
+      '/api/jobs',
+      '/api/jobs.json',
+      '/jobs.json',
+      '/api/careers',
+      '/api/openings',
+      '/api/v1/jobs',
+      '/careers.json',
+      '/openings.json'
+    ];
+
+    for (const probePath of probePaths) {
+      const probeUrl = `${baseOrigin}${probePath}`;
+      try {
+        const probeRes = await safeFetchUrl(probeUrl, { timeoutMs: 5000 });
+        if (probeRes.status === 200) {
+          const jsonPayload = JSON.parse(probeRes.text);
+          const { jobs, rootPath } = FieldMapperService.extractJobsArray(jsonPayload);
+          if (jobs.length > 0) {
+            let mapping = FieldMapperService.inferDeterministicMapping(jobs);
+            mapping.rootJobsPath = rootPath;
+
+            if (!mapping.titleField) {
+              const aiMapping = await AiFieldMapperService.inferMappingWithAi(jobs[0]);
+              mapping = { ...aiMapping, ...mapping };
+            }
+
+            return {
+              detectedType: 'JSON_API',
+              sourceUrl: rawUrl,
+              jobsEndpoint: probeUrl,
+              companyName,
+              officialDomain: domain,
+              jobCount: jobs.length,
+              mappingConfig: mapping,
+              sampleJobs: jobs.slice(0, 3)
+            };
+          }
+        }
+      } catch (probeErr) {
+        // continue probing
+      }
+    }
+
+    throw new Error(`Could not find a structured jobs feed on page: ${rawUrl}`);
+  }
+
+  /**
+   * Syncs jobs using an existing JobSourceConfiguration record or direct discovery result.
+   */
+  public static async syncDiscoveredSource(
+    configId: string,
+    discovery: DiscoveryResult
+  ): Promise<SyncOutcome> {
+    const outcome: SyncOutcome = { created: 0, updated: 0, skipped: 0, failed: 0 };
+
+    // 1. Fetch live jobs payload
+    const res = await safeFetchUrl(discovery.jobsEndpoint);
+    if (res.status !== 200) {
+      throw new Error(`Endpoint returned status ${res.status}`);
+    }
+
+    let rawRecords: any[] = [];
+    if (discovery.detectedType === 'JSON_LD') {
+      const $ = cheerio.load(res.text);
+      $('script[type="application/ld+json"]').each((_, el) => {
+        try {
+          const parsed = JSON.parse($(el).html() || '{}');
+          if (parsed['@type'] === 'JobPosting') rawRecords.push(parsed);
+          else if (Array.isArray(parsed['@graph'])) {
+            parsed['@graph'].forEach((item: any) => {
+              if (item['@type'] === 'JobPosting') rawRecords.push(item);
+            });
+          }
+        } catch {}
+      });
+    } else {
+      const payload = JSON.parse(res.text);
+      const { jobs } = FieldMapperService.extractJobsArray(payload);
+      rawRecords = jobs;
+    }
+
+    // 2. Resolve Canonical Company
+    const company = await CompanyRepository.resolveOrCreate({
+      name: discovery.companyName,
+      officialDomain: discovery.officialDomain,
+      careersUrl: discovery.sourceUrl,
+      sourceType: discovery.detectedType
+    });
+
+    // 3. Register Canonical CompanySource
+    const companySource = await CompanyRepository.registerSource({
+      companyId: company.id,
+      sourceType: discovery.detectedType,
+      sourceName: discovery.companyName,
+      sourceUrl: discovery.sourceUrl,
+      externalIdentifier: discovery.jobsEndpoint
+    });
+
+    // 4. Ingest and persist jobs via canonical V1 architecture
+    const defaults = {
+      companyName: company.name,
+      companyDomain: company.officialDomain || discovery.officialDomain,
+      careersUrl: discovery.sourceUrl,
+      sourceType: discovery.detectedType,
+      sourceName: discovery.companyName
+    };
+
+    for (const rawItem of rawRecords) {
+      try {
+        const mapped = FieldMapperService.mapRecord(rawItem, discovery.mappingConfig, defaults);
+        if (!mapped || !mapped.title) {
+          outcome.skipped++;
+          continue;
+        }
+
+        const normalized = JobNormalizationService.normalize(mapped);
+        const { isNew } = await JobRepositoryV1.upsertNormalizedJob(company.id, normalized);
+        if (isNew) {
+          outcome.created++;
+        } else {
+          outcome.updated++;
+        }
+      } catch (itemErr: any) {
+        outcome.skipped++;
+        logger.warn(`[JobSourceDiscoveryService] Skipped job record: ${itemErr.message}`);
+      }
+    }
+
+    // 5. Update health and stats on CompanySource & JobSourceConfiguration
+    await CompanyRepository.updateSourceHealth(companySource.id, true);
+
+    await prisma.jobSourceConfiguration.update({
+      where: { id: configId },
+      data: {
+        companyId: company.id,
+        companySourceId: companySource.id,
+        healthStatus: SourceHealth.HEALTHY,
+        lastSyncAt: new Date(),
+        lastSuccessfulSyncAt: new Date(),
+        lastSyncError: null,
+        jobsFound: rawRecords.length,
+        jobsCreated: outcome.created,
+        jobsUpdated: outcome.updated
+      }
+    });
+
+    return outcome;
+  }
+
+  /**
+   * Full admin onboarding pipeline:
+   * URL -> Validate & Safe Fetch -> Discover -> Infer Schema -> Persist Configuration -> First Sync.
+   */
+  public static async discoverAndOnboard(url: string): Promise<FullOnboardResult> {
+    try {
+      // 1. Run discovery pipeline
+      const discovery = await this.discoverSource(url);
+
+      // 2. Resolve Canonical Company
+      const company = await CompanyRepository.resolveOrCreate({
+        name: discovery.companyName,
+        officialDomain: discovery.officialDomain,
+        careersUrl: discovery.sourceUrl,
+        sourceType: discovery.detectedType
+      });
+
+      // 3. Persist JobSourceConfiguration
+      const config = await prisma.jobSourceConfiguration.create({
+        data: {
+          companyId: company.id,
+          sourceUrl: discovery.sourceUrl,
+          jobsEndpoint: discovery.jobsEndpoint,
+          sourceType: discovery.detectedType,
+          parserType: 'AUTO',
+          httpMethod: 'GET',
+          mappingConfig: discovery.mappingConfig as any,
+          discoveryMetadata: {
+            discoveredAt: new Date().toISOString(),
+            jobCount: discovery.jobCount,
+            detectedType: discovery.detectedType
+          },
+          lastDiscoveryAt: new Date(),
+          healthStatus: SourceHealth.HEALTHY
+        }
+      });
+
+      // 4. Run immediate first sync
+      const syncOutcome = await this.syncDiscoveredSource(config.id, discovery);
+
+      return {
+        success: true,
+        sourceConfigurationId: config.id,
+        companyId: company.id,
+        companyName: company.name,
+        discovery,
+        sync: syncOutcome
+      };
+    } catch (err: any) {
+      logger.error(`[JobSourceDiscoveryService] Onboarding failed: ${err.message}`);
+      return {
+        success: false,
+        sourceConfigurationId: '',
+        companyId: '',
+        companyName: '',
+        discovery: {
+          detectedType: 'HTML',
+          sourceUrl: url,
+          jobsEndpoint: '',
+          companyName: '',
+          officialDomain: '',
+          jobCount: 0,
+          mappingConfig: {},
+          sampleJobs: []
+        },
+        sync: { created: 0, updated: 0, skipped: 0, failed: 1 },
+        error: err.message
+      };
+    }
+  }
+
+  /**
+   * Resync an existing configured job source by ID.
+   */
+  public static async resyncConfiguration(configId: string): Promise<{ success: boolean; sync: SyncOutcome; error?: string }> {
+    const config = await prisma.jobSourceConfiguration.findUnique({
+      where: { id: configId },
+      include: { company: true }
+    });
+
+    if (!config) {
+      throw new Error(`JobSourceConfiguration with id ${configId} not found.`);
+    }
+
+    try {
+      const discovery: DiscoveryResult = {
+        detectedType: config.sourceType as any,
+        sourceUrl: config.sourceUrl,
+        jobsEndpoint: config.jobsEndpoint || config.sourceUrl,
+        companyName: config.company.name,
+        officialDomain: config.company.officialDomain || '',
+        jobCount: config.jobsFound,
+        mappingConfig: (config.mappingConfig as any) || {},
+        sampleJobs: []
+      };
+
+      const sync = await this.syncDiscoveredSource(config.id, discovery);
+      return { success: true, sync };
+    } catch (err: any) {
+      await prisma.jobSourceConfiguration.update({
+        where: { id: configId },
+        data: {
+          lastSyncAt: new Date(),
+          lastSyncError: err.message,
+          healthStatus: SourceHealth.FAILING
+        }
+      });
+
+      if (config.companySourceId) {
+        await CompanyRepository.updateSourceHealth(config.companySourceId, false, err.message);
+      }
+
+      return {
+        success: false,
+        sync: { created: 0, updated: 0, skipped: 0, failed: 1 },
+        error: err.message
+      };
+    }
+  }
+}
