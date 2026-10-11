@@ -9,6 +9,7 @@ import { prisma } from '../database/prisma.js';
 import { logger } from '../utils/logger.js';
 import { SourceHealth } from '@prisma/client';
 import { HtmlJobDiscoveryService } from './htmlJobDiscovery.service.js';
+import { EmbeddedDataDiscoveryService } from './embeddedDataDiscovery.service.js';
 
 export interface DiscoveryResult {
   detectedType: 'DIRECT_JSON' | 'JSON_API' | 'HTML' | 'EMBEDDED_DATA' | 'JSON_LD' | 'DYNAMIC_API' | 'SPECIALIZED_ATS';
@@ -329,6 +330,36 @@ export class JobSourceDiscoveryService {
       }
     }
 
+    // Strategy D2: Embedded Application State (Next.js RSC, __NEXT_DATA__, JSON state in script tags)
+    try {
+      const embeddedResult = EmbeddedDataDiscoveryService.extractEmbeddedJobsFromHtml(html);
+      if (embeddedResult && embeddedResult.jobs.length > 0) {
+        logger.info(`[JobSourceDiscoveryService] Discovered ${embeddedResult.jobs.length} jobs via Embedded Data (${embeddedResult.sourceType})`);
+        let mapping = FieldMapperService.inferDeterministicMapping(embeddedResult.jobs);
+        if (embeddedResult.rootPath) {
+          mapping.rootJobsPath = embeddedResult.rootPath;
+        }
+
+        if (!mapping.titleField) {
+          const aiMapping = await AiFieldMapperService.inferMappingWithAi(embeddedResult.jobs[0]);
+          mapping = { ...aiMapping, ...mapping };
+        }
+
+        return {
+          detectedType: 'EMBEDDED_DATA',
+          sourceUrl: rawUrl,
+          jobsEndpoint: initialResponse.finalUrl,
+          companyName,
+          officialDomain: domain,
+          jobCount: embeddedResult.jobs.length,
+          mappingConfig: mapping,
+          sampleJobs: embeddedResult.jobs.slice(0, 3)
+        };
+      }
+    } catch (embErr: any) {
+      logger.warn(`[JobSourceDiscoveryService] Embedded data discovery failed: ${embErr.message}`);
+    }
+
     // Strategy E: HTML repeated structure & detail pages discovery
     try {
       logger.info(`[JobSourceDiscoveryService] Probing for HTML job structures on: ${initialResponse.finalUrl}`);
@@ -378,7 +409,12 @@ export class JobSourceDiscoveryService {
     }
 
     let rawRecords: any[] = [];
-    if (discovery.detectedType === 'HTML') {
+    if (discovery.detectedType === 'EMBEDDED_DATA') {
+      const embeddedResult = EmbeddedDataDiscoveryService.extractEmbeddedJobsFromHtml(res.text);
+      if (embeddedResult && embeddedResult.jobs.length > 0) {
+        rawRecords = embeddedResult.jobs;
+      }
+    } else if (discovery.detectedType === 'HTML') {
       const htmlResult = await HtmlJobDiscoveryService.extractJobsFromHtml(discovery.jobsEndpoint, res.text);
       if (htmlResult && htmlResult.jobs.length > 0) {
         rawRecords = htmlResult.jobs;
