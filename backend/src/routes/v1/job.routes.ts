@@ -2,13 +2,13 @@ import { Router } from 'express';
 import { JobControllerV1 } from '../../controllers/v1/job.controller.js';
 import { JobMatchingControllerV1 } from '../../controllers/v1/jobMatching.controller.js';
 import { InterviewControllerV1 } from '../../modules/interviews/interview.controller.js';
-import { authenticateJwt } from '../../middleware/auth.middleware.js';
+import { authenticateJwt, optionalAuthenticateJwt } from '../../middleware/auth.middleware.js';
 
 export const jobRouter = Router();
 
-// Public or Authenticated Job Search and Detail
-jobRouter.get('/', authenticateJwt, JobControllerV1.listJobs);
-jobRouter.get('/:id', authenticateJwt, JobControllerV1.getJobById);
+// Public or Authenticated Job Search and Detail (candidates discover jobs without requiring an admin token)
+jobRouter.get('/', optionalAuthenticateJwt, JobControllerV1.listJobs);
+jobRouter.get('/:id', optionalAuthenticateJwt, JobControllerV1.getJobById);
 
 // Sprint 4: Matching, Skill Gap, and Resume Intelligence Routes
 jobRouter.get('/:id/match', authenticateJwt, JobMatchingControllerV1.getMatch);

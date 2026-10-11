@@ -46,9 +46,6 @@ export const JobsPage: React.FC<JobsPageProps> = ({
   const [totalPages, setTotalPages] = useState(1);
   const [totalCount, setTotalCount] = useState(0);
 
-  // Syncing state
-  const [isSyncing, setIsSyncing] = useState(false);
-
   // Detail Modal state
   const [selectedJob, setSelectedJob] = useState<CanonicalJob | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
@@ -124,21 +121,6 @@ export const JobsPage: React.FC<JobsPageProps> = ({
     fetchCanonicalJobs(1);
   };
 
-  const handleSyncAll = async () => {
-    setIsSyncing(true);
-    try {
-      await apiClient.syncJobs();
-      await fetchCanonicalJobs(1);
-    } catch (err) {
-      console.warn('Sync notice:', err);
-      // Run fallback codewalla sync
-      await api.syncJobSource('codewalla').catch(() => {});
-      await fetchCanonicalJobs(1);
-    } finally {
-      setIsSyncing(false);
-    }
-  };
-
   const handleOpenJobDetail = (job: CanonicalJob) => {
     setSelectedJob(job);
     setIsDetailOpen(true);
@@ -193,7 +175,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
         <div>
           <h2 className="jobs-page-title">Explore Career Opportunities</h2>
           <p className="jobs-page-sub">
-            Verified job openings tailored to your career preferences. Find relevant roles and apply with confidence.
+            Discover opportunities from connected company career sources with automated deduplication and source transparency.
           </p>
         </div>
 
@@ -241,6 +223,21 @@ export const JobsPage: React.FC<JobsPageProps> = ({
             <option value="FULL_TIME">Full Time</option>
             <option value="CONTRACT">Contract</option>
             <option value="INTERNSHIP">Internship</option>
+          </select>
+
+          <select
+            className="filter-select"
+            value={sourceFilter}
+            onChange={e => setSourceFilter(e.target.value)}
+          >
+            <option value="">All Sources</option>
+            <option value="CODEWALLA">Codewalla</option>
+            <option value="EMBEDDED_DATA">Synechron (Embedded)</option>
+            <option value="JSON_API">Codfis (API)</option>
+            <option value="HTML">HTML Careers</option>
+            <option value="GREENHOUSE">Greenhouse</option>
+            <option value="LEVER">Lever</option>
+            <option value="ASHBY">Ashby</option>
           </select>
 
           <Button variant="secondary" size="sm" onClick={() => fetchCanonicalJobs(1)}>
