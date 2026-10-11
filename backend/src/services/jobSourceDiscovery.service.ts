@@ -8,6 +8,7 @@ import { JobNormalizationService } from './jobNormalization.service.js';
 import { prisma } from '../database/prisma.js';
 import { logger } from '../utils/logger.js';
 import { SourceHealth } from '@prisma/client';
+import { HtmlJobDiscoveryService } from './htmlJobDiscovery.service.js';
 
 export interface DiscoveryResult {
   detectedType: 'DIRECT_JSON' | 'JSON_API' | 'HTML' | 'EMBEDDED_DATA' | 'JSON_LD' | 'DYNAMIC_API' | 'SPECIALIZED_ATS';
@@ -25,6 +26,7 @@ export interface SyncOutcome {
   updated: number;
   skipped: number;
   failed: number;
+  expired?: number;
 }
 
 export interface FullOnboardResult {
@@ -310,6 +312,36 @@ export class JobSourceDiscoveryService {
       }
     }
 
+    // Strategy E: HTML repeated structure & detail pages discovery
+    try {
+      logger.info(`[JobSourceDiscoveryService] Probing for HTML job structures on: ${initialResponse.finalUrl}`);
+      const htmlResult = await HtmlJobDiscoveryService.extractJobsFromHtml(initialResponse.finalUrl, html);
+      if (htmlResult && htmlResult.jobs.length > 0) {
+        logger.info(`[JobSourceDiscoveryService] Strategy E extracted ${htmlResult.jobs.length} jobs using strategy: ${htmlResult.strategy}`);
+        
+        let mapping = FieldMapperService.inferDeterministicMapping(htmlResult.jobs);
+        if (!mapping.titleField) {
+          mapping.titleField = 'title';
+        }
+        if (!mapping.descriptionField) {
+          mapping.descriptionField = 'description';
+        }
+
+        return {
+          detectedType: 'HTML',
+          sourceUrl: rawUrl,
+          jobsEndpoint: initialResponse.finalUrl,
+          companyName,
+          officialDomain: domain,
+          jobCount: htmlResult.jobs.length,
+          mappingConfig: mapping,
+          sampleJobs: htmlResult.jobs.slice(0, 3)
+        };
+      }
+    } catch (htmlErr: any) {
+      logger.warn(`[JobSourceDiscoveryService] Strategy E HTML extraction failed: ${htmlErr.message}`);
+    }
+
     throw new Error(`Could not find a structured jobs feed on page: ${rawUrl}`);
   }
 
@@ -329,7 +361,12 @@ export class JobSourceDiscoveryService {
     }
 
     let rawRecords: any[] = [];
-    if (discovery.detectedType === 'JSON_LD') {
+    if (discovery.detectedType === 'HTML') {
+      const htmlResult = await HtmlJobDiscoveryService.extractJobsFromHtml(discovery.jobsEndpoint, res.text);
+      if (htmlResult && htmlResult.jobs.length > 0) {
+        rawRecords = htmlResult.jobs;
+      }
+    } else if (discovery.detectedType === 'JSON_LD') {
       const $ = cheerio.load(res.text);
       $('script[type="application/ld+json"]').each((_, el) => {
         try {
@@ -374,6 +411,8 @@ export class JobSourceDiscoveryService {
       sourceName: discovery.companyName
     };
 
+    const seenJobIds: string[] = [];
+
     for (const rawItem of rawRecords) {
       try {
         const mapped = FieldMapperService.mapRecord(rawItem, discovery.mappingConfig, defaults);
@@ -383,7 +422,9 @@ export class JobSourceDiscoveryService {
         }
 
         const normalized = JobNormalizationService.normalize(mapped);
-        const { isNew } = await JobRepositoryV1.upsertNormalizedJob(company.id, normalized);
+        const { job, isNew } = await JobRepositoryV1.upsertNormalizedJob(company.id, normalized);
+        seenJobIds.push(job.id);
+
         if (isNew) {
           outcome.created++;
         } else {
@@ -395,7 +436,16 @@ export class JobSourceDiscoveryService {
       }
     }
 
-    // 5. Update health and stats on CompanySource & JobSourceConfiguration
+    // 5. Source-Specific Job Reconciliation (Mark missing jobs checked, expire if past 14-day threshold)
+    const { expiredCount } = await JobRepositoryV1.reconcileSourceJobs(
+      company.id,
+      discovery.detectedType,
+      seenJobIds,
+      14
+    );
+    outcome.expired = expiredCount;
+
+    // 6. Update health and stats on CompanySource & JobSourceConfiguration
     await CompanyRepository.updateSourceHealth(companySource.id, true);
 
     await prisma.jobSourceConfiguration.update({
@@ -409,7 +459,10 @@ export class JobSourceDiscoveryService {
         lastSyncError: null,
         jobsFound: rawRecords.length,
         jobsCreated: outcome.created,
-        jobsUpdated: outcome.updated
+        jobsUpdated: outcome.updated,
+        jobsExpired: outcome.expired || 0,
+        syncInProgress: false,
+        syncLockToken: null
       }
     });
 

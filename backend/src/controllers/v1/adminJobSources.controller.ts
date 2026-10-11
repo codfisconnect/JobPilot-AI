@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { JobSourceDiscoveryService } from '../../services/jobSourceDiscovery.service.js';
+import { JobSourceSchedulerService } from '../../services/jobSourceScheduler.service.js';
 import { prisma } from '../../database/prisma.js';
 import { logger } from '../../utils/logger.js';
 
@@ -101,12 +102,20 @@ export class AdminJobSourcesController {
 
   /**
    * POST /api/v1/admin/job-sources/:id/sync
-   * Trigger sync on demand.
+   * Trigger sync on demand using the shared scheduler synchronization engine.
    */
   public static async syncSource(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = String(req.params.id);
-      const result = await JobSourceDiscoveryService.resyncConfiguration(id);
+      const result = await JobSourceSchedulerService.syncSingleSource(id);
+
+      if (result.status === 'ALREADY_RUNNING') {
+        res.status(409).json({
+          success: false,
+          error: 'Synchronization is already running for this job source.'
+        });
+        return;
+      }
 
       if (!result.success) {
         res.status(500).json({

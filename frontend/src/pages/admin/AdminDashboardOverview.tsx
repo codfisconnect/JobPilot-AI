@@ -147,7 +147,38 @@ export const AdminDashboardOverview: React.FC<AdminDashboardOverviewProps> = ({ 
           </div>
           <div className="admin-metric-val">{data?.connectedJobSources ?? 0}</div>
           <div className="admin-metric-sub">
-            <span>Automated discovery connectors</span>
+            <span style={{ color: '#4ade80' }}>{data?.healthyJobSources ?? 0} healthy</span>
+            {data?.failingJobSources ? <span style={{ color: '#f87171', marginLeft: '6px' }}>• {data.failingJobSources} issues</span> : null}
+          </div>
+        </div>
+
+        {/* Jobs Added & Updated Today */}
+        <div className="admin-metric-card" style={{ cursor: 'pointer' }} onClick={() => onNavigateSection?.('jobs')}>
+          <div className="admin-metric-top">
+            <span className="admin-metric-lbl">Sync Activity Today</span>
+            <div className="admin-metric-icon" style={{ background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8' }}>
+              <RefreshCw size={20} />
+            </div>
+          </div>
+          <div className="admin-metric-val">+{data?.jobsAddedToday ?? 0}</div>
+          <div className="admin-metric-sub">
+            <span>{data?.jobsUpdatedToday ?? 0} updated • {data?.jobsExpiredToday ?? 0} expired</span>
+          </div>
+        </div>
+
+        {/* Global Synchronization Schedule */}
+        <div className="admin-metric-card" style={{ cursor: 'pointer' }} onClick={() => onNavigateSection?.('job-sources')}>
+          <div className="admin-metric-top">
+            <span className="admin-metric-lbl">Automated Schedule</span>
+            <div className="admin-metric-icon" style={{ background: 'rgba(234, 179, 8, 0.15)', color: '#facc15' }}>
+              <Clock size={20} />
+            </div>
+          </div>
+          <div className="admin-metric-val" style={{ fontSize: '1.25rem', marginTop: '6px' }}>
+            {data?.nextGlobalSync ? formatRelativeTime(data.nextGlobalSync).replace('ago', 'from now') : 'Every 6 hours'}
+          </div>
+          <div className="admin-metric-sub">
+            <span>Last sync: {formatRelativeTime(data?.lastGlobalSync)}</span>
           </div>
         </div>
 
