@@ -1,0 +1,361 @@
+/* CandidateDashboardWelcome.css */
+
+.pilot-welcome-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: radial-gradient(circle at 50% 20%, rgba(99, 102, 241, 0.12) 0%, rgba(15, 23, 42, 0.96) 75%), var(--bg-canvas, #0b0f19);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  opacity: 1;
+  visibility: visible;
+  transition: opacity 0.45s cubic-bezier(0.16, 1, 0.3, 1), visibility 0.45s ease, transform 0.45s cubic-bezier(0.16, 1, 0.3, 1);
+  overflow-y: auto;
+}
+
+[data-theme="light"] .pilot-welcome-overlay {
+  background: radial-gradient(circle at 50% 20%, rgba(99, 102, 241, 0.08) 0%, rgba(248, 250, 252, 0.98) 75%), var(--bg-canvas, #f8fafc);
+}
+
+.pilot-welcome-overlay.fading-out {
+  opacity: 0;
+  transform: scale(0.985);
+  pointer-events: none;
+  visibility: hidden;
+}
+
+.pilot-welcome-card {
+  width: 100%;
+  max-width: 620px;
+  background: var(--bg-surface, #131c2e);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-xl, 20px);
+  padding: 40px 44px;
+  box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.6), 0 0 0 1px rgba(99, 102, 241, 0.15);
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  position: relative;
+  overflow: hidden;
+  animation: welcomeCardFloat 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+[data-theme="light"] .pilot-welcome-card {
+  background: #ffffff;
+  border-color: rgba(99, 102, 241, 0.12);
+  box-shadow: 0 20px 45px -12px rgba(99, 102, 241, 0.12), 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+/* Subtle top gradient aura */
+.pilot-welcome-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(90deg, #6366f1, #38bdf8, #10b981);
+}
+
+.welcome-badge-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.welcome-brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  color: #818cf8;
+  text-transform: uppercase;
+}
+
+.welcome-brand-icon {
+  width: 14px;
+  height: 14px;
+  color: #6366f1;
+}
+
+.welcome-header {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.welcome-title {
+  font-size: 1.85rem;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  color: var(--text-primary, #f8fafc);
+  margin: 0;
+  line-height: 1.2;
+}
+
+.welcome-subtitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--accent-primary, #818cf8);
+  margin: 0;
+}
+
+.welcome-copy {
+  font-size: 0.92rem;
+  line-height: 1.55;
+  color: var(--text-secondary, #94a3b8);
+  margin: 0;
+}
+
+/* Preparation Checklist */
+.welcome-checklist-section {
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.06));
+  border-radius: var(--radius-lg, 14px);
+  padding: 18px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+[data-theme="light"] .welcome-checklist-section {
+  background: rgba(241, 245, 249, 0.6);
+  border-color: rgba(0, 0, 0, 0.06);
+}
+
+.welcome-checklist-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.82rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted, #64748b);
+}
+
+.welcome-checklist-status-active {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent-primary, #818cf8);
+}
+
+.welcome-checklist-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+
+.checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.88rem;
+  padding: 8px 10px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  transition: all 0.25s ease;
+}
+
+.checklist-item.ready {
+  color: var(--text-primary, #f8fafc);
+}
+
+.checklist-item.pending {
+  color: var(--text-muted, #64748b);
+  opacity: 0.75;
+}
+
+.checklist-icon {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.checklist-icon.ready {
+  color: #10b981;
+}
+
+.checklist-icon.loading {
+  color: #6366f1;
+}
+
+.checklist-icon.pending {
+  color: #475569;
+}
+
+/* Rotating Product Value Highlight */
+.welcome-rotating-message {
+  padding: 16px 18px;
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(56, 189, 248, 0.04) 100%);
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  border-radius: var(--radius-md, 10px);
+  min-height: 72px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 3px;
+  transition: opacity 0.3s ease;
+}
+
+.rotating-msg-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--text-primary, #f8fafc);
+  margin: 0;
+}
+
+.rotating-msg-desc {
+  font-size: 0.825rem;
+  line-height: 1.45;
+  color: var(--text-secondary, #94a3b8);
+  margin: 0;
+}
+
+/* Error banner */
+.welcome-error-card {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md, 10px);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.welcome-error-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #f87171;
+  font-weight: 700;
+  font-size: 0.92rem;
+}
+
+.welcome-error-text {
+  font-size: 0.84rem;
+  color: var(--text-secondary, #cbd5e1);
+  line-height: 1.45;
+  margin: 0;
+}
+
+.welcome-error-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.welcome-retry-btn {
+  padding: 8px 18px;
+  background: #ef4444;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: background 0.2s ease;
+}
+
+.welcome-retry-btn:hover {
+  background: #dc2626;
+}
+
+.welcome-continue-btn {
+  padding: 8px 18px;
+  background: transparent;
+  color: var(--text-primary, #f8fafc);
+  border: 1px solid var(--border-subtle, rgba(255, 255, 255, 0.2));
+  border-radius: 6px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.welcome-continue-btn:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* Subtle animations */
+@keyframes welcomeCardFloat {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+@keyframes spinSlow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.welcome-spinner {
+  animation: spinSlow 1.4s linear infinite;
+}
+
+/* Reduced Motion Support */
+@media (prefers-reduced-motion: reduce) {
+  .pilot-welcome-overlay,
+  .pilot-welcome-card,
+  .welcome-rotating-message,
+  .checklist-item {
+    transition: none !important;
+    animation: none !important;
+  }
+  .welcome-spinner {
+    animation: none !important;
+  }
+}
+
+/* Mobile Responsive */
+@media (max-width: 640px) {
+  .pilot-welcome-overlay {
+    padding: 16px;
+  }
+
+  .pilot-welcome-card {
+    padding: 24px 20px;
+    gap: 18px;
+    border-radius: 16px;
+  }
+
+  .welcome-title {
+    font-size: 1.45rem;
+  }
+
+  .welcome-subtitle {
+    font-size: 0.98rem;
+  }
+
+  .welcome-copy {
+    font-size: 0.85rem;
+  }
+
+  .welcome-checklist-grid {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+
+  .welcome-checklist-section {
+    padding: 14px 14px;
+  }
+}
