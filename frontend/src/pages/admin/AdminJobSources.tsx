@@ -330,7 +330,15 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
                 <CheckCircle2 size={18} />
-                <span>Source Successfully Connected</span>
+                <span>
+                  {discoverySuccess.discovery?.detectedType === 'EMBEDDED_DATA'
+                    ? `Discovered ${discoverySuccess.discovery?.jobCount} jobs from embedded Next.js page data.`
+                    : discoverySuccess.discovery?.detectedType === 'JSON_API'
+                    ? `Discovered ${discoverySuccess.discovery?.jobCount} jobs via API feed.`
+                    : discoverySuccess.discovery?.detectedType === 'JSON_LD'
+                    ? `Discovered ${discoverySuccess.discovery?.jobCount} jobs via JSON-LD metadata.`
+                    : `Discovered ${discoverySuccess.discovery?.jobCount} jobs using page structure.`}
+                </span>
               </div>
               <button
                 onClick={() => onViewJobs?.(discoverySuccess.discovery?.company)}

@@ -4,6 +4,8 @@ import http from 'http';
 import { safeFetchUrl, validateSafeUrl, isPrivateIpv4, isPrivateIpv6 } from '../utils/safeFetch.js';
 import { runSafeFetchDiagnostic } from '../utils/safeFetchDiagnostic.js';
 import { JobSourceDiscoveryService } from '../services/jobSourceDiscovery.service.js';
+import { EmbeddedDataDiscoveryService } from '../services/embeddedDataDiscovery.service.js';
+import { FieldMapperService } from '../services/fieldMapper.service.js';
 
 describe('SafeFetch and Discovery Regression Tests', () => {
   let mockServer: http.Server;
@@ -150,11 +152,63 @@ describe('SafeFetch and Discovery Regression Tests', () => {
     assert.ok(diag.fetch.contentLength! > 0);
   });
 
-  it('Synechron discovery succeeds with generic HTML card extraction', async () => {
+  it('EmbeddedDataDiscoveryService extracts jobs from Next.js self.__next_f fixture', async () => {
+    const fixtureHtml = `
+      <!DOCTYPE html>
+      <html>
+        <head><title>Careers at Acme Corp</title></head>
+        <body>
+          <div id="root">Loading</div>
+          <script>self.__next_f.push([1,"5:[\\\"$\\\",\\\"div\\\",null,{\\\"jobs\\\":[{\\\"jobRequisitionId\\\":\\\"REQ101\\\",\\\"Job_Requisition\\\":\\\"REQ101 Senior Cloud Architect (Open)\\\",\\\"Job_Posting_Location\\\":\\\"Bengaluru\\\",\\\"isActive\\\":true,\\\"url\\\":\\\"https://acme.wd1.myworkdayjobs.com/job/101\\\"},{\\\"jobRequisitionId\\\":\\\"REQ102\\\",\\\"Job_Requisition\\\":\\\"REQ102 DevOps Engineer (Open)\\\",\\\"Job_Posting_Location\\\":\\\"Pune\\\",\\\"isActive\\\":true,\\\"url\\\":\\\"https://acme.wd1.myworkdayjobs.com/job/102\\\"},{\\\"jobRequisitionId\\\":\\\"REQ103\\\",\\\"Job_Requisition\\\":\\\"REQ103 Product Manager (Closed)\\\",\\\"Job_Posting_Location\\\":\\\"Remote\\\",\\\"isActive\\\":false,\\\"url\\\":\\\"https://acme.wd1.myworkdayjobs.com/job/103\\\"}]}]"])</script>
+        </body>
+      </html>
+    `;
+
+    const embeddedResult = EmbeddedDataDiscoveryService.extractEmbeddedJobsFromHtml(fixtureHtml);
+    assert.ok(embeddedResult, 'Embedded result should exist');
+    assert.strictEqual(embeddedResult.sourceType, 'NEXT_JS_RSC');
+    assert.strictEqual(embeddedResult.jobs.length, 3);
+
+    const mapping = FieldMapperService.inferDeterministicMapping(embeddedResult.jobs);
+    assert.strictEqual(mapping.externalJobIdField, 'jobRequisitionId');
+    assert.strictEqual(mapping.titleField, 'Job_Requisition');
+    assert.strictEqual(mapping.locationField, 'Job_Posting_Location');
+    assert.strictEqual(mapping.applicationUrlField, 'url');
+    assert.strictEqual(mapping.activeField, 'isActive');
+
+    // Verify mapping and title cleaning
+    const defaults = {
+      companyName: 'Acme Corp',
+      careersUrl: 'https://acme.com/careers',
+      sourceType: 'EMBEDDED_DATA',
+      sourceName: 'Acme Corp'
+    };
+
+    const activeJob = FieldMapperService.mapRecord(embeddedResult.jobs[0], mapping, defaults);
+    assert.ok(activeJob);
+    assert.strictEqual(activeJob.externalJobId, 'REQ101');
+    assert.strictEqual(activeJob.title, 'Senior Cloud Architect');
+    assert.strictEqual(activeJob.applicationUrl, 'https://acme.wd1.myworkdayjobs.com/job/101');
+
+    // Verify inactive job is rejected
+    const inactiveJob = FieldMapperService.mapRecord(embeddedResult.jobs[2], mapping, defaults);
+    assert.strictEqual(inactiveJob, null, 'Inactive job should be filtered out');
+  });
+
+  it('EmbeddedDataDiscoveryService handles malformed RSC payloads gracefully without throwing', () => {
+    const malformedHtml = `
+      <script>self.__next_f.push([1, "invalid:json:{bad"])</script>
+      <script>self.__next_f.push([2, ""])</script>
+    `;
+    const res = EmbeddedDataDiscoveryService.extractEmbeddedJobsFromHtml(malformedHtml);
+    assert.strictEqual(res, null);
+  });
+
+  it('Synechron discovery succeeds with generic embedded Next.js data extraction', async () => {
     const res = await JobSourceDiscoveryService.discoverSource('https://www.synechron.com/careers');
-    assert.strictEqual(res.detectedType, 'HTML');
+    assert.strictEqual(res.detectedType, 'EMBEDDED_DATA');
     assert.strictEqual(res.companyName, 'Synechron');
-    assert.ok(res.jobCount >= 5, `Expected at least 5 jobs, got ${res.jobCount}`);
-    assert.ok(res.sampleJobs[0].applicationUrl.includes('myworkdayjobs.com'));
+    assert.ok(res.jobCount >= 100, `Expected over 100 jobs from embedded RSC state, got ${res.jobCount}`);
+    assert.ok(res.sampleJobs[0].url.includes('myworkdayjobs.com'));
   });
 });

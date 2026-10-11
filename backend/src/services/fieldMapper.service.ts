@@ -106,22 +106,23 @@ export class FieldMapperService {
 
     // 1. External Job ID / Code priority:
     mapping.externalJobIdField = this.findMatchingKey(keys, [
-      'job_code', 'jobCode', 'externalId', 'external_id', 'code', 'slug', 'requisitionId', 'req_id', 'id'
+      'jobRequisitionId', 'job_requisition_id', 'requisitionId', 'requisition_id', 'job_code', 'jobCode',
+      'externalId', 'external_id', 'documentId', 'document_id', 'code', 'slug', 'req_id', 'id'
     ]);
 
     // 2. Title
     mapping.titleField = this.findMatchingKey(keys, [
-      'title', 'jobTitle', 'position', 'role', 'name', 'job_title'
+      'title', 'jobTitle', 'position', 'role', 'name', 'job_title', 'Job_Requisition', 'jobRequisition', 'job_requisition'
     ]);
 
     // 3. Department
     mapping.departmentField = this.findMatchingKey(keys, [
-      'department', 'dept', 'team', 'category', 'function', 'business_unit'
+      'department', 'dept', 'team', 'category', 'function', 'business_unit', 'jobFamily', 'job_family', 'BU'
     ]);
 
     // 4. Location
     mapping.locationField = this.findMatchingKey(keys, [
-      'location', 'city', 'office', 'workplace', 'region'
+      'Job_Posting_Location', 'jobPostingLocation', 'job_posting_location', 'location', 'city', 'office', 'workplace', 'region', 'State', 'state', 'Country', 'country'
     ]);
 
     // 5. Work Mode / Remote
@@ -220,8 +221,8 @@ export class FieldMapperService {
 
     const getVal = (field?: string) => (field && rawRecord[field] !== undefined ? rawRecord[field] : undefined);
 
-    const title = String(getVal(mapping.titleField) || '').trim();
-    if (!title) {
+    const rawTitle = String(getVal(mapping.titleField) || '').trim();
+    if (!rawTitle) {
       return null; // A job without a title is invalid
     }
 
@@ -232,6 +233,9 @@ export class FieldMapperService {
     } else {
       externalJobId = undefined;
     }
+
+    // Intelligently derive clean title (e.g. "JR1041997 Database Engineer (Open)" -> "Database Engineer")
+    const title = this.cleanTitle(rawTitle, externalJobId);
 
     // Description text
     const description = getVal(mapping.descriptionField) || getVal(mapping.summaryField) || title;
@@ -339,4 +343,29 @@ export class FieldMapperService {
       rawPayload: rawRecord
     };
   }
+
+  /**
+   * Cleans title string intelligently when it includes requisition IDs or status flags.
+   * e.g. "JR1041997 Database Engineer (Open)" -> "Database Engineer"
+   */
+  public static cleanTitle(rawTitle: string, reqId?: string): string {
+    let title = rawTitle.trim();
+    if (!title) return '';
+
+    // Strip explicit requisition ID prefix if provided
+    if (reqId) {
+      const escapedReqId = reqId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const reqRegex = new RegExp(`^${escapedReqId}\\s*[-:–]?\\s*`, 'i');
+      title = title.replace(reqRegex, '');
+    }
+
+    // Strip generic requisition ID prefixes e.g. "JR1041997 ", "REQ-12345: ", "#1234 "
+    title = title.replace(/^(?:JR|REQ|JOB|POS)?\d{4,}\s*[-:–]?\s*/i, '');
+
+    // Strip trailing status/lifecycle tags e.g. "(Open)", "(Closed)", "(Active)", "(Evergreen)"
+    title = title.replace(/\s*\((?:Open|Closed|Active|Evergreen|Full[- ]Time|Part[- ]Time|Contract)\)/gi, '');
+
+    return title.trim() || rawTitle.trim();
+  }
 }
+
