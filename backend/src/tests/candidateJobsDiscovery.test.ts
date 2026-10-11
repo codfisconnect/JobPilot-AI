@@ -9,7 +9,12 @@ describe('Candidate Jobs Discovery & Exploration Suite (Regression for 0 Jobs Bu
   let candidateToken: string;
   let candidateUser: any;
 
-  it('Setup: Retrieve candidate user or create temporary candidate session', async () => {
+  let testCompanyA: any;
+  let testCompanyB: any;
+  let jobA: any;
+  let jobB: any;
+
+  it('Setup: Retrieve candidate user or create temporary candidate session and test canonical jobs', async () => {
     candidateUser = await prisma.user.findFirst({ where: { role: 'CANDIDATE' } });
     if (!candidateUser) {
       candidateUser = await prisma.user.create({
@@ -26,6 +31,50 @@ describe('Candidate Jobs Discovery & Exploration Suite (Regression for 0 Jobs Bu
       role: candidateUser.role
     });
     assert.ok(candidateToken, 'Candidate token generated');
+
+    // Create or retrieve 2 test companies and seed jobs if needed
+    testCompanyA = await prisma.company.upsert({
+      where: { officialDomain: 'codfis-test.com' },
+      create: {
+        name: 'Codfis Technologies Test',
+        officialDomain: 'codfis-test.com'
+      },
+      update: {}
+    });
+
+    testCompanyB = await prisma.company.upsert({
+      where: { officialDomain: 'synechron-test.com' },
+      create: {
+        name: 'Synechron Test',
+        officialDomain: 'synechron-test.com'
+      },
+      update: {}
+    });
+
+    // Ensure we have at least 6 canonical jobs for pagination tests
+    for (let i = 1; i <= 6; i++) {
+      await prisma.job.upsert({
+        where: { contentHash: `hash_test_job_${i}` },
+        create: {
+          title: i % 2 === 0 ? `Senior Software Engineer ${i}` : `Staff Product Designer ${i}`,
+          description: 'Test job description for regression testing',
+          companyId: i % 2 === 0 ? testCompanyA.id : testCompanyB.id,
+          sourceType: i % 2 === 0 ? 'JSON_API' : 'EMBEDDED_DATA',
+          sourceName: i % 2 === 0 ? 'Codfis Test Source' : 'Synechron Test Source',
+          sourceUrl: `https://test.example.com/careers/source_${i}`,
+          remoteType: i % 2 === 0 ? 'REMOTE' : 'ON_SITE',
+          employmentType: 'FULL_TIME',
+          status: 'ACTIVE',
+          contentHash: `hash_test_job_${i}`,
+          applicationUrl: `https://test.example.com/jobs/${i}`,
+          firstSeenAt: new Date(),
+          lastSeenAt: new Date()
+        },
+        update: {
+          status: 'ACTIVE'
+        }
+      });
+    }
   });
 
   it('1. GET /api/v1/jobs returns canonical ACTIVE jobs to authenticated candidates', async () => {
