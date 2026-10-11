@@ -38,8 +38,9 @@ export const AdminLayout: React.FC<AdminLayoutProps> = ({
 
   const navItems = [
     { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
-    { id: 'candidates', label: 'Candidates', icon: Users },
+    { id: 'job-sources', label: 'Job Sources', icon: Layers },
     { id: 'jobs', label: 'Jobs', icon: Briefcase },
+    { id: 'candidates', label: 'Candidates', icon: Users },
     { id: 'applications', label: 'Applications', icon: Send },
     { id: 'employers', label: 'Employers', icon: Building2 },
     { id: 'payments', label: 'Payments', icon: CreditCard },

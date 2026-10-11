@@ -3,6 +3,8 @@ import { adminController } from './admin.controller.js';
 import { authenticateJwt, requireRole } from '../../middleware/auth.middleware.js';
 import { UserRole } from '@prisma/client';
 
+import { AdminJobSourcesController } from '../../controllers/v1/adminJobSources.controller.js';
+
 export const adminRouter = Router();
 
 // 1. Strict Admin Authentication & Authorization
@@ -10,7 +12,15 @@ export const adminRouter = Router();
 adminRouter.use(authenticateJwt);
 adminRouter.use(requireRole([UserRole.ADMIN]));
 
-// 2. Admin API Endpoints
+// 2. Admin Job Sources Endpoints (Universal Discovery & Management)
+adminRouter.post('/job-sources/discover', AdminJobSourcesController.discoverAndConnect);
+adminRouter.get('/job-sources', AdminJobSourcesController.listSources);
+adminRouter.get('/job-sources/:id', AdminJobSourcesController.getSourceById);
+adminRouter.post('/job-sources/:id/sync', AdminJobSourcesController.syncSource);
+adminRouter.patch('/job-sources/:id', AdminJobSourcesController.updateSource);
+adminRouter.delete('/job-sources/:id', AdminJobSourcesController.deleteSource);
+
+// 3. Admin API Endpoints
 adminRouter.get('/dashboard', (req, res, next) => adminController.getDashboard(req, res, next));
 adminRouter.get('/candidates', (req, res, next) => adminController.getCandidates(req, res, next));
 adminRouter.get('/candidates/:id', (req, res, next) => adminController.getCandidateById(req, res, next));

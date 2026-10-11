@@ -8,6 +8,7 @@ import { AdminApplications } from './AdminApplications';
 import { AdminEmployers } from './AdminEmployers';
 import { AdminPayments } from './AdminPayments';
 import { AdminHealth } from './AdminHealth';
+import { AdminJobSources } from './AdminJobSources';
 import { ShieldAlert, ArrowLeft } from 'lucide-react';
 
 interface AdminRootProps {
@@ -79,6 +80,7 @@ export const AdminRoot: React.FC<AdminRootProps> = ({ onExitAdmin, initialSectio
       onExitAdmin={onExitAdmin}
     >
       {activeSection === 'dashboard' && <AdminDashboardOverview />}
+      {(activeSection === 'job-sources' || activeSection === 'job_sources') && <AdminJobSources />}
       {activeSection === 'candidates' && <AdminCandidates />}
       {activeSection === 'jobs' && <AdminJobs />}
       {activeSection === 'applications' && <AdminApplications />}
