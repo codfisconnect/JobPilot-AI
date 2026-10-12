@@ -26,7 +26,7 @@ export class AdminJobSourcesController {
       if (!result.success) {
         res.status(422).json({
           success: false,
-          error: result.error || 'Could not find a structured jobs feed on this page.'
+          error: result.error || 'No public job source was discoverable from this page.'
         });
         return;
       }
@@ -41,10 +41,16 @@ export class AdminJobSourcesController {
         source: configuration,
         discovery: {
           detectedType: result.discovery.detectedType,
+          sourceType: result.discovery.sourceType,
+          atsType: result.discovery.atsType,
+          strategy: result.discovery.strategy,
           jobsEndpoint: result.discovery.jobsEndpoint,
           company: result.companyName,
           officialDomain: result.discovery.officialDomain,
-          jobCount: result.discovery.jobCount
+          jobCount: result.discovery.jobCount,
+          expectedJobCount: result.discovery.expectedJobCount,
+          completeness: result.discovery.completeness,
+          paginationSupported: result.discovery.paginationSupported
         },
         sync: result.sync
       });

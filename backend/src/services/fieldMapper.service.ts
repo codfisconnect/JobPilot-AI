@@ -62,12 +62,17 @@ export class FieldMapperService {
       return { jobs: [], rootPath: '' };
     }
 
-    const priorityWrapperKeys = ['data', 'jobs', 'results', 'jobList', 'openings', 'items', 'postings', 'vacancies'];
+    const priorityWrapperKeys = ['data', 'jobs', 'results', 'jobList', 'openings', 'items', 'postings', 'vacancies', 'docs', 'content', 'records', 'opportunities', 'jobPostings'];
 
     for (const key of priorityWrapperKeys) {
       if (Array.isArray(jsonPayload[key]) && jsonPayload[key].length > 0) {
         return { jobs: jsonPayload[key], rootPath: key };
       }
+    }
+
+    // Check payload.response.docs (Solr / Lucene / Search API format)
+    if (jsonPayload.response && typeof jsonPayload.response === 'object' && Array.isArray(jsonPayload.response.docs) && jsonPayload.response.docs.length > 0) {
+      return { jobs: jsonPayload.response.docs, rootPath: 'response.docs' };
     }
 
     // Inspect any key whose value is an array

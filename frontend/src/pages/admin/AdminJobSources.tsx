@@ -42,15 +42,13 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
 
   // Discovery step labels matching requirement
   const discoverySteps = [
-    'Validating URL & SSRF safeguards',
-    'Fetching careers page',
-    'Detecting job source & endpoints',
-    'Finding jobs endpoint',
-    'Analyzing job schema & data arrays',
-    'Identifying canonical company',
-    'Building deterministic field mapping',
-    'Syncing and normalizing jobs into PostgreSQL',
-    'Completed'
+    'URL validated',
+    'Source analyzed',
+    'Job source detected',
+    'Data structure identified',
+    'Jobs discovered',
+    'Jobs normalized',
+    'Jobs synchronized'
   ];
 
   // Sync Progress State
@@ -114,7 +112,7 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
       setUrlInput('');
       await loadSources();
     } catch (err: unknown) {
-      setDiscoveryError(normalizeApiError(err, 'Could not find a structured jobs feed on this page.'));
+      setDiscoveryError(normalizeApiError(err, 'No public job source was discoverable from this page.'));
     } finally {
       setDiscovering(false);
     }
@@ -247,7 +245,7 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
           <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0 }}>Add Job Source</h2>
         </div>
         <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary, #94a3b8)', marginBottom: '16px' }}>
-          Enter the company's careers or jobs page URL. The engine handles URL validation, API discovery, schema inference, company resolution, and immediate ingestion.
+          Enter any company careers or jobs URL. Pilot Mama automatically detects APIs, ATS platforms, embedded job data, HTML listings, and other public job-source structures.
         </p>
 
         <form onSubmit={handleDiscover} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
@@ -349,11 +347,20 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', fontSize: '0.85rem', color: 'var(--text-primary, #f8fafc)' }}>
               <div><strong>Company:</strong> {discoverySuccess.discovery?.company}</div>
-              <div><strong>Source:</strong> {discoverySuccess.discovery?.detectedType}</div>
-              <div><strong>Jobs Found:</strong> {discoverySuccess.discovery?.jobCount}</div>
+              <div><strong>Source:</strong> {discoverySuccess.discovery?.atsType || discoverySuccess.discovery?.detectedType}</div>
+              {discoverySuccess.discovery?.strategy && (
+                <div><strong>Strategy:</strong> {discoverySuccess.discovery?.strategy}</div>
+              )}
+              <div><strong>Jobs Discovered:</strong> {discoverySuccess.discovery?.jobCount}</div>
+              {discoverySuccess.discovery?.expectedJobCount !== null && discoverySuccess.discovery?.expectedJobCount !== undefined && (
+                <div><strong>Expected Jobs:</strong> {discoverySuccess.discovery?.expectedJobCount}</div>
+              )}
+              {discoverySuccess.discovery?.completeness && (
+                <div><strong>Completeness:</strong> {discoverySuccess.discovery?.completeness}</div>
+              )}
               <div><strong>Created:</strong> {discoverySuccess.sync?.created}</div>
               <div><strong>Updated:</strong> {discoverySuccess.sync?.updated}</div>
-              <div><strong>Status:</strong> Healthy</div>
+              <div><strong>Status:</strong> {discoverySuccess.discovery?.completeness === 'PARTIAL' ? 'Partial' : 'Complete / Healthy'}</div>
             </div>
           </div>
         )}
