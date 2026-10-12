@@ -157,12 +157,12 @@ export class FieldMapperService {
 
     // 10. Summary
     mapping.summaryField = this.findMatchingKey(keys, [
-      'summary', 'shortDescription', 'overview', 'teaser', 'snippet', 'intro'
+      'summary', 'shortDescription', 'overview', 'teaser', 'descriptionTeaser', 'snippet', 'intro'
     ]);
 
     // 11. Description
     mapping.descriptionField = this.findMatchingKey(keys, [
-      'description', 'jobDescription', 'details', 'body', 'content', 'text'
+      'description', 'jobDescription', 'descriptionTeaser', 'details', 'body', 'content', 'text'
     ]);
 
     // 12. Responsibilities
@@ -177,7 +177,7 @@ export class FieldMapperService {
 
     // 14. Skills & Preferred Skills
     mapping.skillsField = this.findMatchingKey(keys, [
-      'skills', 'required_skills', 'requiredSkills', 'coreSkills', 'techStack', 'technologies'
+      'skills', 'required_skills', 'requiredSkills', 'coreSkills', 'techStack', 'technologies', 'ml_skills', 'mlSkills'
     ]);
 
     mapping.preferredSkillsField = this.findMatchingKey(keys, [
@@ -191,7 +191,7 @@ export class FieldMapperService {
 
     // 16. Posted Date & Deadline
     mapping.postedAtField = this.findMatchingKey(keys, [
-      'posted_at', 'postedAt', 'createdAt', 'created_at', 'publishDate', 'published_at', 'date'
+      'posted_at', 'postedAt', 'postedDate', 'createdAt', 'created_at', 'publishDate', 'published_at', 'date'
     ]);
 
     mapping.deadlineField = this.findMatchingKey(keys, [
@@ -329,7 +329,20 @@ export class FieldMapperService {
       companyName: defaults.companyName,
       companyDomain: defaults.companyDomain,
       careersUrl: defaults.careersUrl,
-      location: getVal(mapping.locationField) ? String(getVal(mapping.locationField)) : undefined,
+      location: (() => {
+        const locVal = getVal(mapping.locationField);
+        if (!locVal) {
+          if (Array.isArray(rawRecord.multi_location) && rawRecord.multi_location.length > 0) {
+            return String(rawRecord.multi_location[0]);
+          }
+          return undefined;
+        }
+        if (Array.isArray(locVal)) return locVal.map(String).join(', ');
+        if (typeof locVal === 'object' && locVal !== null) {
+          return locVal.name || locVal.location || locVal.city || JSON.stringify(locVal);
+        }
+        return String(locVal);
+      })(),
       remoteType: getVal(mapping.workModeField) ? String(getVal(mapping.workModeField)) : undefined,
       employmentType: getVal(mapping.employmentTypeField) ? String(getVal(mapping.employmentTypeField)) : undefined,
       salaryMin,

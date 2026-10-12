@@ -42,7 +42,7 @@ export class EmbeddedStateStrategy implements IJobSourceStrategy {
           externalJobId: mapped.externalJobId,
           title: mapped.title,
           location: mapped.location,
-          description: mapped.description,
+          description: mapped.descriptionText || mapped.description || item.descriptionTeaser || mapped.title,
           applicationUrl: mapped.applicationUrl,
           postedAt: mapped.postedAt,
           rawPayload: item

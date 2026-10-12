@@ -158,4 +158,27 @@ describe('Universal Job Discovery Engine V2 Test Suite', () => {
 
     assert.ok(result.discoveredJobCount > 0, `Expected jobs discovered for Publicis Sapient, got: ${result.discoveredJobCount}`);
   });
+
+  // 10. Live Diagnostic Test: Virtusa (Embedded JSON / Phenom)
+  it('Live Diagnostic: Virtusa global careers URL discovers jobs dynamically', async () => {
+    const url = 'https://www.virtusa.com/careers/job-search/global/en';
+    const result = await UniversalDiscoveryOrchestrator.discover(url);
+
+    assert.ok(result.discoveredJobCount > 0, `Expected jobs discovered for Virtusa, got: ${result.discoveredJobCount}`);
+    assert.ok(result.sampleJobs.length > 0, 'Should have sample jobs');
+    assert.ok(result.sampleJobs[0].title.length > 0, 'Sample job has valid title');
+    assert.ok(result.sampleJobs[0].location, 'Sample job has location');
+  });
+
+  // 11. Live Diagnostic Test: Agilysys (Greenhouse client board)
+  it('Live Diagnostic: Agilysys careers portal discovers jobs via Greenhouse adapter', async () => {
+    const url = 'https://www.agilysys.com/en/careers-join/';
+    const result = await UniversalDiscoveryOrchestrator.discover(url);
+
+    assert.strictEqual(result.atsType, 'GREENHOUSE');
+    assert.strictEqual(result.strategy, 'GREENHOUSE_ADAPTER');
+    assert.ok(result.discoveredJobCount > 0, `Expected jobs discovered for Agilysys, got: ${result.discoveredJobCount}`);
+    assert.ok(result.sampleJobs.length > 0, 'Should have sample jobs');
+    assert.ok(result.sampleJobs[0].applicationUrl?.includes('greenhouse.io'), 'Official application URL on Greenhouse');
+  });
 });

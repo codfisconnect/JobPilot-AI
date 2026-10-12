@@ -12,7 +12,16 @@ export class GreenhouseAdapter implements IJobSourceStrategy {
   public canHandle(context: StrategyContext): boolean {
     if (context.fingerprint.atsVendor === 'GREENHOUSE') return true;
     if (context.normalizedUrl.domain.includes('greenhouse.io')) return true;
-    if (context.initialHtml && (context.initialHtml.includes('boards.greenhouse.io') || context.initialHtml.includes('grnh.se'))) return true;
+    if (
+      context.initialHtml &&
+      (context.initialHtml.includes('boards.greenhouse.io') ||
+        context.initialHtml.includes('boards-api.greenhouse.io') ||
+        context.initialHtml.includes('grnh.se') ||
+        context.initialHtml.includes('data-board-token') ||
+        context.initialHtml.includes('careers-job-listing'))
+    ) {
+      return true;
+    }
     return false;
   }
 
@@ -20,11 +29,46 @@ export class GreenhouseAdapter implements IJobSourceStrategy {
     const { normalizedUrl } = context;
     let boardToken = '';
 
-    // Extract board token from path or query
+    // Extract board token from path or query or HTML/scripts
     const match = normalizedUrl.normalizedUrl.match(/boards\.greenhouse\.io\/(?:embed\/job_board\?for=)?([^/?#]+)/i);
     if (match && match[1]) {
       boardToken = match[1];
-    } else {
+    } else if (context.initialHtml) {
+      // Look for data-board-token or boards-api.greenhouse.io or boards.greenhouse.io in HTML and referenced scripts
+      const htmlTokenMatch =
+        context.initialHtml.match(/data-board-token(?:-display)?=["']([^"']+)["']/i) ||
+        context.initialHtml.match(/boards(?:-api)?\.greenhouse\.io\/(?:v1\/boards\/|embed\/job_app\?for=|embed\/job_board\?for=)?([a-zA-Z0-9_-]+)/i);
+      if (htmlTokenMatch && htmlTokenMatch[1]) {
+        boardToken = htmlTokenMatch[1];
+      }
+    }
+
+    if (!boardToken && context.initialHtml) {
+      // Inspect scripts in initialHtml for boards-api.greenhouse.io
+      const scriptMatches = context.initialHtml.match(/<script[^>]*src=["']([^"']+)["'][^>]*>/gi) || [];
+      for (const tag of scriptMatches) {
+        const srcMatch = tag.match(/src=["']([^"']+)["']/i);
+        if (srcMatch && srcMatch[1] && (srcMatch[1].includes('career') || srcMatch[1].includes('job') || srcMatch[1].includes('cjl'))) {
+          try {
+            const resolvedSrc = new URL(srcMatch[1], normalizedUrl.normalizedUrl).toString();
+            const sRes = await safeFetchUrl(resolvedSrc, { timeoutMs: 5000 });
+            if (sRes.status === 200 && sRes.text) {
+              const inScriptMatch =
+                sRes.text.match(/boards(?:-api)?\.greenhouse\.io\/v1\/boards\/([a-zA-Z0-9_-]+)/i) ||
+                sRes.text.match(/data-board-token.*?['"]([a-zA-Z0-9_-]+)['"]/i) ||
+                sRes.text.match(/boards\.greenhouse\.io\/embed\/job_app\?for=([a-zA-Z0-9_-]+)/i) ||
+                sRes.text.match(/BOARD_TOKEN(?:_LC)?\s*=\s*['"]([a-zA-Z0-9_-]+)['"]/i);
+              if (inScriptMatch && inScriptMatch[1]) {
+                boardToken = inScriptMatch[1];
+                break;
+              }
+            }
+          } catch {}
+        }
+      }
+    }
+
+    if (!boardToken) {
       const parts = normalizedUrl.normalizedUrl.split('/').filter(Boolean);
       boardToken = parts[parts.length - 1];
     }
@@ -59,10 +103,14 @@ export class GreenhouseAdapter implements IJobSourceStrategy {
       logger.warn(`[GreenhouseAdapter] Failed to fetch board ${boardToken}: ${err.message}`);
     }
 
+    if (allJobs.length === 0) {
+      return { matched: false } as any;
+    }
+
     const completeness = CompletenessEstimatorService.evaluate(allJobs.length, expectedCount);
 
     return {
-      matched: allJobs.length > 0,
+      matched: true,
       strategyName: this.name,
       sourceType: 'GREENHOUSE',
       atsType: 'GREENHOUSE',
