@@ -172,25 +172,28 @@ export class EmbeddedDataDiscoveryService {
         return;
       }
 
-      // Check for JSON assignments e.g. window.__STATE__ = {...}
-      let jsonStr = content;
-      if (content.includes('=') && !content.startsWith('{') && !content.startsWith('[')) {
-        const eqIdx = content.indexOf('=');
-        jsonStr = content.slice(eqIdx + 1).replace(/;?\s*$/, '').trim();
-      }
+      // Split statements by semicolon or inspect assignments e.g. window.__STATE__ = {...} or phApp.ddo = {...}
+      const statements = content.split(';');
+      for (const stmt of statements) {
+        let jsonStr = stmt.trim();
+        if (jsonStr.includes('=') && !jsonStr.startsWith('{') && !jsonStr.startsWith('[')) {
+          const eqIdx = jsonStr.indexOf('=');
+          jsonStr = jsonStr.slice(eqIdx + 1).trim();
+        }
 
-      if ((jsonStr.startsWith('{') && jsonStr.endsWith('}')) || (jsonStr.startsWith('[') && jsonStr.endsWith(']'))) {
-        try {
-          const parsed = JSON.parse(jsonStr);
-          const found = this.findJobArraysInObject(parsed);
-          for (const cand of found) {
-            if (cand.score > highestScore || (cand.score === highestScore && cand.jobs.length > bestJobs.length)) {
-              bestJobs = cand.jobs;
-              bestRoot = cand.path;
-              highestScore = cand.score;
+        if ((jsonStr.startsWith('{') && jsonStr.endsWith('}')) || (jsonStr.startsWith('[') && jsonStr.endsWith(']'))) {
+          try {
+            const parsed = JSON.parse(jsonStr);
+            const found = this.findJobArraysInObject(parsed);
+            for (const cand of found) {
+              if (cand.score > highestScore || (cand.score === highestScore && cand.jobs.length > bestJobs.length)) {
+                bestJobs = cand.jobs;
+                bestRoot = cand.path;
+                highestScore = cand.score;
+              }
             }
-          }
-        } catch {}
+          } catch {}
+        }
       }
     });
 

@@ -130,7 +130,15 @@ export class SourceFingerprintService {
         signals.push('JSON-LD script tags present');
       }
 
-      if (lowerHtml.includes('__next_f') || lowerHtml.includes('__next_data__') || lowerHtml.includes('window.__initial_state__')) {
+      if (
+        lowerHtml.includes('__next_f') ||
+        lowerHtml.includes('__next_data__') ||
+        lowerHtml.includes('__initial_state__') ||
+        lowerHtml.includes('application/json') ||
+        lowerHtml.includes('phapp') ||
+        lowerHtml.includes('window.') ||
+        lowerHtml.includes('refinesearch')
+      ) {
         hasEmbeddedState = true;
         signals.push('Embedded hydration/application state present');
       }
