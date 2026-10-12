@@ -11,15 +11,26 @@ import { SourceHealth } from '@prisma/client';
 import { HtmlJobDiscoveryService } from './htmlJobDiscovery.service.js';
 import { EmbeddedDataDiscoveryService } from './embeddedDataDiscovery.service.js';
 
+import { UniversalDiscoveryOrchestrator } from '../universalDiscovery/universalDiscoveryOrchestrator.js';
+import { CompletenessStatus } from '../universalDiscovery/types.js';
+
 export interface DiscoveryResult {
-  detectedType: 'DIRECT_JSON' | 'JSON_API' | 'HTML' | 'EMBEDDED_DATA' | 'JSON_LD' | 'DYNAMIC_API' | 'SPECIALIZED_ATS';
+  detectedType: 'DIRECT_JSON' | 'JSON_API' | 'HTML' | 'EMBEDDED_DATA' | 'JSON_LD' | 'DYNAMIC_API' | 'SPECIALIZED_ATS' | string;
+  sourceType?: string;
+  atsType?: string;
+  strategy?: string;
   sourceUrl: string;
   jobsEndpoint: string;
   companyName: string;
   officialDomain: string;
   jobCount: number;
+  expectedJobCount?: number | null;
+  completeness?: CompletenessStatus;
+  paginationSupported?: boolean;
+  paginationConfig?: any;
   mappingConfig: DiscoveredFieldMapping;
   sampleJobs: any[];
+  allDiscoveredJobs?: any[];
 }
 
 export interface SyncOutcome {
@@ -156,9 +167,19 @@ export class JobSourceDiscoveryService {
       }
     }
 
-    // Look for string literals containing /jobs or /careers or /api
-    const literalRegex = /['"`](\/(?:api\/)?(?:jobs|careers|openings|positions)(?:\.[a-z]+)?)['"`]/gi;
+    // Look for string literals containing /jobs or /careers or /api or /bin
+    const literalRegex = /['"`](\/(?:api|bin\/[a-z0-9\-_]+)?\/(?:jobs|careers|openings|positions|careers[a-zA-Z0-9_\-]+)(?:\.[a-z]+)?)['"`]/gi;
     while ((match = literalRegex.exec(html)) !== null) {
+      const candidatePath = match[1].trim();
+      try {
+        const resolved = new URL(candidatePath, baseUrl.origin).toString();
+        candidates.add(resolved);
+      } catch {}
+    }
+
+    // Look for searchApiEndpoint / apiUrl in HTML/props
+    const propApiRegex = /(?:searchApiEndpoint|apiEndpoint|apiUrl|endpoint)["']?\s*:\s*["']([^"']+)["']/gi;
+    while ((match = propApiRegex.exec(html)) !== null) {
       const candidatePath = match[1].trim();
       try {
         const resolved = new URL(candidatePath, baseUrl.origin).toString();
@@ -170,227 +191,31 @@ export class JobSourceDiscoveryService {
   }
 
   /**
-   * Main discovery entrypoint: executes Strategies A through D.
+   * Main discovery entrypoint: executes Universal Discovery Engine V2.
    */
   public static async discoverSource(rawUrl: string): Promise<DiscoveryResult> {
-    logger.info(`[JobSourceDiscoveryService] Starting discovery for: ${rawUrl}`);
+    logger.info(`[JobSourceDiscoveryService] Starting universal discovery for: ${rawUrl}`);
 
-    // Step 1: Fetch initial page safely with SSRF protection
-    const initialResponse = await safeFetchUrl(rawUrl);
-    const contentType = (initialResponse.contentType || '').toLowerCase();
-    const responseText = initialResponse.text.trim();
+    const universal = await UniversalDiscoveryOrchestrator.discover(rawUrl);
 
-    // Strategy A: Direct JSON response
-    if (contentType.includes('application/json') || (responseText.startsWith('{') && responseText.endsWith('}')) || (responseText.startsWith('[') && responseText.endsWith(']'))) {
-      try {
-        const jsonPayload = JSON.parse(responseText);
-        const { jobs, rootPath } = FieldMapperService.extractJobsArray(jsonPayload);
-        if (jobs.length > 0) {
-          const { companyName, domain } = this.extractCompanyMetadata(initialResponse.finalUrl, undefined, jsonPayload);
-          let mapping = FieldMapperService.inferDeterministicMapping(jobs);
-          mapping.rootJobsPath = rootPath;
-
-          // If key fields are missing, try AI mapping fallback
-          if (!mapping.titleField) {
-            const aiMapping = await AiFieldMapperService.inferMappingWithAi(jobs[0]);
-            mapping = { ...aiMapping, ...mapping };
-          }
-
-          return {
-            detectedType: 'DIRECT_JSON',
-            sourceUrl: rawUrl,
-            jobsEndpoint: initialResponse.finalUrl,
-            companyName,
-            officialDomain: domain,
-            jobCount: jobs.length,
-            mappingConfig: mapping,
-            sampleJobs: jobs.slice(0, 3)
-          };
-        }
-      } catch (err: any) {
-        logger.warn(`[JobSourceDiscoveryService] Strategy A JSON parse failed: ${err.message}`);
-      }
-    }
-
-    // Response is HTML
-    const html = responseText;
-    const { companyName, domain } = this.extractCompanyMetadata(initialResponse.finalUrl, html);
-
-    // Strategy D: Embedded Data / JSON-LD in HTML
-    try {
-      const $ = cheerio.load(html);
-      const jsonLdJobs: any[] = [];
-      $('script[type="application/ld+json"]').each((_, el) => {
-        try {
-          const parsed = JSON.parse($(el).html() || '{}');
-          if (parsed['@type'] === 'JobPosting') {
-            jsonLdJobs.push(parsed);
-          } else if (Array.isArray(parsed['@graph'])) {
-            parsed['@graph'].forEach((item: any) => {
-              if (item['@type'] === 'JobPosting') jsonLdJobs.push(item);
-            });
-          }
-        } catch {}
-      });
-
-      if (jsonLdJobs.length > 0) {
-        let mapping = FieldMapperService.inferDeterministicMapping(jsonLdJobs);
-        return {
-          detectedType: 'JSON_LD',
-          sourceUrl: rawUrl,
-          jobsEndpoint: initialResponse.finalUrl,
-          companyName,
-          officialDomain: domain,
-          jobCount: jsonLdJobs.length,
-          mappingConfig: mapping,
-          sampleJobs: jsonLdJobs.slice(0, 3)
-        };
-      }
-    } catch {}
-
-    // Strategy B: HTML referencing JSON API (discovered endpoints)
-    const discoveredEndpoints = this.extractEndpointCandidatesFromHtml(initialResponse.finalUrl, html);
-    logger.info(`[JobSourceDiscoveryService] Discovered ${discoveredEndpoints.length} candidate endpoints from HTML`);
-
-    for (const endpoint of discoveredEndpoints) {
-      try {
-        const epRes = await safeFetchUrl(endpoint, { timeoutMs: 7000 });
-        if (epRes.status === 200) {
-          const jsonPayload = JSON.parse(epRes.text);
-          const { jobs, rootPath } = FieldMapperService.extractJobsArray(jsonPayload);
-          if (jobs.length > 0) {
-            let mapping = FieldMapperService.inferDeterministicMapping(jobs);
-            mapping.rootJobsPath = rootPath;
-
-            if (!mapping.titleField) {
-              const aiMapping = await AiFieldMapperService.inferMappingWithAi(jobs[0]);
-              mapping = { ...aiMapping, ...mapping };
-            }
-
-            return {
-              detectedType: 'JSON_API',
-              sourceUrl: rawUrl,
-              jobsEndpoint: endpoint,
-              companyName,
-              officialDomain: domain,
-              jobCount: jobs.length,
-              mappingConfig: mapping,
-              sampleJobs: jobs.slice(0, 3)
-            };
-          }
-        }
-      } catch (e: any) {
-        // Continue trying other candidates
-      }
-    }
-
-    // Strategy C: Common JSON Endpoints (controlled probing)
-    const baseOrigin = new URL(initialResponse.finalUrl).origin;
-    const probePaths = [
-      '/api/jobs',
-      '/api/jobs.json',
-      '/jobs.json',
-      '/api/careers',
-      '/api/openings',
-      '/api/v1/jobs',
-      '/careers.json',
-      '/openings.json'
-    ];
-
-    for (const probePath of probePaths) {
-      const probeUrl = `${baseOrigin}${probePath}`;
-      try {
-        const probeRes = await safeFetchUrl(probeUrl, { timeoutMs: 5000 });
-        if (probeRes.status === 200) {
-          const jsonPayload = JSON.parse(probeRes.text);
-          const { jobs, rootPath } = FieldMapperService.extractJobsArray(jsonPayload);
-          if (jobs.length > 0) {
-            let mapping = FieldMapperService.inferDeterministicMapping(jobs);
-            mapping.rootJobsPath = rootPath;
-
-            if (!mapping.titleField) {
-              const aiMapping = await AiFieldMapperService.inferMappingWithAi(jobs[0]);
-              mapping = { ...aiMapping, ...mapping };
-            }
-
-            return {
-              detectedType: 'JSON_API',
-              sourceUrl: rawUrl,
-              jobsEndpoint: probeUrl,
-              companyName,
-              officialDomain: domain,
-              jobCount: jobs.length,
-              mappingConfig: mapping,
-              sampleJobs: jobs.slice(0, 3)
-            };
-          }
-        }
-      } catch (probeErr) {
-        // continue probing
-      }
-    }
-
-    // Strategy D2: Embedded Application State (Next.js RSC, __NEXT_DATA__, JSON state in script tags)
-    try {
-      const embeddedResult = EmbeddedDataDiscoveryService.extractEmbeddedJobsFromHtml(html);
-      if (embeddedResult && embeddedResult.jobs.length > 0) {
-        logger.info(`[JobSourceDiscoveryService] Discovered ${embeddedResult.jobs.length} jobs via Embedded Data (${embeddedResult.sourceType})`);
-        let mapping = FieldMapperService.inferDeterministicMapping(embeddedResult.jobs);
-        if (embeddedResult.rootPath) {
-          mapping.rootJobsPath = embeddedResult.rootPath;
-        }
-
-        if (!mapping.titleField) {
-          const aiMapping = await AiFieldMapperService.inferMappingWithAi(embeddedResult.jobs[0]);
-          mapping = { ...aiMapping, ...mapping };
-        }
-
-        return {
-          detectedType: 'EMBEDDED_DATA',
-          sourceUrl: rawUrl,
-          jobsEndpoint: initialResponse.finalUrl,
-          companyName,
-          officialDomain: domain,
-          jobCount: embeddedResult.jobs.length,
-          mappingConfig: mapping,
-          sampleJobs: embeddedResult.jobs.slice(0, 3)
-        };
-      }
-    } catch (embErr: any) {
-      logger.warn(`[JobSourceDiscoveryService] Embedded data discovery failed: ${embErr.message}`);
-    }
-
-    // Strategy E: HTML repeated structure & detail pages discovery
-    try {
-      logger.info(`[JobSourceDiscoveryService] Probing for HTML job structures on: ${initialResponse.finalUrl}`);
-      const htmlResult = await HtmlJobDiscoveryService.extractJobsFromHtml(initialResponse.finalUrl, html);
-      if (htmlResult && htmlResult.jobs.length > 0) {
-        logger.info(`[JobSourceDiscoveryService] Strategy E extracted ${htmlResult.jobs.length} jobs using strategy: ${htmlResult.strategy}`);
-        
-        let mapping = FieldMapperService.inferDeterministicMapping(htmlResult.jobs);
-        if (!mapping.titleField) {
-          mapping.titleField = 'title';
-        }
-        if (!mapping.descriptionField) {
-          mapping.descriptionField = 'description';
-        }
-
-        return {
-          detectedType: 'HTML',
-          sourceUrl: rawUrl,
-          jobsEndpoint: initialResponse.finalUrl,
-          companyName,
-          officialDomain: domain,
-          jobCount: htmlResult.jobs.length,
-          mappingConfig: mapping,
-          sampleJobs: htmlResult.jobs.slice(0, 3)
-        };
-      }
-    } catch (htmlErr: any) {
-      logger.warn(`[JobSourceDiscoveryService] Strategy E HTML extraction failed: ${htmlErr.message}`);
-    }
-
-    throw new Error(`Could not find a structured jobs feed on page: ${rawUrl}`);
+    return {
+      detectedType: universal.detectedType as any,
+      sourceType: universal.sourceType,
+      atsType: universal.atsType,
+      strategy: universal.strategy,
+      sourceUrl: universal.sourceUrl,
+      jobsEndpoint: universal.jobsEndpoint,
+      companyName: universal.companyName,
+      officialDomain: universal.officialDomain,
+      jobCount: universal.discoveredJobCount,
+      expectedJobCount: universal.expectedJobCount,
+      completeness: universal.completeness,
+      paginationSupported: universal.paginationSupported,
+      paginationConfig: universal.paginationConfig,
+      mappingConfig: universal.mappingConfig,
+      sampleJobs: universal.sampleJobs,
+      allDiscoveredJobs: universal.allDiscoveredJobs
+    };
   }
 
   /**
@@ -402,40 +227,45 @@ export class JobSourceDiscoveryService {
   ): Promise<SyncOutcome> {
     const outcome: SyncOutcome = { created: 0, updated: 0, skipped: 0, failed: 0 };
 
-    // 1. Fetch live jobs payload
-    const res = await safeFetchUrl(discovery.jobsEndpoint);
-    if (res.status !== 200) {
-      throw new Error(`Endpoint returned status ${res.status}`);
-    }
-
     let rawRecords: any[] = [];
-    if (discovery.detectedType === 'EMBEDDED_DATA') {
-      const embeddedResult = EmbeddedDataDiscoveryService.extractEmbeddedJobsFromHtml(res.text);
-      if (embeddedResult && embeddedResult.jobs.length > 0) {
-        rawRecords = embeddedResult.jobs;
-      }
-    } else if (discovery.detectedType === 'HTML') {
-      const htmlResult = await HtmlJobDiscoveryService.extractJobsFromHtml(discovery.jobsEndpoint, res.text);
-      if (htmlResult && htmlResult.jobs.length > 0) {
-        rawRecords = htmlResult.jobs;
-      }
-    } else if (discovery.detectedType === 'JSON_LD') {
-      const $ = cheerio.load(res.text);
-      $('script[type="application/ld+json"]').each((_, el) => {
-        try {
-          const parsed = JSON.parse($(el).html() || '{}');
-          if (parsed['@type'] === 'JobPosting') rawRecords.push(parsed);
-          else if (Array.isArray(parsed['@graph'])) {
-            parsed['@graph'].forEach((item: any) => {
-              if (item['@type'] === 'JobPosting') rawRecords.push(item);
-            });
-          }
-        } catch {}
-      });
+    if (discovery.allDiscoveredJobs && discovery.allDiscoveredJobs.length > 0) {
+      // Use jobs discovered through universal orchestrator / adapters (e.g. RippleHire, Workday, etc.)
+      rawRecords = discovery.allDiscoveredJobs;
     } else {
-      const payload = JSON.parse(res.text);
-      const { jobs } = FieldMapperService.extractJobsArray(payload);
-      rawRecords = jobs;
+      // 1. Fetch live jobs payload
+      const res = await safeFetchUrl(discovery.jobsEndpoint);
+      if (res.status !== 200) {
+        throw new Error(`Endpoint returned status ${res.status}`);
+      }
+
+      if (discovery.detectedType === 'EMBEDDED_DATA') {
+        const embeddedResult = EmbeddedDataDiscoveryService.extractEmbeddedJobsFromHtml(res.text);
+        if (embeddedResult && embeddedResult.jobs.length > 0) {
+          rawRecords = embeddedResult.jobs;
+        }
+      } else if (discovery.detectedType === 'HTML') {
+        const htmlResult = await HtmlJobDiscoveryService.extractJobsFromHtml(discovery.jobsEndpoint, res.text);
+        if (htmlResult && htmlResult.jobs.length > 0) {
+          rawRecords = htmlResult.jobs;
+        }
+      } else if (discovery.detectedType === 'JSON_LD') {
+        const $ = cheerio.load(res.text);
+        $('script[type="application/ld+json"]').each((_, el) => {
+          try {
+            const parsed = JSON.parse($(el).html() || '{}');
+            if (parsed['@type'] === 'JobPosting') rawRecords.push(parsed);
+            else if (Array.isArray(parsed['@graph'])) {
+              parsed['@graph'].forEach((item: any) => {
+                if (item['@type'] === 'JobPosting') rawRecords.push(item);
+              });
+            }
+          } catch {}
+        });
+      } else {
+        const payload = JSON.parse(res.text);
+        const { jobs } = FieldMapperService.extractJobsArray(payload);
+        rawRecords = jobs;
+      }
     }
 
     // 2. Resolve Canonical Company
@@ -468,10 +298,40 @@ export class JobSourceDiscoveryService {
 
     for (const rawItem of rawRecords) {
       try {
-        const mapped = FieldMapperService.mapRecord(rawItem, discovery.mappingConfig, defaults);
+        const itemToMap = rawItem.rawPayload || rawItem;
+        let mapped = FieldMapperService.mapRecord(itemToMap, discovery.mappingConfig, defaults);
         if (!mapped || !mapped.title) {
-          outcome.skipped++;
-          continue;
+          // If mapRecord on rawPayload didn't match (e.g. DiscoveredJobRaw fields), use DiscoveredJobRaw fields directly
+          if (rawItem.title) {
+            mapped = {
+              externalJobId: rawItem.externalJobId,
+              title: rawItem.title,
+              department: rawItem.department,
+              location: rawItem.location,
+              country: rawItem.country,
+              city: rawItem.city,
+              stateProvince: rawItem.stateProvince,
+              remoteType: rawItem.workMode,
+              employmentType: rawItem.employmentType,
+              experience: rawItem.experience,
+              salary: rawItem.salary,
+              descriptionHtml: rawItem.description,
+              descriptionText: rawItem.description,
+              responsibilities: rawItem.responsibilities,
+              requirements: rawItem.requirements,
+              skills: rawItem.skills,
+              preferredQualifications: rawItem.preferredSkills,
+              sourceUrl: rawItem.url || rawItem.applicationUrl || defaults.careersUrl,
+              applicationUrl: rawItem.applicationUrl || rawItem.url || defaults.careersUrl,
+              postedAt: rawItem.postedAt,
+              companyName: defaults.companyName,
+              sourceType: defaults.sourceType,
+              sourceName: defaults.sourceName
+            };
+          } else {
+            outcome.skipped++;
+            continue;
+          }
         }
 
         const normalized = JobNormalizationService.normalize(mapped);
@@ -490,13 +350,19 @@ export class JobSourceDiscoveryService {
     }
 
     // 5. Source-Specific Job Reconciliation (Mark missing jobs checked, expire if past 14-day threshold)
-    const { expiredCount } = await JobRepositoryV1.reconcileSourceJobs(
-      company.id,
-      discovery.detectedType,
-      seenJobIds,
-      14
-    );
-    outcome.expired = expiredCount;
+    // CRITICAL: If discovery is PARTIAL, never expire missing jobs as removed!
+    if (discovery.completeness !== 'PARTIAL') {
+      const { expiredCount } = await JobRepositoryV1.reconcileSourceJobs(
+        company.id,
+        discovery.detectedType,
+        seenJobIds,
+        14
+      );
+      outcome.expired = expiredCount;
+    } else {
+      outcome.expired = 0;
+      logger.info(`[JobSourceDiscoveryService] Discovery is PARTIAL (${rawRecords.length}/${discovery.expectedJobCount}); skipping job expiration reconciliation.`);
+    }
 
     // 6. Update health and stats on CompanySource & JobSourceConfiguration
     await CompanyRepository.updateSourceHealth(companySource.id, true);
@@ -552,10 +418,16 @@ export class JobSourceDiscoveryService {
           discoveryMetadata: {
             discoveredAt: new Date().toISOString(),
             jobCount: discovery.jobCount,
-            detectedType: discovery.detectedType
+            expectedJobCount: discovery.expectedJobCount ?? null,
+            completeness: discovery.completeness ?? 'UNKNOWN',
+            detectedType: discovery.detectedType,
+            atsType: discovery.atsType ?? null,
+            strategy: discovery.strategy ?? null,
+            paginationSupported: discovery.paginationSupported ?? false,
+            paginationConfig: discovery.paginationConfig ?? null
           },
           lastDiscoveryAt: new Date(),
-          healthStatus: SourceHealth.HEALTHY
+          healthStatus: discovery.completeness === 'PARTIAL' ? SourceHealth.DEGRADED : SourceHealth.HEALTHY
         }
       });
 

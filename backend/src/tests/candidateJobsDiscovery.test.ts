@@ -39,7 +39,7 @@ describe('Candidate Jobs Discovery & Exploration Suite (Regression for 0 Jobs Bu
           in: ['hash_test_job_1', 'hash_test_job_2', 'hash_test_job_3', 'hash_test_job_4', 'hash_test_job_5', 'hash_test_job_6']
         }
       }
-    }).catch(() => {});
+    }).catch(() => { });
 
     // Create or retrieve 2 test companies and seed jobs if needed
     testCompanyA = await prisma.company.upsert({
@@ -197,10 +197,10 @@ describe('Candidate Jobs Discovery & Exploration Suite (Regression for 0 Jobs Bu
         }
       });
       if (testCompanyA) {
-        await prisma.company.delete({ where: { id: testCompanyA.id } }).catch(() => {});
+        await prisma.company.delete({ where: { id: testCompanyA.id } }).catch(() => { });
       }
       if (testCompanyB) {
-        await prisma.company.delete({ where: { id: testCompanyB.id } }).catch(() => {});
+        await prisma.company.delete({ where: { id: testCompanyB.id } }).catch(() => { });
       }
     } catch {
       // Ignore cleanup error
