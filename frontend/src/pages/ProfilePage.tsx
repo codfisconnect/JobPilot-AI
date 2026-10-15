@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useApp } from "../context/AppContext";
+import { useAuth } from "../context/AuthContext";
 import { Card } from "../components/common/Card";
 import { Button } from "../components/common/Button";
 import { Badge } from "../components/common/Badge";
@@ -30,16 +31,22 @@ import { ResumeUploadManager } from '../components/profile/ResumeUploadManager';
 
 export const ProfilePage: React.FC = () => {
   const { activeCandidate, refreshCandidates, showToast } = useApp();
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [profile, setProfile] = useState<any>(activeCandidate);
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const loadV1Profile = React.useCallback(async () => {
+  const loadV1Profile = React.useCallback(async (forceRefresh = false) => {
+    // If authentication bootstrap is still resolving, do not fire prematurely
+    if (isAuthLoading) {
+      return;
+    }
+
     try {
       setLoading(true);
       setError(null);
-      const v1Data = await apiClient.getCandidateProfile();
+      const v1Data = await apiClient.getCandidateProfile(forceRefresh);
       if (v1Data) {
         // Adapt v1 fields to component format
         setProfile({
@@ -114,19 +121,26 @@ export const ProfilePage: React.FC = () => {
       if (activeCandidate) {
         setProfile(activeCandidate);
       } else {
-        setError(err.message || 'Unable to connect to candidate profile service');
+        const msg = err?.message || '';
+        if (msg.includes('Authorization') || msg.includes('token') || msg.includes('401')) {
+          setError('Your session has expired. Please sign in again.');
+        } else {
+          setError('Unable to load your candidate profile. Please check your connection and try again.');
+        }
       }
     } finally {
       setLoading(false);
     }
-  }, [activeCandidate]);
+  }, [activeCandidate, isAuthLoading]);
 
-  // Sync with production /api/v1/candidates/me on mount
+  // Sync with production /api/v1/candidates/me on mount or when auth state becomes ready
   React.useEffect(() => {
-    loadV1Profile();
-  }, [loadV1Profile]);
+    if (!isAuthLoading) {
+      loadV1Profile();
+    }
+  }, [loadV1Profile, isAuthLoading]);
 
-  if (loading) {
+  if (isAuthLoading || (loading && !profile)) {
     return (
       <div className="profile-page" style={{ padding: '40px 0', textAlign: 'center' }}>
         <div style={{ display: 'inline-flex', alignItems: 'center', gap: '12px', color: 'var(--text-muted)' }}>
@@ -144,7 +158,7 @@ export const ProfilePage: React.FC = () => {
           <AlertCircle size={36} color="#ef4444" style={{ margin: '0 auto 12px' }} />
           <h3 style={{ color: '#ef4444', marginBottom: '8px' }}>Failed to Load Profile</h3>
           <p style={{ color: 'var(--text-secondary)', marginBottom: '16px' }}>{error}</p>
-          <Button variant="primary" onClick={loadV1Profile}>Retry Loading</Button>
+          <Button variant="primary" onClick={() => loadV1Profile(true)}>Retry Loading</Button>
         </div>
       </div>
     );
@@ -154,7 +168,7 @@ export const ProfilePage: React.FC = () => {
     return (
       <div className="profile-page" style={{ padding: '40px 0', textAlign: 'center' }}>
         <p style={{ color: 'var(--text-muted)', marginBottom: '12px' }}>No candidate profile found.</p>
-        <Button variant="primary" onClick={loadV1Profile}>Initialize Profile</Button>
+        <Button variant="primary" onClick={() => loadV1Profile(true)}>Initialize Profile</Button>
       </div>
     );
   }
