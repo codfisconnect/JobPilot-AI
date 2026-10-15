@@ -26,6 +26,8 @@ export class JobControllerV1 {
         salaryMax,
         salaryCurrency,
         sourceType,
+        postedAfter,
+        postedDays,
         sortBy,
         page,
         pageSize
@@ -33,6 +35,19 @@ export class JobControllerV1 {
 
       const parsedPage = Math.max(1, Math.min(10000, Number(page) || 1));
       const parsedPageSize = Math.max(1, Math.min(100, Number(pageSize) || 20));
+
+      let computedPostedAfter: Date | undefined = undefined;
+      if (postedAfter && !isNaN(new Date(String(postedAfter)).getTime())) {
+        computedPostedAfter = new Date(String(postedAfter));
+      } else if (postedDays && !isNaN(Number(postedDays))) {
+        const days = Number(postedDays);
+        computedPostedAfter = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
+      }
+
+      const validSortOptions = ['latest', 'oldest', 'salary', 'company', 'location', 'relevance'];
+      const resolvedSortBy = typeof sortBy === 'string' && validSortOptions.includes(sortBy)
+        ? (sortBy as any)
+        : 'latest';
 
       const result = await JobQueryService.searchJobs({
         query: query ? String(query).slice(0, 200) : undefined,
@@ -51,7 +66,8 @@ export class JobControllerV1 {
         salaryMax: !isNaN(Number(salaryMax)) ? Number(salaryMax) : undefined,
         salaryCurrency: salaryCurrency ? String(salaryCurrency).slice(0, 10) : undefined,
         sourceType: sourceType ? String(sourceType).slice(0, 50) : undefined,
-        sortBy: sortBy === 'salary' || sortBy === 'latest' ? sortBy : 'latest',
+        postedAfter: computedPostedAfter,
+        sortBy: resolvedSortBy,
         page: parsedPage,
         pageSize: parsedPageSize,
         status: JobStatus.ACTIVE

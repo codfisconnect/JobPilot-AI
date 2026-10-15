@@ -29,8 +29,33 @@ export const app = express();
 app.use(requestLogger);
 
 // 2. Security & Cookie Parsing
+const allowedOrigins = (env.CORS_ORIGIN || 'http://localhost:5173')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
 app.use(cors({
-  origin: env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: (requestOrigin, callback) => {
+    // Allow non-browser requests or same-origin
+    if (!requestOrigin) return callback(null, true);
+    
+    // Exact match in allowed origins list
+    if (allowedOrigins.includes(requestOrigin)) {
+      return callback(null, true);
+    }
+    
+    // Allow local development ports
+    if (/^https?:\/\/localhost(:\d+)?$/.test(requestOrigin) || /^https?:\/\/127\.0\.0\.1(:\d+)?$/.test(requestOrigin)) {
+      return callback(null, true);
+    }
+
+    // Allow official PilotMama and Vercel deployments
+    if (/^https:\/\/.*\.vercel\.app$/.test(requestOrigin) || /^https:\/\/.*\.pilotmama\.io$/.test(requestOrigin) || /^https:\/\/pilotmama\.io$/.test(requestOrigin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error(`Origin ${requestOrigin} not permitted by CORS`));
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-request-id']

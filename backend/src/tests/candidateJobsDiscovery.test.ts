@@ -186,6 +186,27 @@ describe('Candidate Jobs Discovery & Exploration Suite (Regression for 0 Jobs Bu
     assert.ok(detailRes.body.data.company.name);
   });
 
+  it('10. Sorting: supports oldest, newest, company, location, and salary', async () => {
+    const resOldest = await supertest(app).get('/api/v1/jobs?sortBy=oldest&pageSize=5');
+    assert.strictEqual(resOldest.status, 200);
+    assert.ok(Array.isArray(resOldest.body.data));
+
+    const resCompany = await supertest(app).get('/api/v1/jobs?sortBy=company&pageSize=5');
+    assert.strictEqual(resCompany.status, 200);
+    assert.ok(Array.isArray(resCompany.body.data));
+
+    const resLocation = await supertest(app).get('/api/v1/jobs?sortBy=location&pageSize=5');
+    assert.strictEqual(resLocation.status, 200);
+    assert.ok(Array.isArray(resLocation.body.data));
+  });
+
+  it('11. Filter: postedDays filters jobs relative to current timestamp', async () => {
+    const res = await supertest(app).get('/api/v1/jobs?postedDays=30');
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.success, true);
+    assert.ok(Array.isArray(res.body.data));
+  });
+
   after(async () => {
     // Clean up seeded candidate test jobs and companies
     try {

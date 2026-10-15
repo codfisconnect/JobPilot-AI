@@ -26,10 +26,17 @@ export interface PaginatedResponse<T> {
 const API_V1_BASE = (import.meta.env?.VITE_API_URL) || (import.meta.env?.PROD ? 'https://jobpilot-ai-backend-a8h6.onrender.com/api/v1' : '/api/v1');
 
 export class ApiClient {
-  private accessToken: string | null = null;
+  private accessToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('pilotmama_access_token') : null;
 
   setToken(token: string | null) {
     this.accessToken = token;
+    if (typeof window !== 'undefined') {
+      if (token) {
+        localStorage.setItem('pilotmama_access_token', token);
+      } else {
+        localStorage.removeItem('pilotmama_access_token');
+      }
+    }
   }
 
   getToken(): string | null {
@@ -358,23 +365,15 @@ export class ApiClient {
       }
     });
     const qs = query.toString();
-    const headers = new Headers();
-    if (this.accessToken) {
-      headers.set('Authorization', `Bearer ${this.accessToken}`);
-    }
-    const res = await fetch(`${API_V1_BASE}/jobs${qs ? `?${qs}` : ''}`, {
-      headers,
-      credentials: 'include'
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok || json.success === false) {
-      throw json.error || new Error(json.message || 'Failed to fetch jobs');
-    }
-    return { data: json.data || [], pagination: json.pagination };
+    return this.requestPaginated<CanonicalJob>(`/jobs${qs ? `?${qs}` : ''}`);
   }
 
   async getCanonicalJobById(id: string): Promise<any> {
     return this.request<any>(`/jobs/${id}`);
+  }
+
+  async listCompanies(limit = 100): Promise<any[]> {
+    return this.request<any[]>(`/companies?limit=${limit}`);
   }
 
   async syncJobs(sourceType?: string): Promise<any> {

@@ -22,7 +22,7 @@ export interface JobFilterParams {
   postedBefore?: Date;
   sourceType?: string;
   status?: JobStatus;
-  sortBy?: 'latest' | 'salary' | 'relevance';
+  sortBy?: 'latest' | 'oldest' | 'salary' | 'relevance' | 'company' | 'location';
   page?: number;
   pageSize?: number;
 }
@@ -306,8 +306,14 @@ export class JobRepositoryV1 {
 
     // Determine sorting
     let orderBy: Prisma.JobOrderByWithRelationInput = { postedAt: 'desc' };
-    if (params.sortBy === 'salary') {
+    if (params.sortBy === 'oldest') {
+      orderBy = { postedAt: 'asc' };
+    } else if (params.sortBy === 'salary') {
       orderBy = { salaryMax: 'desc' };
+    } else if (params.sortBy === 'company') {
+      orderBy = { company: { name: 'asc' } };
+    } else if (params.sortBy === 'location') {
+      orderBy = { location: 'asc' };
     }
 
     const [total, items] = await Promise.all([

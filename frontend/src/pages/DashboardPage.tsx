@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Card } from "../components/common/Card";
 import { Badge } from "../components/common/Badge";
 import { Button } from "../components/common/Button";
@@ -21,10 +21,9 @@ import {
   Send,
   Zap,
   Target,
-  GraduationCap
+  GraduationCap,
+  RefreshCw
 } from 'lucide-react';
-import { CandidateDashboardWelcome } from "../components/dashboard/CandidateDashboardWelcome";
-import { DashboardReadiness } from "../components/dashboard/dashboardWelcome.types";
 import './DashboardPage.css';
 
 interface DashboardPageProps {
@@ -33,9 +32,14 @@ interface DashboardPageProps {
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const { user } = useAuth();
+  
+  // Independent State Streams
+  const [latestJobs, setLatestJobs] = useState<any[]>([]);
+  const [jobsLoading, setJobsLoading] = useState<boolean>(true);
+  const [jobsError, setJobsError] = useState<string | null>(null);
+
   const [profile, setProfile] = useState<any>(null);
   const [resumes, setResumes] = useState<any[]>([]);
-  const [recommendedJobs, setRecommendedJobs] = useState<any[]>([]);
   const [appStats, setAppStats] = useState<any>({
     SAVED: 0,
     APPLIED: 0,
@@ -44,114 +48,70 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     REJECTED: 0
   });
   const [skillGaps, setSkillGaps] = useState<any[]>([]);
-  const [readiness, setReadiness] = useState<DashboardReadiness>({
-    profile: false,
-    resume: false,
-    jobs: false,
-    applications: false,
-    careerIntelligence: false,
-    isReady: false,
-    error: null
-  });
-  const [loading, setLoading] = useState<boolean>(true);
-  const [error, setError] = useState<string | null>(null);
+  const [secondaryLoading, setSecondaryLoading] = useState<boolean>(true);
 
-  const loadCandidateDashboard = React.useCallback(async () => {
+  // 1. HIGH-PRIORITY: Load Latest Jobs Immediately
+  const loadLatestJobs = useCallback(async () => {
+    try {
+      setJobsLoading(true);
+      setJobsError(null);
+      const res = await apiClient.getCanonicalJobs({ pageSize: 6, sortBy: 'latest' });
+      setLatestJobs(res?.data || []);
+    } catch (err: any) {
+      console.warn('Could not load latest jobs directly:', err);
+      setJobsError(err?.message || 'Unable to load latest opportunities');
+    } finally {
+      setJobsLoading(false);
+    }
+  }, []);
+
+  // 2. PROGRESSIVE BACKGROUND: Load Supporting Profile, Resume, Applications, & Skill Intelligence
+  const loadSupportingData = useCallback(async () => {
     let active = true;
     try {
-      setLoading(true);
-      setError(null);
-      setReadiness({
-        profile: false,
-        resume: false,
-        jobs: false,
-        applications: false,
-        careerIntelligence: false,
-        isReady: false,
-        error: null
-      });
+      setSecondaryLoading(true);
 
-      // Track individual asynchronous completion progressively
-      let profData: any = null;
-      let resData: any[] = [];
-      let jobsData: any[] = [];
-      let appsData: any = null;
-
-      const profilePromise = apiClient.getCandidateProfile()
-        .then(res => {
-          if (!active) return;
-          profData = res;
-          setProfile(res);
-          setReadiness(prev => ({ ...prev, profile: true }));
-        })
-        .catch(() => {
-          if (!active) return;
-          setReadiness(prev => ({ ...prev, profile: true }));
-        });
-
-      const resumesPromise = apiClient.listResumes()
-        .then(res => {
-          if (!active) return;
-          resData = res || [];
-          setResumes(resData);
-          setReadiness(prev => ({ ...prev, resume: true }));
-        })
-        .catch(() => {
-          if (!active) return;
-          setReadiness(prev => ({ ...prev, resume: true }));
-        });
-
-      const jobsPromise = apiClient.getCanonicalJobs({ pageSize: 5 })
-        .then(res => {
-          if (!active) return;
-          jobsData = res?.data || [];
-          setRecommendedJobs(jobsData.slice(0, 4));
-          setReadiness(prev => ({ ...prev, jobs: true }));
-        })
-        .catch(() => {
-          if (!active) return;
-          setReadiness(prev => ({ ...prev, jobs: true }));
-        });
-
-      const appsPromise = apiClient.listApplications({ pageSize: 100 })
-        .then(res => {
-          if (!active) return;
-          appsData = res?.data || [];
-          const counts = {
-            SAVED: 0,
-            APPLIED: 0,
-            INTERVIEW: 0,
-            OFFER: 0,
-            REJECTED: 0
-          };
-          appsData.forEach((app: any) => {
-            const s = (app.status || '').toUpperCase();
-            if (s === 'SAVED') counts.SAVED++;
-            else if (s === 'APPLIED' || s === 'APPLICATION_STARTED') counts.APPLIED++;
-            else if (s.includes('INTERVIEW') || s === 'HR_SCREEN' || s === 'TECHNICAL') counts.INTERVIEW++;
-            else if (s === 'OFFER') counts.OFFER++;
-            else if (s === 'REJECTED') counts.REJECTED++;
-          });
-          setAppStats(counts);
-          setReadiness(prev => ({ ...prev, applications: true }));
-        })
-        .catch(() => {
-          if (!active) return;
-          setReadiness(prev => ({ ...prev, applications: true }));
-        });
-
-      // Wait for essential initial datasets to resolve
-      await Promise.all([profilePromise, resumesPromise, jobsPromise, appsPromise]);
+      const [profileRes, resumesRes, appsRes] = await Promise.allSettled([
+        apiClient.getCandidateProfile(),
+        apiClient.listResumes(),
+        apiClient.listApplications({ pageSize: 100 })
+      ]);
 
       if (!active) return;
 
-      // Extract top candidate skills to compute top 2-3 actionable skill gaps
+      let profData: any = null;
+      if (profileRes.status === 'fulfilled') {
+        profData = profileRes.value;
+        setProfile(profData);
+      }
+
+      let resData: any[] = [];
+      if (resumesRes.status === 'fulfilled') {
+        resData = resumesRes.value || [];
+        setResumes(resData);
+      }
+
+      if (appsRes.status === 'fulfilled') {
+        const appsData = appsRes.value?.data || [];
+        const counts = { SAVED: 0, APPLIED: 0, INTERVIEW: 0, OFFER: 0, REJECTED: 0 };
+        appsData.forEach((app: any) => {
+          const s = (app.status || '').toUpperCase();
+          if (s === 'SAVED') counts.SAVED++;
+          else if (s === 'APPLIED' || s === 'APPLICATION_STARTED') counts.APPLIED++;
+          else if (s.includes('INTERVIEW') || s === 'HR_SCREEN' || s === 'TECHNICAL') counts.INTERVIEW++;
+          else if (s === 'OFFER') counts.OFFER++;
+          else if (s === 'REJECTED') counts.REJECTED++;
+        });
+        setAppStats(counts);
+      }
+
+      // Compute Top Skill Gaps if candidate profile and jobs are available
       const candidateSkills = new Set(
         (profData?.skills || []).map((s: any) => (s.skill?.name || s.name || '').toLowerCase())
       );
 
       const gapMap = new Map<string, number>();
-      jobsData.forEach((job: any) => {
+      latestJobs.forEach((job: any) => {
         (job.skills || []).forEach((sk: any) => {
           const skillName = sk.name || sk.skill?.name;
           if (skillName && !candidateSkills.has(skillName.toLowerCase())) {
@@ -170,28 +130,28 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         }));
 
       setSkillGaps(sortedGaps);
-      setReadiness(prev => ({ ...prev, careerIntelligence: true, isReady: true }));
-      setLoading(false);
-    } catch (err: any) {
-      if (!active) return;
-      console.error('Failed to load candidate dashboard:', err);
-      const errMsg = err?.message || 'Unable to prepare career workspace';
-      setError(errMsg);
-      setReadiness(prev => ({ ...prev, error: errMsg }));
-      setLoading(false);
+    } catch {
+      // Graceful fallback
+    } finally {
+      if (active) {
+        setSecondaryLoading(false);
+      }
     }
 
     return () => {
       active = false;
     };
-  }, []);
+  }, [latestJobs]);
 
+  // Trigger high-priority latest jobs on mount
   useEffect(() => {
-    const cleanup = loadCandidateDashboard();
-    return () => {
-      cleanup.then(fn => fn?.());
-    };
-  }, [loadCandidateDashboard, user?.id]);
+    loadLatestJobs();
+  }, [loadLatestJobs]);
+
+  // Trigger secondary background supporting data
+  useEffect(() => {
+    loadSupportingData();
+  }, [loadSupportingData, user?.id]);
 
   // Compute profile completeness score based on candidate fields
   let completionPoints = 0;
@@ -208,62 +168,32 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const candidateName = profile?.fullName || user?.candidateProfile?.fullName || user?.email?.split('@')[0] || 'Candidate';
   const masterResume = resumes.find(r => r.isMaster) || resumes[0];
 
-  // Determine the single next best action (Part 3.E)
-  let nextAction = {
-    title: 'Explore Matching Jobs',
-    desc: 'Browse verified job listings that align with your career profile and experience.',
-    buttonText: 'Discover Jobs',
-    tab: 'jobs'
+  const formatRelativeDate = (dateStr?: string) => {
+    if (!dateStr) return 'Recently posted';
+    const time = new Date(dateStr).getTime();
+    if (isNaN(time)) return 'Recently posted';
+    const diffHours = Math.floor((Date.now() - time) / (1000 * 60 * 60));
+    if (diffHours < 1) return 'Posted just now';
+    if (diffHours < 24) return `Posted ${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+    const diffDays = Math.floor(diffHours / 24);
+    if (diffDays === 1) return 'Posted yesterday';
+    if (diffDays < 30) return `Posted ${diffDays} days ago`;
+    return 'Posted over a month ago';
   };
-
-  if (completeness < 70) {
-    nextAction = {
-      title: 'Complete Your Career Profile',
-      desc: 'Add your summary, work experiences, and core competencies to increase job fit accuracy.',
-      buttonText: 'Complete Profile',
-      tab: 'profile'
-    };
-  } else if (!masterResume) {
-    nextAction = {
-      title: 'Upload Your Master Resume',
-      desc: 'Upload your verified resume document to enable AI job matching and zero-fabrication tailoring.',
-      buttonText: 'Upload Master Resume',
-      tab: 'resumes'
-    };
-  } else if (skillGaps.length > 0) {
-    nextAction = {
-      title: `Close High-Demand Skill Gap: ${skillGaps[0].name}`,
-      desc: `Adding ${skillGaps[0].name} can unlock up to ${skillGaps[0].count} matching job opportunities.`,
-      buttonText: 'View Career Guidance',
-      tab: 'career'
-    };
-  }
 
   return (
     <div className="dashboard-page" style={{ position: 'relative' }}>
-      {/* Premium First-Load Welcome Experience (Smoothly transitions out upon genuine readiness) */}
-      {(!readiness.isReady || readiness.error) && (
-        <CandidateDashboardWelcome
-          readiness={readiness}
-          onRetry={loadCandidateDashboard}
-          onContinueAnyway={() => {
-            setReadiness(prev => ({ ...prev, isReady: true, error: null }));
-            setLoading(false);
-          }}
-        />
-      )}
-
-      {/* Action-Oriented Hero Banner */}
+      {/* 1. Action-Oriented Hero Banner */}
       <div className="dash-hero">
         <div className="dash-hero-content">
           <Badge variant="indigo" size="sm">
-            Personal Career Assistant
+            Personal Career Operating System
           </Badge>
           <h2 className="dash-hero-title">
             Welcome back, {candidateName}
           </h2>
           <p className="dash-hero-subtitle">
-            Focus on high-probability opportunities, tailored applications, and actionable career readiness.
+            Discover real career opportunities instantly, build verified resumes, and track your applications.
           </p>
         </div>
         <div className="dash-hero-actions" style={{ display: 'flex', gap: '10px' }}>
@@ -279,54 +209,144 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             icon={<Briefcase size={16} />}
             onClick={() => onNavigate('jobs')}
           >
-            Find Jobs
+            Explore All Jobs
           </Button>
         </div>
       </div>
 
-      {/* Part 3.E: Single Clear Recommended Next Action */}
-      <Card style={{ padding: '20px 24px', background: 'linear-gradient(135deg, rgba(99, 102, 241, 0.12), rgba(16, 185, 129, 0.08))', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '16px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '16px' }}>
-            <div style={{ width: '44px', height: '44px', borderRadius: '10px', background: 'var(--accent-primary, #6366f1)', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <Zap size={22} />
-            </div>
-            <div>
-              <div style={{ fontSize: '0.75rem', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.05em', color: '#818cf8' }}>
-                Recommended Next Action
-              </div>
-              <h3 style={{ margin: '2px 0 4px', fontSize: '1.1rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                {nextAction.title}
+      {/* 2. JOBS-FIRST SECTION: Latest Real Canonical Opportunities (Highest Priority) */}
+      <div className="dashboard-jobs-first-section">
+        <div className="section-head" style={{ marginBottom: '16px' }}>
+          <div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#10b981' }} />
+              <h3 className="section-title" style={{ fontSize: '1.25rem', fontWeight: 800 }}>
+                Latest Verified Job Opportunities
               </h3>
-              <p style={{ margin: 0, fontSize: '0.85rem', color: 'var(--text-secondary)' }}>
-                {nextAction.desc}
-              </p>
             </div>
+            <p style={{ margin: '2px 0 0', fontSize: '0.825rem', color: 'var(--text-muted)' }}>
+              Real-time openings from connected company career sources. Newest first.
+            </p>
           </div>
-          <Button
-            variant="primary"
-            icon={<ArrowRight size={16} />}
-            onClick={() => onNavigate(nextAction.tab)}
-          >
-            {nextAction.buttonText}
-          </Button>
+          <button className="link-action" onClick={() => onNavigate('jobs')}>
+            Browse Full Catalog →
+          </button>
         </div>
-      </Card>
 
-      {/* Part 3.A: Profile Status + Part 3.D: Applications Pipeline Summary */}
+        {/* Jobs Loading Stream */}
+        {jobsLoading && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+            {[1, 2, 3].map(n => (
+              <Card key={n} style={{ padding: '24px', minHeight: '180px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <div style={{ height: '14px', width: '40%', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px' }} />
+                <div style={{ height: '22px', width: '80%', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '4px' }} />
+                <div style={{ height: '14px', width: '60%', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', marginTop: 'auto' }} />
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Jobs Error Stream (Recoverable without blocking page) */}
+        {jobsError && !jobsLoading && (
+          <Card style={{ padding: '24px', textAlign: 'center', border: '1px solid rgba(239, 68, 68, 0.3)' }}>
+            <AlertCircle size={28} style={{ color: '#f87171', margin: '0 auto 8px' }} />
+            <p style={{ color: 'var(--text-primary)', fontWeight: 600, margin: '0 0 6px' }}>{jobsError}</p>
+            <Button variant="outline" size="sm" onClick={loadLatestJobs}>
+              Retry Opportunities
+            </Button>
+          </Card>
+        )}
+
+        {/* Jobs List Grid */}
+        {!jobsLoading && !jobsError && latestJobs.length > 0 && (
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
+            {latestJobs.map((job) => (
+              <Card key={job.id} className="job-overview-card" style={{ padding: '18px 20px', display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                <div>
+                  <div className="job-card-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '8px' }}>
+                    <span className="job-company" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
+                      {job.company?.name || 'Verified Company'}
+                    </span>
+                    <Badge variant="indigo" size="sm">
+                      {formatRelativeDate(job.postedAt || job.firstSeenAt)}
+                    </Badge>
+                  </div>
+
+                  <h4 className="job-role" style={{ margin: '0 0 10px', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)', lineHeight: 1.3 }}>
+                    {job.title}
+                  </h4>
+
+                  <div className="job-meta" style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '14px' }}>
+                    <span className="meta-item" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                      <MapPin size={13} /> {job.location || job.city || 'Location unlisted'}
+                    </span>
+                    <span className="meta-item">
+                      {job.remoteType ? job.remoteType.replace('_', ' ') : 'Flexible'}
+                    </span>
+                    <span className="meta-item">
+                      {job.employmentType ? job.employmentType.replace('_', ' ') : 'Full Time'}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="job-card-bottom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    icon={<Bookmark size={14} />}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      apiClient.createApplication({ jobId: job.id, status: 'SAVED' })
+                        .then(() => alert('Job saved to your applications!'))
+                        .catch(() => alert('Job already saved.'));
+                    }}
+                  >
+                    Save
+                  </Button>
+
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    icon={<ArrowRight size={14} />}
+                    onClick={() => onNavigate('jobs', job.id)}
+                  >
+                    View Job / Apply
+                  </Button>
+                </div>
+              </Card>
+            ))}
+          </div>
+        )}
+
+        {/* Empty State */}
+        {!jobsLoading && !jobsError && latestJobs.length === 0 && (
+          <Card className="empty-panel" style={{ padding: '36px', textAlign: 'center' }}>
+            <Briefcase size={36} style={{ color: 'var(--text-muted)', margin: '0 auto 12px' }} />
+            <h4 style={{ margin: '0 0 6px', color: 'var(--text-primary)' }}>No active job opportunities yet</h4>
+            <p style={{ color: 'var(--text-muted)', fontSize: '0.875rem', marginBottom: '14px' }}>
+              Opportunities will appear as job sources synchronize canonical openings.
+            </p>
+            <Button variant="outline" size="sm" onClick={() => onNavigate('jobs')}>
+              Explore Catalog
+            </Button>
+          </Card>
+        )}
+      </div>
+
+      {/* 3. SECONDARY SUPPORTING SUMMARY CARDS (Progressively Populated) */}
       <div className="kpi-grid">
-        {/* Profile Completion */}
+        {/* Profile Completion Card (Contextual encouragement, never blocking) */}
         <Card className="kpi-card" hoverable onClick={() => onNavigate('profile')}>
           <div className="kpi-icon-wrap kpi-blue">
             <User size={22} />
           </div>
           <div className="kpi-data">
             <span className="kpi-val">{completeness}%</span>
-            <span className="kpi-label">Profile Completion</span>
+            <span className="kpi-label">Profile Readiness</span>
           </div>
         </Card>
 
-        {/* Resume Status */}
+        {/* Master Resume Status */}
         <Card className="kpi-card" hoverable onClick={() => onNavigate('resumes')}>
           <div className="kpi-icon-wrap kpi-emerald">
             <FileText size={22} />
@@ -336,12 +356,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
               {masterResume ? 'Master Active' : 'Pending Upload'}
             </span>
             <span className="kpi-label">
-              {masterResume ? `Status: ${masterResume.status}` : 'Upload Resume'}
+              {masterResume ? `Verified Document` : 'Upload Resume'}
             </span>
           </div>
         </Card>
 
-        {/* Compact Application Pipeline: Saved & Applied */}
+        {/* Active Application Pipeline */}
         <Card className="kpi-card" hoverable onClick={() => onNavigate('applications')}>
           <div className="kpi-icon-wrap kpi-indigo">
             <Send size={22} />
@@ -352,8 +372,8 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           </div>
         </Card>
 
-        {/* Compact Application Pipeline: Interview & Offers */}
-        <Card className="kpi-card" hoverable onClick={() => onNavigate('applications')}>
+        {/* Interview Readiness */}
+        <Card className="kpi-card" hoverable onClick={() => onNavigate('interview')}>
           <div className="kpi-icon-wrap kpi-amber">
             <Sparkles size={22} />
           </div>
@@ -364,121 +384,15 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
         </Card>
       </div>
 
-      {/* Main Split: Recommended Jobs & Skill Gaps */}
+      {/* 4. LOWER PROGRESSION: High-Impact Skill Gaps & Interview Prep Intelligence */}
       <div className="dash-columns">
-        {/* Left Column: Part 3.B - Recommended Jobs (3-5 cards) */}
-        <div className="dash-col">
-          <div className="section-head">
-            <div>
-              <h3 className="section-title">Recommended Jobs For You</h3>
-              <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Curated matches tailored to your career profile and experience.
-              </p>
-            </div>
-            <button className="link-action" onClick={() => onNavigate('jobs')}>
-              View All Jobs
-            </button>
-          </div>
-
-          <div className="jobs-list-flow" style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-            {recommendedJobs.length > 0 ? (
-              recommendedJobs.map((job, idx) => {
-                // Calculated truthful match indicator (85% - 95% range for top recommendations)
-                const matchPct = 95 - (idx * 4);
-                const missingSkill = (job.skills || []).find((s: any) => {
-                  const sName = (s.name || '').toLowerCase();
-                  return !(profile?.skills || []).some((ps: any) => (ps.skill?.name || ps.name || '').toLowerCase() === sName);
-                });
-
-                return (
-                  <Card key={job.id} className="job-overview-card" style={{ padding: '18px 20px' }}>
-                    <div className="job-card-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                      <div>
-                        <span className="job-company" style={{ fontSize: '0.85rem', color: 'var(--text-muted)', fontWeight: 600 }}>
-                          {job.company?.name || 'Verified Company'}
-                        </span>
-                        <h4 className="job-role" style={{ margin: '2px 0 6px', fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                          {job.title}
-                        </h4>
-                      </div>
-                      <Badge variant="emerald" size="sm">
-                        {matchPct}% Match
-                      </Badge>
-                    </div>
-
-                    <div className="job-meta" style={{ display: 'flex', gap: '14px', fontSize: '0.825rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-                      <span className="meta-item" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
-                        <MapPin size={14} /> {job.location || job.city || 'Location unlisted'}
-                      </span>
-                      <span className="meta-item">
-                        {job.remoteType ? job.remoteType.replace('_', ' ') : 'Flexible'}
-                      </span>
-                      {job.experienceMin && (
-                        <span className="meta-item">
-                          {job.experienceMin}+ yrs experience
-                        </span>
-                      )}
-                    </div>
-
-                    {/* Short Reason for Match */}
-                    <div style={{ background: 'rgba(255, 255, 255, 0.03)', padding: '8px 12px', borderRadius: '6px', fontSize: '0.825rem', color: 'var(--text-secondary)', marginBottom: '10px' }}>
-                      <span style={{ fontWeight: 600, color: '#818cf8' }}>Why it matches: </span>
-                      Aligns with your primary background and technical qualifications.
-                    </div>
-
-                    {/* Important missing skill if applicable */}
-                    {missingSkill && (
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.8rem', color: '#fbbf24', marginBottom: '12px' }}>
-                        <AlertCircle size={14} />
-                        <span>Key missing skill: <strong>{missingSkill.name}</strong></span>
-                      </div>
-                    )}
-
-                    <div className="job-card-bottom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        icon={<Bookmark size={14} />}
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          apiClient.createApplication({ jobId: job.id, status: 'SAVED' })
-                            .then(() => alert('Job saved to your applications!'))
-                            .catch(() => alert('Job already saved.'));
-                        }}
-                      >
-                        Save
-                      </Button>
-
-                      <Button
-                        variant="primary"
-                        size="sm"
-                        icon={<ArrowRight size={14} />}
-                        onClick={() => onNavigate('jobs', job.id)}
-                      >
-                        View Job / Apply
-                      </Button>
-                    </div>
-                  </Card>
-                );
-              })
-            ) : (
-              <Card className="empty-panel" style={{ padding: '32px', textAlign: 'center' }}>
-                <p style={{ color: 'var(--text-muted)', marginBottom: '12px' }}>No recommended jobs available yet.</p>
-                <Button variant="outline" size="sm" onClick={() => onNavigate('jobs')}>
-                  Discover Opportunities
-                </Button>
-              </Card>
-            )}
-          </div>
-        </div>
-
-        {/* Right Column: Part 3.C - Top 2-3 Actionable Skill Gaps */}
+        {/* High-Impact Skill Gaps */}
         <div className="dash-col">
           <div className="section-head">
             <div>
               <h3 className="section-title">High-Impact Skill Gaps</h3>
               <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-                Target these skills to maximize job matches.
+                Target these competencies to increase match probability.
               </p>
             </div>
             <button className="link-action" onClick={() => onNavigate('career')}>
@@ -495,7 +409,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                       {gap.name}
                     </h4>
                     <Badge variant="indigo" size="sm">
-                      Important for {gap.count} {gap.count === 1 ? 'match' : 'matches'}
+                      Unlocks {gap.count} {gap.count === 1 ? 'match' : 'matches'}
                     </Badge>
                   </div>
                   <p style={{ margin: 0, fontSize: '0.825rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
@@ -510,24 +424,35 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                   Skills Well Aligned
                 </h4>
                 <p style={{ margin: 0, fontSize: '0.825rem', color: 'var(--text-muted)' }}>
-                  Your profile competencies match the active job requirements in your field.
+                  Your profile competencies match active job requirements in your domain.
                 </p>
               </Card>
             )}
           </div>
+        </div>
 
-          {/* Quick Interview Prep Widget */}
-          <Card style={{ padding: '20px', marginTop: '8px', background: 'rgba(255, 255, 255, 0.02)' }}>
+        {/* Supporting Modules Summary */}
+        <div className="dash-col">
+          <div className="section-head">
+            <div>
+              <h3 className="section-title">Preparation & Intelligence</h3>
+              <p style={{ margin: '2px 0 0', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
+                Tools to accelerate your application journey.
+              </p>
+            </div>
+          </div>
+
+          <Card style={{ padding: '20px', background: 'rgba(255, 255, 255, 0.02)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
               <div style={{ padding: '8px', background: 'rgba(99, 102, 241, 0.15)', borderRadius: '6px', color: '#818cf8' }}>
                 <GraduationCap size={18} />
               </div>
               <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                Interview Preparation
+                Interview Preparation Intelligence
               </h4>
             </div>
             <p style={{ margin: '0 0 14px', fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
-              Practice AI-generated role questions and receive constructive feedback before your upcoming interviews.
+              Practice targeted behavioral and technical questions customized to verified job postings.
             </p>
             <Button
               variant="outline"
@@ -538,8 +463,32 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
               Start Interview Prep
             </Button>
           </Card>
+
+          <Card style={{ padding: '20px', background: 'rgba(255, 255, 255, 0.02)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <div style={{ padding: '8px', background: 'rgba(16, 185, 129, 0.15)', borderRadius: '6px', color: '#34d399' }}>
+                <FileText size={18} />
+              </div>
+              <h4 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                Resume Version Vault
+              </h4>
+            </div>
+            <p style={{ margin: '0 0 14px', fontSize: '0.825rem', color: 'var(--text-secondary)' }}>
+              Inspect and manage immutable snapshots of your canonical Master Resume.
+            </p>
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<ArrowRight size={14} />}
+              onClick={() => onNavigate('resumes')}
+            >
+              Manage Resumes
+            </Button>
+          </Card>
         </div>
       </div>
     </div>
   );
 };
+
+export default DashboardPage;
