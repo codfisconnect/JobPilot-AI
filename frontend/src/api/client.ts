@@ -472,19 +472,7 @@ export class ApiClient {
       }
     });
     const qs = query.toString();
-    const headers = new Headers();
-    if (this.accessToken) {
-      headers.set('Authorization', `Bearer ${this.accessToken}`);
-    }
-    const res = await fetch(`${API_V1_BASE}/applications${qs ? `?${qs}` : ''}`, {
-      headers,
-      credentials: 'include'
-    });
-    const json = await res.json().catch(() => ({}));
-    if (!res.ok || json.success === false) {
-      throw json.error || new Error(json.message || 'Failed to fetch applications');
-    }
-    return { data: json.data || [], pagination: json.pagination };
+    return this.requestPaginated<any>(`/applications${qs ? `?${qs}` : ''}`);
   }
 
   async getApplicationById(id: string): Promise<any> {
