@@ -7,7 +7,7 @@ const REFRESH_COOKIE_NAME = 'pm_refresh_token';
 const COOKIE_OPTIONS = {
   httpOnly: true,
   secure: env.NODE_ENV === 'production',
-  sameSite: env.NODE_ENV === 'production' ? ('strict' as const) : ('lax' as const),
+  sameSite: env.NODE_ENV === 'production' ? ('none' as const) : ('lax' as const),
   maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
   path: '/api/v1/auth'
 };
@@ -89,7 +89,7 @@ export class AuthController {
       res.clearCookie(REFRESH_COOKIE_NAME, {
         httpOnly: true,
         secure: env.NODE_ENV === 'production',
-        sameSite: env.NODE_ENV === 'production' ? 'strict' : 'lax',
+        sameSite: env.NODE_ENV === 'production' ? 'none' : 'lax',
         path: '/api/v1/auth'
       });
 
