@@ -1,22 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, lazy, Suspense } from 'react';
 import { AppShell } from "./layouts/AppShell";
 import { DashboardPage } from "./pages/DashboardPage";
-import { ProfilePage } from "./pages/ProfilePage";
-import { JobsPage } from "./pages/JobsPage";
-import { JobAnalysisPage } from "./pages/JobAnalysisPage";
-import { ResumesPage } from "./pages/ResumesPage";
-import { ResumeStudioPage } from "./pages/ResumeStudioPage";
-import { ApplicationsPage } from "./pages/ApplicationsPage";
-import { SavedJobsPage } from "./pages/SavedJobsPage";
-import { InterviewPrepPage } from "./pages/InterviewPrepPage";
-import { CareerPage } from "./pages/CareerPage";
-import { SettingsPage } from "./pages/SettingsPage";
-import { PricingPage } from "./pages/PricingPage";
-import { EmployerPage } from "./pages/EmployerPage";
-import { CareerAgentPage } from "./pages/CareerAgentPage";
-import { AuthPage } from "./pages/AuthPage";
-import { AdminRoot } from "./pages/admin/AdminRoot";
-import { AdminLoginPage } from "./pages/admin/AdminLoginPage";
+
+// Lazy-loaded routes for code-splitting non-critical paths
+const ProfilePage = lazy(() => import("./pages/ProfilePage").then(m => ({ default: m.ProfilePage })));
+const JobsPage = lazy(() => import("./pages/JobsPage").then(m => ({ default: m.JobsPage })));
+const JobAnalysisPage = lazy(() => import("./pages/JobAnalysisPage").then(m => ({ default: m.JobAnalysisPage })));
+const ResumesPage = lazy(() => import("./pages/ResumesPage").then(m => ({ default: m.ResumesPage })));
+const ResumeStudioPage = lazy(() => import("./pages/ResumeStudioPage").then(m => ({ default: m.ResumeStudioPage })));
+const ApplicationsPage = lazy(() => import("./pages/ApplicationsPage").then(m => ({ default: m.ApplicationsPage })));
+const SavedJobsPage = lazy(() => import("./pages/SavedJobsPage").then(m => ({ default: m.SavedJobsPage })));
+const InterviewPrepPage = lazy(() => import("./pages/InterviewPrepPage").then(m => ({ default: m.InterviewPrepPage })));
+const CareerPage = lazy(() => import("./pages/CareerPage").then(m => ({ default: m.CareerPage })));
+const SettingsPage = lazy(() => import("./pages/SettingsPage").then(m => ({ default: m.SettingsPage })));
+const PricingPage = lazy(() => import("./pages/PricingPage").then(m => ({ default: m.PricingPage })));
+const EmployerPage = lazy(() => import("./pages/EmployerPage").then(m => ({ default: m.EmployerPage })));
+const CareerAgentPage = lazy(() => import("./pages/CareerAgentPage").then(m => ({ default: m.CareerAgentPage })));
+const AuthPage = lazy(() => import("./pages/AuthPage").then(m => ({ default: m.AuthPage })));
+const AdminRoot = lazy(() => import("./pages/admin/AdminRoot").then(m => ({ default: m.AdminRoot })));
+const AdminLoginPage = lazy(() => import("./pages/admin/AdminLoginPage").then(m => ({ default: m.AdminLoginPage })));
+
+const RouteLoadingFallback: React.FC = () => (
+  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', width: '100%' }}>
+    <div style={{
+      width: '32px',
+      height: '32px',
+      borderRadius: '50%',
+      border: '3px solid rgba(99, 102, 241, 0.2)',
+      borderTopColor: '#6366f1',
+      animation: 'spin 0.8s linear infinite'
+    }} />
+  </div>
+);
 
 export const App: React.FC = () => {
   const getTabFromPath = (path: string): string => {
@@ -123,14 +138,16 @@ export const App: React.FC = () => {
   // Dedicated Administrative Portal Layout (isolated from candidate navigation)
   if (currentTab === 'admin-login') {
     return (
-      <AdminLoginPage
-        onSuccess={() => {
-          handleNavigate('admin');
-        }}
-        onExit={() => {
-          handleNavigate('dashboard');
-        }}
-      />
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <AdminLoginPage
+          onSuccess={() => {
+            handleNavigate('admin');
+          }}
+          onExit={() => {
+            handleNavigate('dashboard');
+          }}
+        />
+      </Suspense>
     );
   }
 
@@ -146,10 +163,12 @@ export const App: React.FC = () => {
     }
 
     return (
-      <AdminRoot
-        initialSection={initialSection}
-        onExitAdmin={() => handleNavigate('dashboard')}
-      />
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <AdminRoot
+          initialSection={initialSection}
+          onExitAdmin={() => handleNavigate('dashboard')}
+        />
+      </Suspense>
     );
   }
 
@@ -159,91 +178,93 @@ export const App: React.FC = () => {
         <DashboardPage onNavigate={handleNavigate} />
       )}
 
-      {currentTab === 'profile' && (
-        <ProfilePage />
-      )}
+      <Suspense fallback={<RouteLoadingFallback />}>
+        {currentTab === 'profile' && (
+          <ProfilePage />
+        )}
 
-      {currentTab === 'resumes' && (
-        <ResumesPage onNavigate={handleNavigate} />
-      )}
+        {currentTab === 'resumes' && (
+          <ResumesPage onNavigate={handleNavigate} />
+        )}
 
-      {currentTab === 'jobs' && (
-        <JobsPage
-          onSelectJobForAnalysis={jobId => handleNavigate('analysis', jobId)}
-          preselectedJobId={contextId}
-        />
-      )}
+        {currentTab === 'jobs' && (
+          <JobsPage
+            onSelectJobForAnalysis={jobId => handleNavigate('analysis', jobId)}
+            preselectedJobId={contextId}
+          />
+        )}
 
-      {currentTab === 'analysis' && contextId && (
-        <JobAnalysisPage
-          jobId={contextId}
-          onBack={() => handleNavigate('jobs')}
-          onNavigate={handleNavigate}
-        />
-      )}
+        {currentTab === 'analysis' && contextId && (
+          <JobAnalysisPage
+            jobId={contextId}
+            onBack={() => handleNavigate('jobs')}
+            onNavigate={handleNavigate}
+          />
+        )}
 
-      {currentTab === 'studio' && (
-        <ResumeStudioPage
-          preselectedResumeId={contextId}
-          onNavigate={handleNavigate}
-        />
-      )}
+        {currentTab === 'studio' && (
+          <ResumeStudioPage
+            preselectedResumeId={contextId}
+            onNavigate={handleNavigate}
+          />
+        )}
 
-      {currentTab === 'applications' && (
-        <ApplicationsPage
-          preselectedAppId={contextId}
-          onNavigate={handleNavigate}
-        />
-      )}
+        {currentTab === 'applications' && (
+          <ApplicationsPage
+            preselectedAppId={contextId}
+            onNavigate={handleNavigate}
+          />
+        )}
 
-      {currentTab === 'saved-jobs' && (
-        <SavedJobsPage onNavigate={handleNavigate} />
-      )}
+        {currentTab === 'saved-jobs' && (
+          <SavedJobsPage onNavigate={handleNavigate} />
+        )}
 
-      {currentTab === 'interview' && (
-        <InterviewPrepPage
-          preselectedJobId={contextId}
-          onNavigate={handleNavigate}
-        />
-      )}
+        {currentTab === 'interview' && (
+          <InterviewPrepPage
+            preselectedJobId={contextId}
+            onNavigate={handleNavigate}
+          />
+        )}
 
-      {currentTab === 'career' && (
-        <CareerPage
-          onNavigate={handleNavigate}
-        />
-      )}
+        {currentTab === 'career' && (
+          <CareerPage
+            onNavigate={handleNavigate}
+          />
+        )}
 
-      {currentTab === 'learning' && (
-        <CareerPage
-          onNavigate={handleNavigate}
-        />
-      )}
+        {currentTab === 'learning' && (
+          <CareerPage
+            onNavigate={handleNavigate}
+          />
+        )}
 
-      {currentTab === 'employer' && (
-        <EmployerPage
-          onNavigate={handleNavigate}
-        />
-      )}
+        {currentTab === 'employer' && (
+          <EmployerPage
+            onNavigate={handleNavigate}
+          />
+        )}
 
-      {currentTab === 'agent' && (
-        <CareerAgentPage
-          onNavigate={handleNavigate}
-        />
-      )}
+        {currentTab === 'agent' && (
+          <CareerAgentPage
+            onNavigate={handleNavigate}
+          />
+        )}
 
-      {currentTab === 'pricing' && (
-        <PricingPage
-          onNavigate={handleNavigate}
-        />
-      )}
+        {currentTab === 'pricing' && (
+          <PricingPage
+            onNavigate={handleNavigate}
+          />
+        )}
 
-      {currentTab === 'settings' && (
-        <SettingsPage />
-      )}
+        {currentTab === 'settings' && (
+          <SettingsPage />
+        )}
 
-      {currentTab === 'auth' && (
-        <AuthPage onSuccess={() => handleNavigate('dashboard')} />
-      )}
+        {currentTab === 'auth' && (
+          <AuthPage onSuccess={() => handleNavigate('dashboard')} />
+        )}
+      </Suspense>
     </AppShell>
   );
 };

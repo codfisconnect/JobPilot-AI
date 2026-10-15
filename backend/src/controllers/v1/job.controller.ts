@@ -30,11 +30,13 @@ export class JobControllerV1 {
         postedDays,
         sortBy,
         page,
-        pageSize
+        pageSize,
+        lightweight
       } = req.query;
 
       const parsedPage = Math.max(1, Math.min(10000, Number(page) || 1));
       const parsedPageSize = Math.max(1, Math.min(100, Number(pageSize) || 20));
+      const isLightweight = lightweight === 'true' || lightweight === '1' || parsedPageSize <= 6;
 
       let computedPostedAfter: Date | undefined = undefined;
       if (postedAfter && !isNaN(new Date(String(postedAfter)).getTime())) {
@@ -70,6 +72,7 @@ export class JobControllerV1 {
         sortBy: resolvedSortBy,
         page: parsedPage,
         pageSize: parsedPageSize,
+        lightweight: isLightweight,
         status: JobStatus.ACTIVE
       });
 

@@ -27,9 +27,14 @@ const API_V1_BASE = (import.meta.env?.VITE_API_URL) || (import.meta.env?.PROD ? 
 
 export class ApiClient {
   private accessToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('pilotmama_access_token') : null;
+  private memoryCache = new Map<string, { data: any; expiry: number }>();
+  private inflightRequests = new Map<string, Promise<any>>();
 
   setToken(token: string | null) {
     this.accessToken = token;
+    // Clear user-dependent caches when token changes
+    this.memoryCache.clear();
+    this.inflightRequests.clear();
     if (typeof window !== 'undefined') {
       if (token) {
         localStorage.setItem('pilotmama_access_token', token);
@@ -178,11 +183,35 @@ export class ApiClient {
   }
 
   // Candidate Profile V1 APIs
-  async getCandidateProfile(): Promise<any> {
-    return this.request<any>('/candidates/me');
+  async getCandidateProfile(forceRefresh: boolean = false): Promise<any> {
+    const cacheKey = 'candidate_profile_me';
+    if (!forceRefresh) {
+      const cached = this.memoryCache.get(cacheKey);
+      if (cached && cached.expiry > Date.now()) {
+        return cached.data;
+      }
+      const inflight = this.inflightRequests.get(cacheKey);
+      if (inflight) {
+        return inflight;
+      }
+    }
+
+    const promise = this.request<any>('/candidates/me')
+      .then(data => {
+        // Cache profile for 30 seconds
+        this.memoryCache.set(cacheKey, { data, expiry: Date.now() + 30000 });
+        return data;
+      })
+      .finally(() => {
+        this.inflightRequests.delete(cacheKey);
+      });
+
+    this.inflightRequests.set(cacheKey, promise);
+    return promise;
   }
 
   async updateCandidateProfile(data: any): Promise<any> {
+    this.memoryCache.delete('candidate_profile_me');
     return this.request<any>('/candidates/me', {
       method: 'PATCH',
       body: JSON.stringify(data)
@@ -357,7 +386,7 @@ export class ApiClient {
   }
 
   // Sprint 3 Canonical Job Engine Methods
-  async getCanonicalJobs(params: Record<string, any> = {}): Promise<PaginatedResponse<CanonicalJob>> {
+  async getCanonicalJobs(params: Record<string, any> = {}, options: { bypassCache?: boolean } = {}): Promise<PaginatedResponse<CanonicalJob>> {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') {
@@ -365,7 +394,32 @@ export class ApiClient {
       }
     });
     const qs = query.toString();
-    return this.requestPaginated<CanonicalJob>(`/jobs${qs ? `?${qs}` : ''}`);
+    const endpoint = `/jobs${qs ? `?${qs}` : ''}`;
+    const cacheKey = `jobs_${qs}`;
+
+    if (!options.bypassCache) {
+      const cached = this.memoryCache.get(cacheKey);
+      if (cached && cached.expiry > Date.now()) {
+        return cached.data;
+      }
+      const inflight = this.inflightRequests.get(cacheKey);
+      if (inflight) {
+        return inflight;
+      }
+    }
+
+    const promise = this.requestPaginated<CanonicalJob>(endpoint)
+      .then(res => {
+        // Cache canonical job listing for 60 seconds (prevents refetching when navigating between Dashboard and other tabs)
+        this.memoryCache.set(cacheKey, { data: res, expiry: Date.now() + 60000 });
+        return res;
+      })
+      .finally(() => {
+        this.inflightRequests.delete(cacheKey);
+      });
+
+    this.inflightRequests.set(cacheKey, promise);
+    return promise;
   }
 
   async getCanonicalJobById(id: string): Promise<any> {

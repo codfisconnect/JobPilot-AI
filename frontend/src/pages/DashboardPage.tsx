@@ -233,15 +233,28 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
           </button>
         </div>
 
-        {/* Jobs Loading Stream */}
+        {/* Jobs Loading Stream: 6 Realistic Skeleton Cards Communicating Layout */}
         {jobsLoading && (
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: '16px' }}>
-            {[1, 2, 3].map(n => (
-              <Card key={n} style={{ padding: '24px', minHeight: '180px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                <div style={{ height: '14px', width: '40%', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px' }} />
-                <div style={{ height: '22px', width: '80%', background: 'rgba(255, 255, 255, 0.08)', borderRadius: '4px' }} />
-                <div style={{ height: '14px', width: '60%', background: 'rgba(255, 255, 255, 0.05)', borderRadius: '4px', marginTop: 'auto' }} />
-              </Card>
+            {[1, 2, 3, 4, 5, 6].map(n => (
+              <div key={n} className="job-skeleton-card">
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '10px' }}>
+                    <div className="skeleton-shimmer" style={{ height: '14px', width: '38%' }} />
+                    <div className="skeleton-shimmer" style={{ height: '18px', width: '22%', borderRadius: '12px' }} />
+                  </div>
+                  <div className="skeleton-shimmer" style={{ height: '20px', width: '75%', marginBottom: '14px' }} />
+                  <div style={{ display: 'flex', gap: '10px', marginBottom: '16px' }}>
+                    <div className="skeleton-shimmer" style={{ height: '14px', width: '28%' }} />
+                    <div className="skeleton-shimmer" style={{ height: '14px', width: '22%' }} />
+                    <div className="skeleton-shimmer" style={{ height: '14px', width: '24%' }} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.05)' }}>
+                  <div className="skeleton-shimmer" style={{ height: '28px', width: '60px', borderRadius: '6px' }} />
+                  <div className="skeleton-shimmer" style={{ height: '28px', width: '120px', borderRadius: '6px' }} />
+                </div>
+              </div>
             ))}
           </div>
         )}
