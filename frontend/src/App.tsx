@@ -20,8 +20,10 @@ const CareerAgentPage = lazy(() => import("./pages/CareerAgentPage").then(m => (
 const AuthPage = lazy(() => import("./pages/AuthPage").then(m => ({ default: m.AuthPage })));
 const AdminRoot = lazy(() => import("./pages/admin/AdminRoot").then(m => ({ default: m.AdminRoot })));
 const AdminLoginPage = lazy(() => import("./pages/admin/AdminLoginPage").then(m => ({ default: m.AdminLoginPage })));
+import { AuthLayout } from "./layouts/AuthLayout";
 
 import { PilotMamaLoadingScreen } from "./components/common/PilotMamaLoadingScreen";
+
 
 const RouteLoadingFallback: React.FC = () => (
   <PilotMamaLoadingScreen fullScreen={false} statusText="Loading section…" />
@@ -136,8 +138,30 @@ export const App: React.FC = () => {
     return <PilotMamaLoadingScreen fullScreen={true} statusText="Initializing your career workspace…" />;
   }
 
+  // Dedicated Public Authentication Layout (isolated from candidate AppShell)
+  if (currentTab === 'auth') {
+    const isRegisterRoute = window.location.pathname.toLowerCase().includes('/register');
+    return (
+      <AuthLayout onNavigateHome={() => handleNavigate('dashboard')}>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <AuthPage
+            initialMode={isRegisterRoute ? 'register' : 'login'}
+            onSuccess={() => handleNavigate('dashboard')}
+            onNavigateMode={(mode) => {
+              const targetPath = mode === 'register' ? '/register' : '/login';
+              if (window.location.pathname !== targetPath) {
+                window.history.pushState({}, '', targetPath);
+              }
+            }}
+          />
+        </Suspense>
+      </AuthLayout>
+    );
+  }
+
   // Dedicated Administrative Portal Layout (isolated from candidate navigation)
   if (currentTab === 'admin-login') {
+
     return (
       <Suspense fallback={<RouteLoadingFallback />}>
         <AdminLoginPage
@@ -261,12 +285,9 @@ export const App: React.FC = () => {
         {currentTab === 'settings' && (
           <SettingsPage />
         )}
-
-        {currentTab === 'auth' && (
-          <AuthPage onSuccess={() => handleNavigate('dashboard')} />
-        )}
       </Suspense>
     </AppShell>
+
   );
 };
 

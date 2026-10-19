@@ -122,6 +122,43 @@ describe('Sprint 1 Production Authentication Suite', () => {
             mockTokens.splice(i, 1);
           }
         }
+      },
+      async findByProviderSubject(provider: any, subject: string) {
+        return mockUsers.find(u => (u as any).providerSubjectId === subject) || null;
+      },
+      async linkProviderAccount(userId: string, provider: any, subject: string, email?: string) {
+        const u = mockUsers.find(user => user.id === userId);
+        if (u) {
+          (u as any).providerAccounts = (u as any).providerAccounts || [];
+          (u as any).providerAccounts.push({ provider, providerSubjectId: subject, providerEmail: email });
+        }
+        return { userId, provider, providerSubjectId: subject } as any;
+      },
+      async createSocialUser(data: any) {
+        const newUser = {
+          id: 'user_' + (mockUsers.length + 1),
+          email: data.email,
+          passwordHash: 'oauth_mock_hash',
+          role: UserRole.CANDIDATE,
+          isActive: true,
+          emailVerified: data.emailVerified ?? true,
+          createdAt: new Date(),
+          providerSubjectId: data.providerSubjectId,
+          candidateProfile: {
+            id: 'prof_' + (mockUsers.length + 1),
+            fullName: data.fullName || 'Social User',
+            avatarUrl: data.avatarUrl || null
+          },
+          providerAccounts: [
+            { provider: data.provider, providerSubjectId: data.providerSubjectId, providerEmail: data.email }
+          ]
+        };
+        mockUsers.push(newUser);
+        return newUser as any;
+      },
+      async getProviderAccounts(userId: string) {
+        const u = mockUsers.find(user => user.id === userId);
+        return (u as any)?.providerAccounts || [];
       }
     } as any;
 
@@ -206,5 +243,40 @@ describe('Sprint 1 Production Authentication Suite', () => {
       await auth.logout('user_1');
       assert.strictEqual(mockTokens.length, 0);
     });
+
+    describe('Social Authentication & Account Linking', () => {
+      it('should create a new user via social auth when not already existing', async () => {
+        const res = await auth.authenticateSocialUser({
+          provider: 'GOOGLE' as any,
+          providerSubjectId: 'google-sub-12345',
+          email: 'googleuser@example.com',
+          fullName: 'Google User',
+          avatarUrl: 'https://example.com/photo.jpg',
+          emailVerified: true
+        });
+
+        assert.strictEqual(res.user.email, 'googleuser@example.com');
+        assert.strictEqual(res.user.candidateProfile?.fullName, 'Google User');
+        assert.ok(res.accessToken);
+        assert.ok(res.refreshToken);
+      });
+
+      it('should link provider to existing email account without duplicating user', async () => {
+        // Link LinkedIn to the candidate@pilotmama.com registered earlier
+        const res = await auth.authenticateSocialUser({
+          provider: 'LINKEDIN' as any,
+          providerSubjectId: 'linkedin-sub-99999',
+          email: 'candidate@pilotmama.com',
+          fullName: 'Pilot Candidate LinkedIn',
+          avatarUrl: 'https://example.com/linkedin.jpg',
+          emailVerified: true
+        });
+
+        assert.strictEqual(res.user.email, 'candidate@pilotmama.com');
+        assert.strictEqual(res.user.id, 'user_1', 'Must link to existing user_1 rather than create duplicate');
+        assert.ok(res.accessToken);
+      });
+    });
   });
 });
+

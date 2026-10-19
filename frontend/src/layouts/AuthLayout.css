@@ -1,0 +1,129 @@
+.auth-layout-root {
+  min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-canvas);
+  background-image: 
+    radial-gradient(circle at 50% 0%, rgba(99, 102, 241, 0.08) 0%, transparent 60%),
+    radial-gradient(circle at 100% 100%, rgba(139, 92, 246, 0.05) 0%, transparent 50%);
+  color: var(--text-primary);
+  box-sizing: border-box;
+  position: relative;
+  overflow-x: hidden;
+}
+
+.auth-layout-header {
+  height: 72px;
+  width: 100%;
+  max-width: 1400px;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  box-sizing: border-box;
+  z-index: 10;
+}
+
+.auth-layout-brand {
+  background: none;
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+}
+
+.auth-layout-brand:hover {
+  opacity: 0.9;
+  transform: translateY(-1px);
+}
+
+.auth-layout-brand:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 4px;
+}
+
+.auth-layout-actions {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.auth-layout-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 1.5rem 1rem 2.5rem;
+  box-sizing: border-box;
+  z-index: 5;
+}
+
+.auth-layout-container {
+  width: 100%;
+  max-width: 480px;
+  display: flex;
+  justify-content: center;
+  margin: 0 auto;
+}
+
+.auth-layout-footer {
+  width: 100%;
+  padding: 1.25rem 1.5rem 1.75rem;
+  border-top: 1px solid var(--border-secondary, rgba(255, 255, 255, 0.06));
+  box-sizing: border-box;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  z-index: 10;
+}
+
+.auth-layout-footer-inner {
+  max-width: 1400px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.auth-footer-links {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.auth-footer-badge {
+  display: inline-flex;
+  align-items: center;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.auth-footer-dot {
+  opacity: 0.5;
+}
+
+@media (max-width: 640px) {
+  .auth-layout-header {
+    height: 60px;
+    padding: 0 1rem;
+  }
+
+  .auth-layout-main {
+    padding: 1rem 0.75rem 2rem;
+  }
+
+  .auth-layout-footer-inner {
+    flex-direction: column;
+    text-align: center;
+    gap: 0.5rem;
+  }
+}

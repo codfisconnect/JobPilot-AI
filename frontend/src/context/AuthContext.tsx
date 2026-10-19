@@ -8,11 +8,14 @@ interface AuthContextType {
   isLoading: boolean;
   login: (credentials: { email: string; password: string }) => Promise<User>;
   register: (data: { email: string; password: string; fullName?: string }) => Promise<User>;
+  loginWithGoogle: (credential: string) => Promise<User>;
+  loginWithLinkedIn: (token: string) => Promise<User>;
   logout: () => Promise<void>;
   updateUserProfile: (updatedFields: { fullName?: string }) => void;
   error: string | null;
   clearError: () => void;
 }
+
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -101,7 +104,42 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
+  const loginWithGoogle = useCallback(async (credential: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const res = await apiClient.loginWithGoogle(credential);
+      setUser(res.user);
+      return res.user;
+    } catch (err: any) {
+      const apiErr = err as ApiError;
+      const msg = apiErr.message || 'Google sign-in failed. Please try again.';
+      setError(msg);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const loginWithLinkedIn = useCallback(async (token: string) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const res = await apiClient.loginWithLinkedIn(token);
+      setUser(res.user);
+      return res.user;
+    } catch (err: any) {
+      const apiErr = err as ApiError;
+      const msg = apiErr.message || 'LinkedIn sign-in failed. Please try again.';
+      setError(msg);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
   const logout = useCallback(async () => {
+
     try {
       setIsLoading(true);
       await apiClient.logout();
@@ -123,11 +161,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         login,
         register,
+        loginWithGoogle,
+        loginWithLinkedIn,
         logout,
         updateUserProfile,
         error,
         clearError
       }}
+
     >
       {children}
     </AuthContext.Provider>
