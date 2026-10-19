@@ -83,31 +83,34 @@ export const CareerPage: React.FC<CareerPageProps> = ({ onNavigate }) => {
   const activePlan = learningPlans.length > 0 ? learningPlans[0] : null;
 
   return (
-    <div className="career-page-container" style={{ padding: '24px', maxWidth: '1300px', margin: '0 auto' }}>
+    <div className="career-page-container">
       {/* Page Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px' }}>
+      <div className="career-page-header">
         <div>
-          <h1 style={{ fontSize: '1.75rem', fontWeight: 800, color: '#f8fafc', margin: '0 0 6px 0', display: 'flex', alignItems: 'center', gap: '10px' }}>
+          <h1 className="career-page-title">
             <Compass style={{ color: '#818cf8' }} size={24} />
-            Career Intelligence & Learning Readiness
+            <span>Career Intelligence</span>
           </h1>
-          <p style={{ margin: 0, fontSize: '0.9rem', color: '#94a3b8' }}>
-            Evidence-based track transition assessments, verified skill classifications, and curated official learning pathways.
+          <p className="career-page-subtitle">
+            <span className="desktop-only-text">Evidence-based track transition assessments, verified skill classifications, and curated official learning pathways.</span>
+            <span className="mobile-only-text">Track transition assessments & skill readiness.</span>
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '10px' }}>
+        <div className="career-header-actions">
           <Button
             variant="outline"
+            size="sm"
             icon={<RefreshCw size={14} />}
             onClick={loadCareerData}
             loading={loading}
           >
-            Refresh Data
+            Refresh
           </Button>
           {onNavigate && (
             <Button
               variant="primary"
+              size="sm"
               icon={<ArrowRight size={14} />}
               onClick={() => onNavigate('interview')}
             >

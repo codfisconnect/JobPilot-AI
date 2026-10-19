@@ -1,5 +1,6 @@
 import { Request, Response, NextFunction } from 'express';
 import { JobSourceDiscoveryService } from '../../services/jobSourceDiscovery.service.js';
+import { JobSourceSchedulerService } from '../../services/jobSourceScheduler.service.js';
 import { prisma } from '../../database/prisma.js';
 import { logger } from '../../utils/logger.js';
 
@@ -25,7 +26,7 @@ export class AdminJobSourcesController {
       if (!result.success) {
         res.status(422).json({
           success: false,
-          error: result.error || 'Could not find a structured jobs feed on this page.'
+          error: result.error || 'No public job source was discoverable from this page.'
         });
         return;
       }
@@ -40,10 +41,16 @@ export class AdminJobSourcesController {
         source: configuration,
         discovery: {
           detectedType: result.discovery.detectedType,
+          sourceType: result.discovery.sourceType,
+          atsType: result.discovery.atsType,
+          strategy: result.discovery.strategy,
           jobsEndpoint: result.discovery.jobsEndpoint,
           company: result.companyName,
           officialDomain: result.discovery.officialDomain,
-          jobCount: result.discovery.jobCount
+          jobCount: result.discovery.jobCount,
+          expectedJobCount: result.discovery.expectedJobCount,
+          completeness: result.discovery.completeness,
+          paginationSupported: result.discovery.paginationSupported
         },
         sync: result.sync
       });
@@ -101,12 +108,20 @@ export class AdminJobSourcesController {
 
   /**
    * POST /api/v1/admin/job-sources/:id/sync
-   * Trigger sync on demand.
+   * Trigger sync on demand using the shared scheduler synchronization engine.
    */
   public static async syncSource(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const id = String(req.params.id);
-      const result = await JobSourceDiscoveryService.resyncConfiguration(id);
+      const result = await JobSourceSchedulerService.syncSingleSource(id);
+
+      if (result.status === 'ALREADY_RUNNING') {
+        res.status(409).json({
+          success: false,
+          error: 'Synchronization is already running for this job source.'
+        });
+        return;
+      }
 
       if (!result.success) {
         res.status(500).json({

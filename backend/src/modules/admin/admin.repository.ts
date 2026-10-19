@@ -22,6 +22,10 @@ export class AdminRepository {
       paymentsSummary,
       creditsSummary,
       connectedJobSources,
+      healthyJobSources,
+      failingJobSources,
+      jobsAddedToday,
+      jobsExpiredToday,
       recentSyncs,
       recentApplications,
       recentRegistrations
@@ -78,6 +82,18 @@ export class AdminRepository {
       }),
       // Connected Job Sources count
       prisma.jobSourceConfiguration.count(),
+      // Healthy Job Sources count
+      prisma.jobSourceConfiguration.count({ where: { healthStatus: 'HEALTHY' } }),
+      // Failing Job Sources count
+      prisma.jobSourceConfiguration.count({ where: { healthStatus: { in: ['FAILING', 'DEGRADED'] } } }),
+      // Jobs Added Today
+      prisma.job.count({
+        where: { createdAt: { gte: startOfToday } }
+      }),
+      // Jobs Expired Today
+      prisma.job.count({
+        where: { status: 'EXPIRED', updatedAt: { gte: startOfToday } }
+      }),
       // Recent Job Source Syncs
       prisma.jobSourceConfiguration.findMany({
         take: 5,
@@ -107,6 +123,19 @@ export class AdminRepository {
       })
     ]);
 
+    // Calculate last global sync and next scheduled sync
+    const lastGlobalSync = recentSyncs.length > 0 && recentSyncs[0].lastSyncAt ? recentSyncs[0].lastSyncAt : null;
+    let nextGlobalSync: Date | null = null;
+    if (lastGlobalSync) {
+      nextGlobalSync = new Date(new Date(lastGlobalSync).getTime() + 6 * 60 * 60 * 1000); // 6 hours cadence
+    }
+
+    // Calculate jobs updated today from jobSourceConfigurations
+    const jobsUpdatedAgg = await prisma.jobSourceConfiguration.aggregate({
+      where: { lastSyncAt: { gte: startOfToday } },
+      _sum: { jobsUpdated: true }
+    });
+
     return {
       totalCandidates,
       candidatesToday,
@@ -117,6 +146,13 @@ export class AdminRepository {
       totalEmployers,
       activeSubscriptions,
       connectedJobSources,
+      healthyJobSources,
+      failingJobSources,
+      jobsAddedToday,
+      jobsUpdatedToday: jobsUpdatedAgg._sum.jobsUpdated || 0,
+      jobsExpiredToday,
+      lastGlobalSync,
+      nextGlobalSync,
       paymentsSummary: {
         totalRevenue: Number(paymentsSummary._sum.amount || 0),
         successfulPaymentsCount: paymentsSummary._count.id || 0

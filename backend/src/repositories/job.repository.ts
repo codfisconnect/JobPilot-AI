@@ -22,9 +22,10 @@ export interface JobFilterParams {
   postedBefore?: Date;
   sourceType?: string;
   status?: JobStatus;
-  sortBy?: 'latest' | 'salary' | 'relevance';
+  sortBy?: 'latest' | 'oldest' | 'salary' | 'relevance' | 'company' | 'location';
   page?: number;
   pageSize?: number;
+  lightweight?: boolean;
 }
 
 export class JobRepositoryV1 {
@@ -305,12 +306,33 @@ export class JobRepositoryV1 {
     }
 
     // Determine sorting
-    let orderBy: Prisma.JobOrderByWithRelationInput = { postedAt: 'desc' };
-    if (params.sortBy === 'salary') {
-      orderBy = { salaryMax: 'desc' };
+    let orderBy: Prisma.JobOrderByWithRelationInput[] = [
+      { postedAt: 'desc' },
+      { createdAt: 'desc' }
+    ];
+    if (params.sortBy === 'oldest') {
+      orderBy = [
+        { postedAt: 'asc' },
+        { createdAt: 'asc' }
+      ];
+    } else if (params.sortBy === 'salary') {
+      orderBy = [
+        { salaryMax: 'desc' },
+        { createdAt: 'desc' }
+      ];
+    } else if (params.sortBy === 'company') {
+      orderBy = [
+        { company: { name: 'asc' } },
+        { createdAt: 'desc' }
+      ];
+    } else if (params.sortBy === 'location') {
+      orderBy = [
+        { location: 'asc' },
+        { createdAt: 'desc' }
+      ];
     }
 
-    const [total, items] = await Promise.all([
+    const [total, rawItems] = await Promise.all([
       prisma.job.count({ where }),
       prisma.job.findMany({
         where,
@@ -341,6 +363,17 @@ export class JobRepositoryV1 {
       })
     ]);
 
+    // When lightweight list view is requested (e.g. Dashboard cards), omit multi-kilobyte description text blobs
+    const items = params.lightweight
+      ? rawItems.map(j => ({
+          ...j,
+          description: j.description ? (j.description.length > 200 ? `${j.description.slice(0, 197)}...` : j.description) : '',
+          responsibilities: [],
+          requirements: [],
+          preferredQualifications: []
+        }))
+      : rawItems;
+
     return {
       items,
       pagination: {
@@ -367,5 +400,65 @@ export class JobRepositoryV1 {
       }
     });
     return result.count;
+  }
+
+  /**
+   * Reconciles missing jobs specifically for a company and sourceType.
+   * NEVER expires jobs from other companies or sources.
+   * Expire only if lastSeenAt is older than thresholdDays.
+   */
+  public static async reconcileSourceJobs(
+    companyId: string,
+    sourceType: string,
+    seenJobIds: string[],
+    thresholdDays = 14
+  ): Promise<{ activeCount: number; expiredCount: number }> {
+    // 1. Find all ACTIVE jobs belonging to this company and sourceType
+    const activeJobs = await prisma.job.findMany({
+      where: {
+        companyId,
+        sourceType: sourceType.toUpperCase(),
+        status: JobStatus.ACTIVE
+      },
+      select: {
+        id: true,
+        externalJobId: true,
+        lastSeenAt: true
+      }
+    });
+
+    const seenSet = new Set(seenJobIds);
+    const cutoffDate = new Date(Date.now() - thresholdDays * 24 * 60 * 60 * 1000);
+    let expiredCount = 0;
+
+    for (const job of activeJobs) {
+      const isSeen = seenSet.has(job.id);
+      if (!isSeen) {
+        // Missing from current sync! Update lastCheckedAt
+        await prisma.job.update({
+          where: { id: job.id },
+          data: { lastCheckedAt: new Date() }
+        });
+
+        // If lastSeenAt exceeds stale threshold, mark EXPIRED
+        if (job.lastSeenAt < cutoffDate) {
+          await prisma.job.update({
+            where: { id: job.id },
+            data: { status: JobStatus.EXPIRED }
+          });
+          expiredCount++;
+        }
+      }
+    }
+
+    const currentActiveCount = await prisma.job.count({
+      where: {
+        companyId,
+        sourceType: sourceType.toUpperCase(),
+        status: JobStatus.ACTIVE
+      }
+    });
+
+    return { activeCount: currentActiveCount, expiredCount };
   }
 }

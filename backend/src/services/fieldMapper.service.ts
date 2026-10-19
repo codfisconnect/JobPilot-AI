@@ -62,12 +62,17 @@ export class FieldMapperService {
       return { jobs: [], rootPath: '' };
     }
 
-    const priorityWrapperKeys = ['data', 'jobs', 'results', 'jobList', 'openings', 'items', 'postings', 'vacancies'];
+    const priorityWrapperKeys = ['data', 'jobs', 'results', 'jobList', 'openings', 'items', 'postings', 'vacancies', 'docs', 'content', 'records', 'opportunities', 'jobPostings'];
 
     for (const key of priorityWrapperKeys) {
       if (Array.isArray(jsonPayload[key]) && jsonPayload[key].length > 0) {
         return { jobs: jsonPayload[key], rootPath: key };
       }
+    }
+
+    // Check payload.response.docs (Solr / Lucene / Search API format)
+    if (jsonPayload.response && typeof jsonPayload.response === 'object' && Array.isArray(jsonPayload.response.docs) && jsonPayload.response.docs.length > 0) {
+      return { jobs: jsonPayload.response.docs, rootPath: 'response.docs' };
     }
 
     // Inspect any key whose value is an array
@@ -106,22 +111,23 @@ export class FieldMapperService {
 
     // 1. External Job ID / Code priority:
     mapping.externalJobIdField = this.findMatchingKey(keys, [
-      'job_code', 'jobCode', 'externalId', 'external_id', 'code', 'slug', 'requisitionId', 'req_id', 'id'
+      'jobRequisitionId', 'job_requisition_id', 'requisitionId', 'requisition_id', 'job_code', 'jobCode',
+      'externalId', 'external_id', 'documentId', 'document_id', 'code', 'slug', 'req_id', 'id'
     ]);
 
     // 2. Title
     mapping.titleField = this.findMatchingKey(keys, [
-      'title', 'jobTitle', 'position', 'role', 'name', 'job_title'
+      'title', 'jobTitle', 'position', 'role', 'name', 'job_title', 'Job_Requisition', 'jobRequisition', 'job_requisition'
     ]);
 
     // 3. Department
     mapping.departmentField = this.findMatchingKey(keys, [
-      'department', 'dept', 'team', 'category', 'function', 'business_unit'
+      'department', 'dept', 'team', 'category', 'function', 'business_unit', 'jobFamily', 'job_family', 'BU'
     ]);
 
     // 4. Location
     mapping.locationField = this.findMatchingKey(keys, [
-      'location', 'city', 'office', 'workplace', 'region'
+      'Job_Posting_Location', 'jobPostingLocation', 'job_posting_location', 'location', 'city', 'office', 'workplace', 'region', 'State', 'state', 'Country', 'country'
     ]);
 
     // 5. Work Mode / Remote
@@ -151,12 +157,12 @@ export class FieldMapperService {
 
     // 10. Summary
     mapping.summaryField = this.findMatchingKey(keys, [
-      'summary', 'shortDescription', 'overview', 'teaser', 'snippet', 'intro'
+      'summary', 'shortDescription', 'overview', 'teaser', 'descriptionTeaser', 'snippet', 'intro'
     ]);
 
     // 11. Description
     mapping.descriptionField = this.findMatchingKey(keys, [
-      'description', 'jobDescription', 'details', 'body', 'content', 'text'
+      'description', 'jobDescription', 'descriptionTeaser', 'details', 'body', 'content', 'text'
     ]);
 
     // 12. Responsibilities
@@ -171,7 +177,7 @@ export class FieldMapperService {
 
     // 14. Skills & Preferred Skills
     mapping.skillsField = this.findMatchingKey(keys, [
-      'skills', 'required_skills', 'requiredSkills', 'coreSkills', 'techStack', 'technologies'
+      'skills', 'required_skills', 'requiredSkills', 'coreSkills', 'techStack', 'technologies', 'ml_skills', 'mlSkills'
     ]);
 
     mapping.preferredSkillsField = this.findMatchingKey(keys, [
@@ -185,7 +191,7 @@ export class FieldMapperService {
 
     // 16. Posted Date & Deadline
     mapping.postedAtField = this.findMatchingKey(keys, [
-      'posted_at', 'postedAt', 'createdAt', 'created_at', 'publishDate', 'published_at', 'date'
+      'posted_at', 'postedAt', 'postedDate', 'createdAt', 'created_at', 'publishDate', 'published_at', 'date'
     ]);
 
     mapping.deadlineField = this.findMatchingKey(keys, [
@@ -220,8 +226,8 @@ export class FieldMapperService {
 
     const getVal = (field?: string) => (field && rawRecord[field] !== undefined ? rawRecord[field] : undefined);
 
-    const title = String(getVal(mapping.titleField) || '').trim();
-    if (!title) {
+    const rawTitle = String(getVal(mapping.titleField) || '').trim();
+    if (!rawTitle) {
       return null; // A job without a title is invalid
     }
 
@@ -232,6 +238,9 @@ export class FieldMapperService {
     } else {
       externalJobId = undefined;
     }
+
+    // Intelligently derive clean title (e.g. "JR1041997 Database Engineer (Open)" -> "Database Engineer")
+    const title = this.cleanTitle(rawTitle, externalJobId);
 
     // Description text
     const description = getVal(mapping.descriptionField) || getVal(mapping.summaryField) || title;
@@ -320,7 +329,20 @@ export class FieldMapperService {
       companyName: defaults.companyName,
       companyDomain: defaults.companyDomain,
       careersUrl: defaults.careersUrl,
-      location: getVal(mapping.locationField) ? String(getVal(mapping.locationField)) : undefined,
+      location: (() => {
+        const locVal = getVal(mapping.locationField);
+        if (!locVal) {
+          if (Array.isArray(rawRecord.multi_location) && rawRecord.multi_location.length > 0) {
+            return String(rawRecord.multi_location[0]);
+          }
+          return undefined;
+        }
+        if (Array.isArray(locVal)) return locVal.map(String).join(', ');
+        if (typeof locVal === 'object' && locVal !== null) {
+          return locVal.name || locVal.location || locVal.city || JSON.stringify(locVal);
+        }
+        return String(locVal);
+      })(),
       remoteType: getVal(mapping.workModeField) ? String(getVal(mapping.workModeField)) : undefined,
       employmentType: getVal(mapping.employmentTypeField) ? String(getVal(mapping.employmentTypeField)) : undefined,
       salaryMin,
@@ -339,4 +361,29 @@ export class FieldMapperService {
       rawPayload: rawRecord
     };
   }
+
+  /**
+   * Cleans title string intelligently when it includes requisition IDs or status flags.
+   * e.g. "JR1041997 Database Engineer (Open)" -> "Database Engineer"
+   */
+  public static cleanTitle(rawTitle: string, reqId?: string): string {
+    let title = rawTitle.trim();
+    if (!title) return '';
+
+    // Strip explicit requisition ID prefix if provided
+    if (reqId) {
+      const escapedReqId = reqId.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const reqRegex = new RegExp(`^${escapedReqId}\\s*[-:–]?\\s*`, 'i');
+      title = title.replace(reqRegex, '');
+    }
+
+    // Strip generic requisition ID prefixes e.g. "JR1041997 ", "REQ-12345: ", "#1234 "
+    title = title.replace(/^(?:JR|REQ|JOB|POS)?\d{4,}\s*[-:–]?\s*/i, '');
+
+    // Strip trailing status/lifecycle tags e.g. "(Open)", "(Closed)", "(Active)", "(Evergreen)"
+    title = title.replace(/\s*\((?:Open|Closed|Active|Evergreen|Full[- ]Time|Part[- ]Time|Contract)\)/gi, '');
+
+    return title.trim() || rawTitle.trim();
+  }
 }
+

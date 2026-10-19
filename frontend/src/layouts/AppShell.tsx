@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { TopBar } from './TopBar';
+import { MobileBottomNav } from './MobileBottomNav';
 import { Modal } from '../components/common/Modal';
 import { Button } from '../components/common/Button';
 import { UploadCloud, CheckCircle, AlertCircle } from 'lucide-react';
@@ -101,6 +102,13 @@ export const AppShell: React.FC<AppShellProps> = ({
         />
         <main className="app-page-content">{children}</main>
       </div>
+
+      <MobileBottomNav
+        currentTab={currentTab}
+        onSelectTab={onSelectTab}
+        onOpenMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
+        isMobileMenuOpen={isMobileMenuOpen}
+      />
 
       {/* Toast Notification */}
       {toastMessage && (

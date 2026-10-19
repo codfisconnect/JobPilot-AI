@@ -22,6 +22,8 @@ import {
 } from 'lucide-react';
 import './AdminPages.css';
 
+import { normalizeApiError, NormalizedError } from '../../utils/errorUtils';
+
 interface AdminJobSourcesProps {
   onViewJobs?: (companyName?: string) => void;
   preselectedSourceId?: string;
@@ -35,20 +37,18 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
   const [urlInput, setUrlInput] = useState('');
   const [discovering, setDiscovering] = useState(false);
   const [discoveryStep, setDiscoveryStep] = useState(0);
-  const [discoveryError, setDiscoveryError] = useState<string | null>(null);
+  const [discoveryError, setDiscoveryError] = useState<NormalizedError | null>(null);
   const [discoverySuccess, setDiscoverySuccess] = useState<any | null>(null);
 
   // Discovery step labels matching requirement
   const discoverySteps = [
-    'Validating URL & SSRF safeguards',
-    'Fetching careers page',
-    'Detecting job source & endpoints',
-    'Finding jobs endpoint',
-    'Analyzing job schema & data arrays',
-    'Identifying canonical company',
-    'Building deterministic field mapping',
-    'Syncing and normalizing jobs into PostgreSQL',
-    'Completed'
+    'URL validated',
+    'Source analyzed',
+    'Job source detected',
+    'Data structure identified',
+    'Jobs discovered',
+    'Jobs normalized',
+    'Jobs synchronized'
   ];
 
   // Sync Progress State
@@ -111,8 +111,8 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
       setDiscoverySuccess(res);
       setUrlInput('');
       await loadSources();
-    } catch (err: any) {
-      setDiscoveryError(err.message || 'Could not find a structured jobs feed on this page.');
+    } catch (err: unknown) {
+      setDiscoveryError(normalizeApiError(err, 'No public job source was discoverable from this page.'));
     } finally {
       setDiscovering(false);
     }
@@ -136,8 +136,9 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
 
       setSyncModalResult(res.sync);
       await loadSources();
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to sync source');
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Failed to sync source');
+      setActionError(normalized.message);
     } finally {
       setSyncingId(null);
       setSyncStep(null);
@@ -149,8 +150,9 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
       setLoadingDetail(true);
       const detail = await apiClient.getAdminJobSourceById(id);
       setSelectedSourceDetail(detail.data || detail);
-    } catch (err: any) {
-      setActionError('Failed to load job source detail: ' + err.message);
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Failed to load job source detail');
+      setActionError(normalized.message);
     } finally {
       setLoadingDetail(false);
     }
@@ -160,8 +162,9 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
     try {
       await apiClient.updateAdminJobSource(source.id, { enabled: !source.enabled });
       await loadSources();
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to update source');
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Failed to update source');
+      setActionError(normalized.message);
     }
   };
 
@@ -170,8 +173,9 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
     try {
       await apiClient.deleteAdminJobSource(id);
       await loadSources();
-    } catch (err: any) {
-      setActionError(err.message || 'Failed to delete source');
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Failed to delete source');
+      setActionError(normalized.message);
     }
   };
 
@@ -241,7 +245,7 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
           <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0 }}>Add Job Source</h2>
         </div>
         <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary, #94a3b8)', marginBottom: '16px' }}>
-          Enter the company's careers or jobs page URL. The engine handles URL validation, API discovery, schema inference, company resolution, and immediate ingestion.
+          Enter any company careers or jobs URL. Pilot Mama automatically detects APIs, ATS platforms, embedded job data, HTML listings, and other public job-source structures.
         </p>
 
         <form onSubmit={handleDiscover} style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
@@ -324,7 +328,15 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
                 <CheckCircle2 size={18} />
-                <span>Source Successfully Connected</span>
+                <span>
+                  {discoverySuccess.discovery?.detectedType === 'EMBEDDED_DATA'
+                    ? `Discovered ${discoverySuccess.discovery?.jobCount} jobs from embedded Next.js page data.`
+                    : discoverySuccess.discovery?.detectedType === 'JSON_API'
+                    ? `Discovered ${discoverySuccess.discovery?.jobCount} jobs via API feed.`
+                    : discoverySuccess.discovery?.detectedType === 'JSON_LD'
+                    ? `Discovered ${discoverySuccess.discovery?.jobCount} jobs via JSON-LD metadata.`
+                    : `Discovered ${discoverySuccess.discovery?.jobCount} jobs using page structure.`}
+                </span>
               </div>
               <button
                 onClick={() => onViewJobs?.(discoverySuccess.discovery?.company)}
@@ -335,11 +347,20 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
             </div>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', fontSize: '0.85rem', color: 'var(--text-primary, #f8fafc)' }}>
               <div><strong>Company:</strong> {discoverySuccess.discovery?.company}</div>
-              <div><strong>Source:</strong> {discoverySuccess.discovery?.detectedType}</div>
-              <div><strong>Jobs Found:</strong> {discoverySuccess.discovery?.jobCount}</div>
+              <div><strong>Source:</strong> {discoverySuccess.discovery?.atsType || discoverySuccess.discovery?.detectedType}</div>
+              {discoverySuccess.discovery?.strategy && (
+                <div><strong>Strategy:</strong> {discoverySuccess.discovery?.strategy}</div>
+              )}
+              <div><strong>Jobs Discovered:</strong> {discoverySuccess.discovery?.jobCount}</div>
+              {discoverySuccess.discovery?.expectedJobCount !== null && discoverySuccess.discovery?.expectedJobCount !== undefined && (
+                <div><strong>Expected Jobs:</strong> {discoverySuccess.discovery?.expectedJobCount}</div>
+              )}
+              {discoverySuccess.discovery?.completeness && (
+                <div><strong>Completeness:</strong> {discoverySuccess.discovery?.completeness}</div>
+              )}
               <div><strong>Created:</strong> {discoverySuccess.sync?.created}</div>
               <div><strong>Updated:</strong> {discoverySuccess.sync?.updated}</div>
-              <div><strong>Status:</strong> Healthy</div>
+              <div><strong>Status:</strong> {discoverySuccess.discovery?.completeness === 'PARTIAL' ? 'Partial' : 'Complete / Healthy'}</div>
             </div>
           </div>
         )}
@@ -350,8 +371,20 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, marginBottom: '6px' }}>
               <XCircle size={18} />
               <span>Discovery Notice</span>
+              {discoveryError.code && (
+                <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.2)', marginLeft: '6px' }}>
+                  {discoveryError.code}
+                </span>
+              )}
             </div>
-            <p style={{ margin: '0 0 10px', fontSize: '0.88rem' }}>{discoveryError}</p>
+            <p style={{ margin: '0 0 10px', fontSize: '0.88rem' }}>
+              Discovery failed: {discoveryError.message}
+            </p>
+            {discoveryError.details && (
+              <pre style={{ margin: '0 0 12px', padding: '8px', background: 'rgba(0, 0, 0, 0.25)', borderRadius: '4px', fontSize: '0.75rem', overflowX: 'auto', whiteSpace: 'pre-wrap', color: '#fca5a5' }}>
+                {discoveryError.details}
+              </pre>
+            )}
             <div style={{ display: 'flex', gap: '10px' }}>
               <button
                 type="button"
@@ -451,12 +484,12 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
               <thead>
                 <tr>
                   <th>Company</th>
-                  <th>Source URL</th>
-                  <th>Detected Type</th>
+                  <th>Source Type</th>
                   <th>Jobs</th>
                   <th>Last Sync</th>
-                  <th>Last Successful Sync</th>
+                  <th>Next Scheduled Sync</th>
                   <th>Status</th>
+                  <th>Created / Updated / Expired</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -485,18 +518,6 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
                       </td>
 
                       <td>
-                        <a
-                          href={src.sourceUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', color: 'var(--accent-primary, #818cf8)', textDecoration: 'none', fontSize: '0.85rem', maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-                        >
-                          <span>{src.sourceUrl}</span>
-                          <ExternalLink size={12} />
-                        </a>
-                      </td>
-
-                      <td>
                         <span style={{ display: 'inline-block', padding: '3px 8px', borderRadius: '4px', background: 'rgba(255,255,255,0.07)', fontSize: '0.78rem', fontWeight: 600, color: '#e2e8f0' }}>
                           {src.sourceType}
                         </span>
@@ -509,14 +530,19 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
                       </td>
 
                       <td>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary, #94a3b8)' }}>
+                        <div style={{ fontSize: '0.85rem', color: 'var(--text-secondary, #94a3b8)' }}>
                           {formatRelativeTime(src.lastSyncAt)}
-                        </span>
+                        </div>
+                        {src.lastSuccessfulSyncAt && (
+                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted, #64748b)' }}>
+                            Success: {formatRelativeTime(src.lastSuccessfulSyncAt)}
+                          </div>
+                        )}
                       </td>
 
                       <td>
-                        <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary, #94a3b8)' }}>
-                          {formatRelativeTime(src.lastSuccessfulSyncAt)}
+                        <span style={{ fontSize: '0.85rem', color: '#facc15' }}>
+                          {src.lastSyncAt ? 'Every 6 hrs' : 'Pending First Sync'}
                         </span>
                       </td>
 
@@ -535,6 +561,12 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
                           <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }} />
                           {src.healthStatus}
                         </span>
+                      </td>
+
+                      <td>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-primary, #f8fafc)' }}>
+                          <span style={{ color: '#4ade80' }}>+{src.jobsCreated ?? 0}</span> / <span style={{ color: '#818cf8' }}>~{src.jobsUpdated ?? 0}</span> / <span style={{ color: '#f87171' }}>-{src.jobsExpired ?? 0}</span>
+                        </div>
                       </td>
 
                       <td>
@@ -660,11 +692,17 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px', marginBottom: '20px', fontSize: '0.85rem' }}>
               <div><strong>Original Careers URL:</strong> <a href={selectedSourceDetail.sourceUrl} target="_blank" rel="noreferrer" style={{ color: '#818cf8', wordBreak: 'break-all' }}>{selectedSourceDetail.sourceUrl}</a></div>
               <div><strong>Detected Jobs Endpoint:</strong> <span style={{ color: '#cbd5e1', wordBreak: 'break-all' }}>{selectedSourceDetail.jobsEndpoint || 'Direct Page'}</span></div>
+              <div><strong>Automatic Sync:</strong> <span style={{ color: selectedSourceDetail.enabled ? '#4ade80' : '#f87171', fontWeight: 600 }}>{selectedSourceDetail.enabled ? 'Enabled' : 'Disabled'}</span></div>
+              <div><strong>Schedule:</strong> Every 6 hours</div>
               <div><strong>Parser Type:</strong> {selectedSourceDetail.parserType}</div>
               <div><strong>Health Status:</strong> {selectedSourceDetail.healthStatus}</div>
               <div><strong>Jobs Discovered:</strong> {selectedSourceDetail.jobsFound || 0}</div>
+              <div><strong>Jobs Created:</strong> +{selectedSourceDetail.jobsCreated || 0}</div>
+              <div><strong>Jobs Updated:</strong> ~{selectedSourceDetail.jobsUpdated || 0}</div>
+              <div><strong>Jobs Expired:</strong> -{selectedSourceDetail.jobsExpired || 0}</div>
               <div><strong>Last Sync:</strong> {formatRelativeTime(selectedSourceDetail.lastSyncAt)}</div>
-              <div><strong>Last Successful:</strong> {formatRelativeTime(selectedSourceDetail.lastSuccessfulSyncAt)}</div>
+              <div><strong>Next Scheduled Sync:</strong> {selectedSourceDetail.lastSyncAt ? 'In ~6 hours' : 'Pending'}</div>
+              <div><strong>Last Successful Sync:</strong> {formatRelativeTime(selectedSourceDetail.lastSuccessfulSyncAt)}</div>
               {selectedSourceDetail.lastSyncError && (
                 <div style={{ color: '#f87171' }}><strong>Last Error:</strong> {selectedSourceDetail.lastSyncError}</div>
               )}

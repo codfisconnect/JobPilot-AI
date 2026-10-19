@@ -305,6 +305,12 @@ describe('Sprint Job Source Discovery & Universal Onboarding Suite', () => {
   // 4. Real Codfis 20-Job Fixture Validation
   describe('Codfis Real Fixture & End-to-End Pipeline', () => {
     it('should discover Codfis JSON API and import jobs using job_code as identity', async () => {
+      // Clean any residual Codfis test data to ensure clean isolation
+      const codfisComp = await prisma.company.findFirst({ where: { officialDomain: 'codfis.com' } });
+      if (codfisComp) {
+        await prisma.job.deleteMany({ where: { companyId: codfisComp.id } });
+      }
+
       const onboard = await JobSourceDiscoveryService.discoverAndOnboard('https://www.codfis.com/careers.html');
 
       assert.strictEqual(onboard.success, true);

@@ -1,451 +1,764 @@
+/* ==========================================================================
+   PILOT MAMA — BENTO GRID DASHBOARD STYLING
+   Dominant Jobs-First Hierarchy, Balanced Tiles, Dual-Theme Support
+   ========================================================================== */
+
 .dashboard-page {
   display: flex;
   flex-direction: column;
-  gap: 28px;
-}
-
-.dash-hero {
-  background: linear-gradient(135deg, rgba(30, 41, 59, 0.9), rgba(17, 24, 39, 0.95));
-  border: 1px solid var(--border-primary);
-  border-radius: var(--radius-lg);
-  padding: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 24px;
-}
-
-[data-theme="light"] .dash-hero {
-  background: linear-gradient(135deg, #ffffff, #f1f5f9);
-  box-shadow: var(--shadow-sm);
-}
-
-.dash-hero-title {
-  font-size: 1.75rem;
-  font-weight: 800;
-  margin: 10px 0 8px;
-  color: var(--text-primary);
-  letter-spacing: -0.02em;
-}
-
-.dash-hero-subtitle {
-  color: var(--text-secondary);
-  font-size: 0.9375rem;
-  max-width: 680px;
-  line-height: 1.6;
-}
-
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
   gap: 20px;
+  width: 100%;
 }
 
-.kpi-card {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 20px;
-}
-
-.kpi-icon-wrap {
-  width: 48px;
-  height: 48px;
-  border-radius: var(--radius-md);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.kpi-blue { background: rgba(14, 165, 233, 0.15); color: #38bdf8; }
-.kpi-emerald { background: rgba(16, 185, 129, 0.15); color: #34d399; }
-.kpi-indigo { background: rgba(99, 102, 241, 0.15); color: #818cf8; }
-.kpi-amber { background: rgba(245, 158, 11, 0.15); color: #fbbf24; }
-
-.kpi-data {
-  display: flex;
-  flex-direction: column;
-}
-
-.kpi-val {
-  font-size: 1.5rem;
-  font-weight: 800;
-  color: var(--text-primary);
-  line-height: 1.2;
-}
-
-.kpi-label {
-  font-size: 0.8125rem;
-  color: var(--text-muted);
-  font-weight: 500;
-}
-
-.dash-columns {
-  display: grid;
-  grid-template-columns: 1.4fr 1fr;
-  gap: 24px;
-}
-
-.dash-col {
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
-}
-
-.section-head {
+/* --------------------------------------------------------------------------
+   Top Bar: Greeting & Instant Universal Job Search
+   -------------------------------------------------------------------------- */
+.dashboard-top-bar {
   display: flex;
   align-items: center;
   justify-content: space-between;
-}
-
-.section-title {
-  font-size: 1.125rem;
-  font-weight: 700;
-  color: var(--text-primary);
-}
-
-.link-action {
-  background: transparent;
-  border: none;
-  color: #818cf8;
-  font-size: 0.8125rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.link-action:hover {
-  text-decoration: underline;
-}
-
-.jobs-list-flow, .applications-flow {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-}
-
-.job-overview-card {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding: 18px 20px;
-}
-
-.job-card-top {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.job-company {
-  font-size: 0.75rem;
-  text-transform: uppercase;
-  color: var(--text-muted);
-  font-weight: 700;
-  letter-spacing: 0.05em;
-}
-
-.job-role {
-  font-size: 1rem;
-  font-weight: 700;
-  color: var(--text-primary);
-  margin-top: 2px;
-}
-
-.job-meta {
-  display: flex;
   gap: 16px;
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
-}
-
-.meta-item {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-}
-
-.job-skills-strip {
-  display: flex;
   flex-wrap: wrap;
+  width: 100%;
+}
+
+.dash-compact-greeting {
+  display: flex;
+  align-items: baseline;
   gap: 6px;
 }
 
-.skill-chip {
-  background: rgba(255, 255, 255, 0.05);
-  border: 1px solid var(--border-subtle);
-  color: var(--text-secondary);
-  font-size: 0.75rem;
-  padding: 3px 8px;
-  border-radius: var(--radius-sm);
-}
-
-.skill-chip-more {
-  font-size: 0.75rem;
+.dash-greeting-label {
+  font-size: 0.875rem;
   color: var(--text-muted);
-  align-self: center;
 }
 
-.job-card-bottom {
+.dash-greeting-name {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  letter-spacing: -0.01em;
+}
+
+.dash-search-row {
   display: flex;
-  justify-content: space-between;
   align-items: center;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255, 255, 255, 0.05);
+  gap: 10px;
+  flex: 1;
+  max-width: 520px;
+}
+
+.dash-search-input-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 1;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+[data-theme="light"] .dash-search-input-wrap {
+  background: #ffffff;
+  border-color: #cbd5e1;
+}
+
+[data-theme="dark"] .dash-search-input-wrap {
+  background: #151d2f;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dash-search-input-wrap:hover {
+  border-color: var(--accent-primary);
+}
+
+.dash-search-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.dash-search-input {
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 0.875rem;
+  color: var(--text-primary);
+  width: 100%;
+  cursor: pointer;
+}
+
+.dash-search-input::placeholder {
+  color: var(--text-muted);
+}
+
+.dash-quick-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
   font-size: 0.8125rem;
-}
-
-.salary-tag {
-  color: #34d399;
   font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  white-space: nowrap;
 }
 
-.action-link {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  color: #818cf8;
-  font-weight: 600;
+[data-theme="light"] .dash-quick-filter-btn {
+  background: #ffffff;
+  border-color: #cbd5e1;
 }
 
-.app-history-card {
-  padding: 16px 20px;
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+[data-theme="dark"] .dash-quick-filter-btn {
+  background: #151d2f;
+  border-color: rgba(255, 255, 255, 0.1);
 }
 
-.app-history-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-}
-
-.app-role {
-  font-size: 0.9375rem;
-  font-weight: 700;
+.dash-quick-filter-btn:hover {
+  border-color: var(--accent-primary);
   color: var(--text-primary);
 }
 
-.app-company {
+/* --------------------------------------------------------------------------
+   Bento Grid Layout
+   -------------------------------------------------------------------------- */
+.dashboard-bento-grid {
+  width: 100%;
+}
+
+/* --------------------------------------------------------------------------
+   Dominant Jobs Hero Bento Tile
+   -------------------------------------------------------------------------- */
+.bento-tile-jobs-hero {
+  grid-column: span 12;
+  background: var(--bg-surface);
+  padding: 24px;
+  border-radius: var(--radius-lg);
+}
+
+[data-theme="dark"] .bento-tile-jobs-hero {
+  background: linear-gradient(180deg, #161e31 0%, #111827 100%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+[data-theme="light"] .bento-tile-jobs-hero {
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  border: 1px solid #e2e8f0;
+}
+
+.bento-jobs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.bento-jobs-title-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.live-indicator-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.live-pulse-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
+  flex-shrink: 0;
+}
+
+.bento-section-title {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin: 0;
+  letter-spacing: -0.01em;
+}
+
+.bento-section-sub {
+  margin: 2px 0 0;
   font-size: 0.8125rem;
   color: var(--text-muted);
 }
 
-.app-sub-info {
+.bento-jobs-actions {
   display: flex;
-  justify-content: space-between;
   align-items: center;
+  gap: 12px;
+}
+
+.bento-action-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--accent-primary);
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+}
+
+.bento-action-link:hover {
+  color: var(--accent-primary-hover);
+  text-decoration: underline;
+}
+
+/* Quick Category Filter Pills */
+.bento-quick-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding-bottom: 4px;
+  margin-bottom: 16px;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+}
+
+.bento-quick-pills::-webkit-scrollbar {
+  display: none;
+}
+
+.bento-pill {
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
   font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-subtle);
+  color: var(--text-secondary);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease;
+}
+
+[data-theme="light"] .bento-pill {
+  background: #f1f5f9;
+  border-color: #e2e8f0;
+  color: #475569;
+}
+
+.bento-pill:hover {
+  background: var(--accent-primary);
+  color: #ffffff;
+  border-color: var(--accent-primary);
+}
+
+.bento-pill-active {
+  background: var(--accent-primary) !important;
+  color: #ffffff !important;
+  border-color: var(--accent-primary) !important;
+}
+
+/* Jobs Cards Grid Inside Bento Tile */
+.bento-jobs-cards-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+  width: 100%;
+}
+
+@media (max-width: 1100px) {
+  .bento-jobs-cards-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .bento-jobs-cards-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Individual Bento Job Card */
+.bento-job-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease;
+}
+
+[data-theme="dark"] .bento-job-card {
+  background: rgba(30, 41, 59, 0.5);
+  border-color: rgba(255, 255, 255, 0.07);
+}
+
+[data-theme="light"] .bento-job-card {
+  background: #ffffff;
+  border-color: #e2e8f0;
+}
+
+.bento-job-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-primary);
+}
+
+[data-theme="light"] .bento-job-card:hover {
+  box-shadow: 0 4px 14px -2px rgba(15, 23, 42, 0.08);
+}
+
+[data-theme="dark"] .bento-job-card:hover {
+  box-shadow: 0 4px 16px -2px rgba(0, 0, 0, 0.5), 0 0 16px rgba(99, 102, 241, 0.2);
+}
+
+.bento-job-card-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.bento-job-company {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 180px;
+}
+
+.bento-job-title {
+  font-size: 0.975rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 10px;
+  line-height: 1.35;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.7em;
+}
+
+.bento-job-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.775rem;
+  color: var(--text-secondary);
+  margin-bottom: 14px;
+}
+
+.bento-meta-item {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.bento-meta-text {
+  max-width: 120px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bento-job-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--border-subtle);
+  gap: 8px;
+}
+
+.bento-job-save-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 10px;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  border-radius: var(--radius-sm);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.bento-job-save-btn:hover {
+  color: var(--text-primary);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* --------------------------------------------------------------------------
+   Profile Readiness Tile Specifics
+   -------------------------------------------------------------------------- */
+.bento-score-badge {
+  font-size: 1.15rem;
+  font-weight: 800;
+  color: var(--accent-primary);
+}
+
+.bento-progress-wrap {
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.bento-progress-track {
+  width: 100%;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+}
+
+[data-theme="light"] .bento-progress-track {
+  background: #e2e8f0;
+}
+
+.bento-progress-fill {
+  height: 100%;
+  border-radius: var(--radius-full);
+  transition: width 0.4s ease;
+}
+
+.bento-profile-checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.bento-check-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
   color: var(--text-secondary);
 }
 
-.resume-version-badge {
-  background: rgba(99, 102, 241, 0.12);
-  color: #818cf8;
-  padding: 2px 8px;
-  border-radius: var(--radius-sm);
-  font-family: var(--font-mono);
+.bento-check-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-muted);
 }
 
-.empty-panel {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 12px;
-  padding: 36px 20px;
-  color: var(--text-muted);
-  text-align: center;
+.bento-check-dot.dot-active {
+  background: var(--color-success);
+  box-shadow: 0 0 6px rgba(16, 185, 129, 0.4);
 }
 
-/* Source Health Banner */
-.source-health-banner {
-  padding: 16px 20px;
-  background: rgba(15, 23, 42, 0.6);
-  border: 1px solid var(--border-primary);
+/* --------------------------------------------------------------------------
+   Resume Vault Tile Specifics
+   -------------------------------------------------------------------------- */
+.bento-resume-status-card {
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.03);
   border-radius: var(--radius-md);
+  margin-bottom: 14px;
+}
+
+[data-theme="light"] .bento-resume-status-card {
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+}
+
+.bento-resume-doc-row {
   display: flex;
-  flex-direction: column;
+  align-items: center;
   gap: 12px;
 }
 
-.health-banner-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 10px;
+.bento-doc-icon {
+  color: var(--color-success);
+  flex-shrink: 0;
 }
 
-.health-banner-title {
+.bento-doc-info {
   display: flex;
-  align-items: center;
-  gap: 10px;
+  flex-direction: column;
+  min-width: 0;
 }
 
-.health-icon-pulse {
+.bento-doc-title {
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bento-doc-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.bento-resume-empty-prompt {
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+/* --------------------------------------------------------------------------
+   Small Bento Tiles (Pipeline, Saved, Interview)
+   -------------------------------------------------------------------------- */
+.bento-stat-hero {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1;
+}
+
+.bento-stat-sub {
+  font-size: 0.775rem;
+  color: var(--text-muted);
+  margin: 2px 0 8px;
+}
+
+.bento-pipeline-mini-stats {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  font-weight: 500;
+}
+
+.mini-stat-sep {
+  color: var(--text-muted);
+}
+
+.bento-pulse-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: rgba(16, 185, 129, 0.12);
   color: #10b981;
+  border-radius: var(--radius-full);
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
-.health-title-text {
+/* --------------------------------------------------------------------------
+   Skill Gaps Bento Tile
+   -------------------------------------------------------------------------- */
+.bento-skill-gaps-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.bento-skill-gap-item {
+  padding: 10px 14px;
+  background: rgba(255, 255, 255, 0.02);
+  border-left: 3px solid #6366f1;
+  border-radius: var(--radius-sm);
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+[data-theme="light"] .bento-skill-gap-item {
+  background: #f8fafc;
+}
+
+.bento-skill-gap-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.bento-skill-name {
   font-size: 0.875rem;
   font-weight: 700;
   color: var(--text-primary);
 }
 
-.health-actions {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.connector-chips-grid {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-}
-
-.connector-status-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(30, 41, 59, 0.7);
-  border: 1px solid var(--border-subtle);
-  border-radius: var(--radius-sm);
-  padding: 6px 12px;
-  font-size: 0.8125rem;
-}
-
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  display: inline-block;
-}
-
-.dot-healthy {
-  background-color: #10b981;
-  box-shadow: 0 0 6px rgba(16, 185, 129, 0.6);
-}
-
-.dot-warning {
-  background-color: #f59e0b;
-  box-shadow: 0 0 6px rgba(245, 158, 11, 0.6);
-}
-
-.dot-error, .dot-down {
-  background-color: #ef4444;
-  box-shadow: 0 0 6px rgba(239, 68, 68, 0.6);
-}
-
-.source-name {
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-.source-jobs-count {
+.bento-skill-rec {
+  font-size: 0.775rem;
   color: var(--text-muted);
-  font-size: 0.75rem;
+  line-height: 1.35;
 }
 
-.connector-fallback-status {
+.bento-skills-aligned-box {
+  padding: 20px;
+  text-align: center;
+}
+
+/* --------------------------------------------------------------------------
+   Bento Tile Footer / Action Link
+   -------------------------------------------------------------------------- */
+.bento-tile-footer {
+  margin-top: auto;
   display: flex;
   align-items: center;
-  gap: 8px;
-  font-size: 0.8125rem;
-  color: var(--text-secondary);
+  justify-content: flex-end;
 }
 
-/* ==========================================================================
-   Responsive Breakpoints for DashboardPage
-   ========================================================================== */
+.bento-footer-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+}
 
-@media (max-width: 1100px) {
-  .dash-columns {
-    grid-template-columns: 1fr;
-    gap: 20px;
+/* --------------------------------------------------------------------------
+   Skeletons & Error
+   -------------------------------------------------------------------------- */
+@keyframes shimmerPulse {
+  0% {
+    background-position: -200% 0;
   }
+  100% {
+    background-position: 200% 0;
+  }
+}
 
-  .kpi-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 16px;
-  }
+.job-skeleton-card {
+  padding: 16px 18px;
+  min-height: 175px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md);
+}
+
+[data-theme="dark"] .job-skeleton-card {
+  background: rgba(30, 41, 59, 0.4);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.04) 25%,
+    rgba(255, 255, 255, 0.12) 50%,
+    rgba(255, 255, 255, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmerPulse 1.8s infinite ease-in-out;
+  border-radius: 4px;
+}
+
+[data-theme="light"] .skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(0, 0, 0, 0.04) 25%,
+    rgba(0, 0, 0, 0.09) 50%,
+    rgba(0, 0, 0, 0.04) 75%
+  );
+  background-size: 200% 100%;
+  animation: shimmerPulse 1.8s infinite ease-in-out;
+}
+
+.bento-jobs-error-box {
+  padding: 24px;
+  text-align: center;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md);
+  background: rgba(239, 68, 68, 0.05);
+}
+
+.bento-error-icon {
+  color: #f87171;
+  margin: 0 auto 8px;
+}
+
+.bento-error-text {
+  color: var(--text-primary);
+  font-weight: 600;
+  margin: 0 0 10px;
+  font-size: 0.875rem;
+}
+
+.bento-jobs-empty {
+  padding: 36px 20px;
+  text-align: center;
+}
+
+.bento-empty-icon {
+  color: var(--text-muted);
+  margin: 0 auto 10px;
+}
+
+.bento-jobs-empty h4 {
+  margin: 0 0 6px;
+  color: var(--text-primary);
+  font-size: 1rem;
+}
+
+.bento-jobs-empty p {
+  color: var(--text-muted);
+  font-size: 0.8125rem;
+  margin-bottom: 14px;
+}
+
+/* --------------------------------------------------------------------------
+   Mobile Text & Layout Utility Controls
+   -------------------------------------------------------------------------- */
+.mobile-only-text {
+  display: none;
+}
+
+.desktop-only-text {
+  display: inline;
 }
 
 @media (max-width: 768px) {
-  .dashboard-page {
-    gap: 20px;
+  .desktop-only-text {
+    display: none !important;
   }
 
-  .dash-hero {
-    flex-direction: column;
-    align-items: flex-start;
-    padding: 20px 18px;
-    gap: 16px;
+  .mobile-only-text {
+    display: inline !important;
   }
 
-  .dash-hero-title {
-    font-size: 1.375rem;
+  .bento-tile-jobs-hero {
+    padding: 16px 14px;
   }
 
-  .dash-hero-subtitle {
-    font-size: 0.875rem;
+  .bento-jobs-header {
+    margin-bottom: 10px;
   }
 
-  .dash-hero-actions {
-    width: 100%;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  .bento-section-title {
+    font-size: 1.1rem;
   }
 
-  .dash-hero-actions button,
-  .dash-hero-actions a {
-    width: 100%;
-    justify-content: center;
-  }
-
-  .kpi-grid {
-    grid-template-columns: repeat(2, 1fr);
-    gap: 12px;
-  }
-
-  .kpi-card {
+  .bento-job-card {
     padding: 14px;
-    gap: 12px;
   }
 
-  .kpi-icon-wrap {
-    width: 40px;
-    height: 40px;
-    min-width: 40px;
-  }
-
-  .kpi-val {
-    font-size: 1.25rem;
+  .bento-job-title {
+    font-size: 0.95rem;
+    min-height: auto;
   }
 }
-
-@media (max-width: 480px) {
-  .kpi-grid {
-    grid-template-columns: 1fr;
-    gap: 10px;
-  }
-
-  .kpi-card {
-    padding: 12px 14px;
-  }
-
-  .section-head {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 8px;
-  }
-
-  .connector-status-chip {
-    width: 100%;
-    justify-content: space-between;
-  }
-}
-

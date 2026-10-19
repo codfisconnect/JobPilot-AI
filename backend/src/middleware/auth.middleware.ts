@@ -32,6 +32,22 @@ export function authenticateJwt(req: Request, res: Response, next: NextFunction)
   }
 }
 
+export function optionalAuthenticateJwt(req: Request, res: Response, next: NextFunction): void {
+  const authHeader = req.headers.authorization;
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return next();
+  }
+
+  const token = authHeader.split(' ')[1];
+  try {
+    const payload = verifyAccessToken(token);
+    req.user = payload;
+  } catch {
+    // Gracefully ignore expired/invalid token for optional routes
+  }
+  next();
+}
+
 export function requireRole(allowedRoles: UserRole[]) {
   return (req: Request, res: Response, next: NextFunction): void => {
     if (!req.user) {
