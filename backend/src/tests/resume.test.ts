@@ -224,6 +224,87 @@ Certified Kubernetes Administrator
       assert.strictEqual(javaSkill?.yearsOfExperience, 6);
       assert.strictEqual(pythonSkill?.yearsOfExperience, null);
     });
+
+    it('should reliably extract structured experience, projects, education and skills from real-world candidate resume fixture', () => {
+      const regressionResume = `
+SYED SALMAN A
+Mobile: +91 9876543210
+Email: salman.connect1@gmail.com
+Chennai, India
+
+Career Objective
+To secure a challenging role where I can utilize my testing and analysis expertise to contribute to organizational success.
+
+Professional Summary
+Experienced IT professional with over 6 years of expertise in software testing, quality engineering, and business analysis.
+
+Key Skills
+JIRA
+Confluence
+Power BI
+Git
+Maven
+Eclipse
+Agile
+Scrum
+Kanban
+BPMN
+
+Experience
+Senior Test Engineer / Business Analyst
+Machine Vogue Technology Pvt Ltd.
+6 years
+
+Key Responsibilities:
+• Developed and executed test plans, test scenarios, and comprehensive test cases.
+• Collaborated closely with product owners, stakeholders, and developers in agile sprints.
+• Conducted defect triage, bug tracking, and root cause analysis in JIRA.
+• Formulated business process models and workflows using BPMN notations.
+
+Projects
+EasyJet Airlines Inc.
+Implemented reservation engine automation workflows and validated flight scheduling data integrity across critical milestones.
+
+Wakampa (Ecommerce)
+Performed end-to-end user journey validation, checkout payment gateway regression, and inventory tracking.
+
+Education
+B.Tech (Automobile Engineering)
+B.S Abdur Rahman University, Chennai
+`;
+
+      const parsed = ResumeParsingService.parse(regressionResume);
+
+      // Verify Personal Info and section boundaries
+      assert.strictEqual(parsed.personalInfo.fullName, 'SYED SALMAN A');
+      assert.strictEqual(parsed.personalInfo.email, 'salman.connect1@gmail.com');
+      assert.ok(!parsed.summary.includes('salman.connect1@gmail.com'), 'Summary must not contain email');
+      assert.ok(!parsed.summary.includes('SYED SALMAN A'), 'Summary must not contain candidate name');
+
+      // Verify Experience extraction (CRITICAL: Must NOT be 0!)
+      assert.ok(parsed.experience.length >= 1, `Expected at least 1 experience entry, got ${parsed.experience.length}`);
+      const exp = parsed.experience[0];
+      assert.strictEqual(exp.jobTitle, 'Senior Test Engineer / Business Analyst');
+      assert.strictEqual(exp.company, 'Machine Vogue Technology Pvt Ltd.');
+      assert.strictEqual(exp.duration, '6 years');
+      assert.ok(exp.responsibilities.length >= 3, 'Responsibilities must be captured');
+
+      // Verify Projects
+      assert.ok(parsed.projects.length >= 2, `Expected at least 2 projects, got ${parsed.projects.length}`);
+      assert.ok(parsed.projects.some(p => p.name.includes('EasyJet')));
+      assert.ok(parsed.projects.some(p => p.name.includes('Wakampa')));
+
+      // Verify Education
+      assert.ok(parsed.education.length >= 1, 'Expected at least 1 education entry');
+      assert.ok(parsed.education[0].degree.includes('B.Tech'));
+      assert.ok(parsed.education[0].institution.includes('Abdur Rahman University'));
+
+      // Verify Skills
+      assert.ok(parsed.skills.some(s => s.name === 'Jira'));
+      assert.ok(parsed.skills.some(s => s.name === 'Power BI'));
+      assert.ok(parsed.skills.some(s => s.name === 'Git'));
+      assert.ok(parsed.skills.some(s => s.name === 'Agile Methodologies'));
+    });
   });
 
   describe('Candidate Review, Confirmation & Master Resume', () => {

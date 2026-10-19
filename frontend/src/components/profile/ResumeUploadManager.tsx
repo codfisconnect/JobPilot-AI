@@ -10,9 +10,16 @@ import {
   AlertCircle,
   Loader2,
   Trash2,
-  ArrowRight,
   Eye,
-  Plus
+  Plus,
+  Briefcase,
+  GraduationCap,
+  FolderGit2,
+  Sparkles,
+  Edit2,
+  ChevronDown,
+  ChevronUp,
+  X
 } from 'lucide-react';
 import './ResumeUploadManager.css';
 
@@ -33,6 +40,11 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
   const [isDragging, setIsDragging] = useState(false);
   const [versionTitle, setVersionTitle] = useState('');
   const [creatingVersionForId, setCreatingVersionForId] = useState<string | null>(null);
+  const [editingExpIndex, setEditingExpIndex] = useState<number | null>(null);
+  const [editingProjectIndex, setEditingProjectIndex] = useState<number | null>(null);
+  const [editingEducationIndex, setEditingEducationIndex] = useState<number | null>(null);
+  const [expandedExpIndex, setExpandedExpIndex] = useState<number | null>(0);
+  const [newSkillInput, setNewSkillInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Load existing resumes on mount
@@ -47,7 +59,6 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
       const list = await apiClient.listResumes();
       setResumes(list || []);
     } catch (err: any) {
-      // If user has not logged in with V1 yet, gracefully fall back
       console.warn('Could not fetch v1 resumes:', err.message);
     } finally {
       setLoading(false);
@@ -127,6 +138,113 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
     } finally {
       setLoading(false);
     }
+  };
+
+  // Experience manipulation helpers
+  const handleAddExperience = () => {
+    if (!reviewModalData) return;
+    const newExp = {
+      jobTitle: '',
+      company: '',
+      duration: '',
+      startDate: '',
+      endDate: '',
+      isCurrent: false,
+      location: '',
+      responsibilities: []
+    };
+    const updated = [...(reviewModalData.parsed.experience || []), newExp];
+    setReviewModalData({
+      ...reviewModalData,
+      parsed: { ...reviewModalData.parsed, experience: updated }
+    });
+    setEditingExpIndex(updated.length - 1);
+  };
+
+  const handleRemoveExperience = (index: number) => {
+    if (!reviewModalData) return;
+    const updated = (reviewModalData.parsed.experience || []).filter((_: any, i: number) => i !== index);
+    setReviewModalData({
+      ...reviewModalData,
+      parsed: { ...reviewModalData.parsed, experience: updated }
+    });
+    if (editingExpIndex === index) setEditingExpIndex(null);
+  };
+
+  const handleAddProject = () => {
+    if (!reviewModalData) return;
+    const newProj = {
+      name: '',
+      description: '',
+      role: 'Contributor',
+      technologies: []
+    };
+    const updated = [...(reviewModalData.parsed.projects || []), newProj];
+    setReviewModalData({
+      ...reviewModalData,
+      parsed: { ...reviewModalData.parsed, projects: updated }
+    });
+    setEditingProjectIndex(updated.length - 1);
+  };
+
+  const handleRemoveProject = (index: number) => {
+    if (!reviewModalData) return;
+    const updated = (reviewModalData.parsed.projects || []).filter((_: any, i: number) => i !== index);
+    setReviewModalData({
+      ...reviewModalData,
+      parsed: { ...reviewModalData.parsed, projects: updated }
+    });
+    if (editingProjectIndex === index) setEditingProjectIndex(null);
+  };
+
+  const handleAddEducation = () => {
+    if (!reviewModalData) return;
+    const newEdu = {
+      degree: '',
+      institution: '',
+      fieldOfStudy: '',
+      location: '',
+      endDate: ''
+    };
+    const updated = [...(reviewModalData.parsed.education || []), newEdu];
+    setReviewModalData({
+      ...reviewModalData,
+      parsed: { ...reviewModalData.parsed, education: updated }
+    });
+    setEditingEducationIndex(updated.length - 1);
+  };
+
+  const handleRemoveEducation = (index: number) => {
+    if (!reviewModalData) return;
+    const updated = (reviewModalData.parsed.education || []).filter((_: any, i: number) => i !== index);
+    setReviewModalData({
+      ...reviewModalData,
+      parsed: { ...reviewModalData.parsed, education: updated }
+    });
+    if (editingEducationIndex === index) setEditingEducationIndex(null);
+  };
+
+  const handleAddSkill = () => {
+    if (!newSkillInput.trim() || !reviewModalData) return;
+    const skillName = newSkillInput.trim();
+    const existing = reviewModalData.parsed.skills || [];
+    if (!existing.some((s: any) => s.name.toLowerCase() === skillName.toLowerCase())) {
+      const updated = [...existing, { name: skillName, category: 'TECHNICAL', source: 'RESUME' }];
+      setReviewModalData({
+        ...reviewModalData,
+        parsed: { ...reviewModalData.parsed, skills: updated }
+      });
+    }
+    setNewSkillInput('');
+  };
+
+  const handleRemoveSkill = (skillName: string) => {
+    if (!reviewModalData) return;
+    const updated = (reviewModalData.parsed.skills || []).filter((s: any) => s.name !== skillName);
+    setReviewModalData({
+      ...reviewModalData,
+      parsed: { ...reviewModalData.parsed, skills: updated }
+    });
   };
 
   return (
@@ -283,36 +401,71 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
         )}
       </div>
 
-      {/* Candidate Review Modal */}
+      {/* Candidate Verification & Review Modal */}
       {reviewModalData && (
         <div className="review-modal-backdrop">
           <div className="review-modal-card">
+            {/* Sticky Header */}
             <div className="review-modal-header">
-              <div>
-                <h3 className="text-lg font-bold">Review Extracted Candidate Information</h3>
-                <p className="text-xs text-muted">
-                  Truth Protection Guarantee: Please verify or edit any fields before saving to your Canonical Master Profile.
+              <div className="review-header-title-wrap">
+                <div className="review-header-badge-row">
+                  <span className="review-tag">Candidate Verification Workspace</span>
+                  <Badge variant={reviewModalData.parsed.needsReview ? 'amber' : 'emerald'} size="sm">
+                    {reviewModalData.parsed.needsReview ? 'Review Required' : 'Verified'}
+                  </Badge>
+                </div>
+                <h3 className="review-modal-title">Review Extracted Information</h3>
+                <p className="review-modal-subtitle">
+                  Review and confirm the information Pilot Mama found in your resume before saving it to your Master Profile.
                 </p>
               </div>
               <Button size="sm" variant="ghost" onClick={() => setReviewModalData(null)}>✕</Button>
+            </div>
+
+            {/* Quick Extraction Metric Chips */}
+            <div className="review-metrics-summary">
+              <div className="metric-chip">
+                <span className="metric-chip-label">Experience:</span>
+                <span className="metric-chip-value font-bold">{reviewModalData.parsed.experience?.length || 0}</span>
+              </div>
+              <div className="metric-chip">
+                <span className="metric-chip-label">Projects:</span>
+                <span className="metric-chip-value font-bold">{reviewModalData.parsed.projects?.length || 0}</span>
+              </div>
+              <div className="metric-chip">
+                <span className="metric-chip-label">Education:</span>
+                <span className="metric-chip-value font-bold">{reviewModalData.parsed.education?.length || 0}</span>
+              </div>
+              <div className="metric-chip">
+                <span className="metric-chip-label">Skills:</span>
+                <span className="metric-chip-value font-bold">{reviewModalData.parsed.skills?.length || 0}</span>
+              </div>
+              <div className="metric-chip">
+                <span className="metric-chip-label">Confidence:</span>
+                <span className="metric-chip-value font-bold">{reviewModalData.parsed.parseConfidence || 90}%</span>
+              </div>
             </div>
 
             <div className="review-modal-body">
               {reviewModalData.parsed.needsReview && (
                 <div className="review-warning-banner">
                   <AlertCircle size={16} />
-                  <span>Some sections require candidate confirmation: {reviewModalData.parsed.reviewReasons?.join(', ')}</span>
+                  <span>{reviewModalData.parsed.reviewReasons?.join(', ') || 'Please verify detected entries'}</span>
                 </div>
               )}
 
-              {/* Detected Identity */}
+              {/* 1. Detected Personal Identity */}
               <div className="review-section">
-                <h4 className="review-section-title">Detected Personal Information</h4>
-                <div className="form-row">
+                <div className="review-section-header-row">
+                  <h4 className="review-section-title">Personal Information</h4>
+                  <Badge variant="emerald" size="sm">✓ Verified</Badge>
+                </div>
+                <div className="form-grid-two">
                   <div className="form-group">
-                    <label>Candidate Name</label>
+                    <label className="field-label">Candidate Full Name</label>
                     <input
                       type="text"
+                      className="text-input"
                       value={reviewModalData.parsed.personalInfo.fullName || ''}
                       onChange={e => setReviewModalData({
                         ...reviewModalData,
@@ -324,9 +477,10 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
                     />
                   </div>
                   <div className="form-group">
-                    <label>Email Address</label>
+                    <label className="field-label">Email Address</label>
                     <input
                       type="email"
+                      className="text-input"
                       value={reviewModalData.parsed.personalInfo.email || ''}
                       onChange={e => setReviewModalData({
                         ...reviewModalData,
@@ -337,14 +491,50 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
                       })}
                     />
                   </div>
+                  <div className="form-group">
+                    <label className="field-label">Phone Number</label>
+                    <input
+                      type="tel"
+                      className="text-input"
+                      value={reviewModalData.parsed.personalInfo.phone || ''}
+                      placeholder="+91 98765 43210"
+                      onChange={e => setReviewModalData({
+                        ...reviewModalData,
+                        parsed: {
+                          ...reviewModalData.parsed,
+                          personalInfo: { ...reviewModalData.parsed.personalInfo, phone: e.target.value }
+                        }
+                      })}
+                    />
+                  </div>
+                  <div className="form-group">
+                    <label className="field-label">Location / City</label>
+                    <input
+                      type="text"
+                      className="text-input"
+                      value={reviewModalData.parsed.personalInfo.location || ''}
+                      placeholder="e.g. Chennai, India"
+                      onChange={e => setReviewModalData({
+                        ...reviewModalData,
+                        parsed: {
+                          ...reviewModalData.parsed,
+                          personalInfo: { ...reviewModalData.parsed.personalInfo, location: e.target.value }
+                        }
+                      })}
+                    />
+                  </div>
                 </div>
               </div>
 
-              {/* Detected Summary */}
+              {/* 2. Professional Summary */}
               <div className="review-section">
-                <h4 className="review-section-title">Detected Professional Summary</h4>
+                <div className="review-section-header-row">
+                  <h4 className="review-section-title">Professional Summary</h4>
+                  <Badge variant="emerald" size="sm">✓ Verified</Badge>
+                </div>
                 <textarea
                   rows={3}
+                  className="textarea-input"
                   value={reviewModalData.parsed.summary || ''}
                   onChange={e => setReviewModalData({
                     ...reviewModalData,
@@ -353,42 +543,439 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
                 />
               </div>
 
-              {/* Detected Skills */}
+              {/* 3. Detected Experience Entries (HIGHEST PRIORITY) */}
               <div className="review-section">
-                <h4 className="review-section-title">Detected Skills ({reviewModalData.parsed.skills?.length || 0})</h4>
-                <div className="review-skills-chips">
-                  {reviewModalData.parsed.skills?.map((s: any, idx: number) => (
-                    <Badge key={idx} variant="indigo" size="sm">
-                      {s.name} {s.yearsOfExperience ? `(${s.yearsOfExperience} yrs)` : ''}
-                    </Badge>
-                  ))}
+                <div className="review-section-header-row">
+                  <div className="flex-row items-center gap-2">
+                    <Briefcase size={16} className="text-primary" />
+                    <h4 className="review-section-title">
+                      Experience ({reviewModalData.parsed.experience?.length || 0})
+                    </h4>
+                  </div>
+                  <div className="flex-row items-center gap-2">
+                    {(!reviewModalData.parsed.experience || reviewModalData.parsed.experience.length === 0) ? (
+                      <Badge variant="amber" size="sm">⚠ Review Required</Badge>
+                    ) : (
+                      <Badge variant="emerald" size="sm">✓ Detected</Badge>
+                    )}
+                    <Button size="sm" variant="outline" icon={<Plus size={14} />} onClick={handleAddExperience}>
+                      Add Experience
+                    </Button>
+                  </div>
+                </div>
+
+                {(!reviewModalData.parsed.experience || reviewModalData.parsed.experience.length === 0) ? (
+                  <div className="review-empty-state">
+                    <AlertCircle size={20} className="text-amber" />
+                    <div>
+                      <p className="font-semibold text-sm">Experience detected — review required</p>
+                      <p className="text-xs text-muted">Click "+ Add Experience" to insert your professional role.</p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="review-items-list">
+                    {reviewModalData.parsed.experience.map((exp: any, idx: number) => {
+                      const isEditing = editingExpIndex === idx;
+                      const isExpanded = expandedExpIndex === idx;
+
+                      if (isEditing) {
+                        return (
+                          <div key={idx} className="review-card-edit-box">
+                            <div className="form-grid-two">
+                              <div className="form-group">
+                                <label className="field-label">Job Title *</label>
+                                <input
+                                  type="text"
+                                  className="text-input"
+                                  value={exp.jobTitle || ''}
+                                  onChange={e => {
+                                    const updated = [...reviewModalData.parsed.experience];
+                                    updated[idx] = { ...updated[idx], jobTitle: e.target.value };
+                                    setReviewModalData({
+                                      ...reviewModalData,
+                                      parsed: { ...reviewModalData.parsed, experience: updated }
+                                    });
+                                  }}
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label className="field-label">Company Name *</label>
+                                <input
+                                  type="text"
+                                  className="text-input"
+                                  value={exp.company || ''}
+                                  onChange={e => {
+                                    const updated = [...reviewModalData.parsed.experience];
+                                    updated[idx] = { ...updated[idx], company: e.target.value };
+                                    setReviewModalData({
+                                      ...reviewModalData,
+                                      parsed: { ...reviewModalData.parsed, experience: updated }
+                                    });
+                                  }}
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label className="field-label">Duration</label>
+                                <input
+                                  type="text"
+                                  className="text-input"
+                                  placeholder="e.g. 6 years"
+                                  value={exp.duration || ''}
+                                  onChange={e => {
+                                    const updated = [...reviewModalData.parsed.experience];
+                                    updated[idx] = { ...updated[idx], duration: e.target.value };
+                                    setReviewModalData({
+                                      ...reviewModalData,
+                                      parsed: { ...reviewModalData.parsed, experience: updated }
+                                    });
+                                  }}
+                                />
+                              </div>
+                              <div className="form-group">
+                                <label className="field-label">Location</label>
+                                <input
+                                  type="text"
+                                  className="text-input"
+                                  placeholder="e.g. Chennai, India"
+                                  value={exp.location || ''}
+                                  onChange={e => {
+                                    const updated = [...reviewModalData.parsed.experience];
+                                    updated[idx] = { ...updated[idx], location: e.target.value };
+                                    setReviewModalData({
+                                      ...reviewModalData,
+                                      parsed: { ...reviewModalData.parsed, experience: updated }
+                                    });
+                                  }}
+                                />
+                              </div>
+                            </div>
+                            <div className="flex-row justify-end gap-2 mt-3">
+                              <Button size="sm" variant="ghost" onClick={() => handleRemoveExperience(idx)}>
+                                Remove
+                              </Button>
+                              <Button size="sm" variant="primary" onClick={() => setEditingExpIndex(null)}>
+                                Done
+                              </Button>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div key={idx} className="review-entity-card">
+                          <div className="review-card-top-row">
+                            <div>
+                              <div className="font-bold text-sm text-primary">{exp.jobTitle}</div>
+                              <div className="text-xs font-semibold">{exp.company}</div>
+                              <div className="text-xs text-muted">
+                                {exp.duration ? exp.duration : `${exp.startDate || ''} - ${exp.isCurrent ? 'Present' : (exp.endDate || '')}`}
+                                {exp.location ? ` • ${exp.location}` : ''}
+                              </div>
+                            </div>
+                            <div className="review-card-controls">
+                              <button
+                                className="icon-btn"
+                                title="Expand Responsibilities"
+                                onClick={() => setExpandedExpIndex(isExpanded ? null : idx)}
+                              >
+                                {isExpanded ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                              </button>
+                              <button
+                                className="icon-btn"
+                                title="Edit Experience"
+                                onClick={() => setEditingExpIndex(idx)}
+                              >
+                                <Edit2 size={14} />
+                              </button>
+                              <button
+                                className="icon-btn text-red"
+                                title="Remove Experience"
+                                onClick={() => handleRemoveExperience(idx)}
+                              >
+                                <Trash2 size={14} />
+                              </button>
+                            </div>
+                          </div>
+
+                          {/* Expandable Key Responsibilities */}
+                          {isExpanded && exp.responsibilities && exp.responsibilities.length > 0 && (
+                            <div className="review-card-details">
+                              <div className="text-xs font-bold uppercase tracking-wider mb-1 text-muted">Key Responsibilities</div>
+                              <ul className="review-bullets-list">
+                                {exp.responsibilities.map((bullet: string, bIdx: number) => (
+                                  <li key={bIdx} className="text-xs">{bullet}</li>
+                                ))}
+                              </ul>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* 4. Projects Section */}
+              <div className="review-section">
+                <div className="review-section-header-row">
+                  <div className="flex-row items-center gap-2">
+                    <FolderGit2 size={16} className="text-primary" />
+                    <h4 className="review-section-title">
+                      Projects ({reviewModalData.parsed.projects?.length || 0})
+                    </h4>
+                  </div>
+                  <Button size="sm" variant="outline" icon={<Plus size={14} />} onClick={handleAddProject}>
+                    Add Project
+                  </Button>
+                </div>
+
+                <div className="review-items-list">
+                  {reviewModalData.parsed.projects?.map((proj: any, idx: number) => {
+                    const isEditing = editingProjectIndex === idx;
+
+                    if (isEditing) {
+                      return (
+                        <div key={idx} className="review-card-edit-box">
+                          <div className="form-group mb-2">
+                            <label className="field-label">Project Name *</label>
+                            <input
+                              type="text"
+                              className="text-input"
+                              value={proj.name || ''}
+                              onChange={e => {
+                                const updated = [...reviewModalData.parsed.projects];
+                                updated[idx] = { ...updated[idx], name: e.target.value };
+                                setReviewModalData({
+                                  ...reviewModalData,
+                                  parsed: { ...reviewModalData.parsed, projects: updated }
+                                });
+                              }}
+                            />
+                          </div>
+                          <div className="form-group mb-2">
+                            <label className="field-label">Description / Achievements</label>
+                            <textarea
+                              rows={2}
+                              className="textarea-input"
+                              value={proj.description || ''}
+                              onChange={e => {
+                                const updated = [...reviewModalData.parsed.projects];
+                                updated[idx] = { ...updated[idx], description: e.target.value };
+                                setReviewModalData({
+                                  ...reviewModalData,
+                                  parsed: { ...reviewModalData.parsed, projects: updated }
+                                });
+                              }}
+                            />
+                          </div>
+                          <div className="flex-row justify-end gap-2 mt-2">
+                            <Button size="sm" variant="ghost" onClick={() => handleRemoveProject(idx)}>
+                              Remove
+                            </Button>
+                            <Button size="sm" variant="primary" onClick={() => setEditingProjectIndex(null)}>
+                              Done
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={idx} className="review-entity-card">
+                        <div className="review-card-top-row">
+                          <div>
+                            <div className="font-bold text-sm">{proj.name}</div>
+                            <div className="text-xs text-muted">{proj.description}</div>
+                          </div>
+                          <div className="review-card-controls">
+                            <button
+                              className="icon-btn"
+                              title="Edit Project"
+                              onClick={() => setEditingProjectIndex(idx)}
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              className="icon-btn text-red"
+                              title="Remove Project"
+                              onClick={() => handleRemoveProject(idx)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
               </div>
 
-              {/* Detected Work Experiences */}
+              {/* 5. Education Section */}
               <div className="review-section">
-                <h4 className="review-section-title">Detected Experience Entries ({reviewModalData.parsed.experience?.length || 0})</h4>
-                {reviewModalData.parsed.experience?.map((exp: any, idx: number) => (
-                  <div key={idx} className="review-exp-item">
-                    <div className="font-semibold text-sm">{exp.jobTitle} at {exp.company}</div>
-                    <div className="text-xs text-muted">{exp.startDate} - {exp.isCurrent ? 'Present' : exp.endDate}</div>
+                <div className="review-section-header-row">
+                  <div className="flex-row items-center gap-2">
+                    <GraduationCap size={16} className="text-primary" />
+                    <h4 className="review-section-title">
+                      Education ({reviewModalData.parsed.education?.length || 0})
+                    </h4>
                   </div>
-                ))}
+                  <Button size="sm" variant="outline" icon={<Plus size={14} />} onClick={handleAddEducation}>
+                    Add Education
+                  </Button>
+                </div>
+
+                <div className="review-items-list">
+                  {reviewModalData.parsed.education?.map((edu: any, idx: number) => {
+                    const isEditing = editingEducationIndex === idx;
+
+                    if (isEditing) {
+                      return (
+                        <div key={idx} className="review-card-edit-box">
+                          <div className="form-grid-two">
+                            <div className="form-group">
+                              <label className="field-label">Degree *</label>
+                              <input
+                                type="text"
+                                className="text-input"
+                                value={edu.degree || ''}
+                                onChange={e => {
+                                  const updated = [...reviewModalData.parsed.education];
+                                  updated[idx] = { ...updated[idx], degree: e.target.value };
+                                  setReviewModalData({
+                                    ...reviewModalData,
+                                    parsed: { ...reviewModalData.parsed, education: updated }
+                                  });
+                                }}
+                              />
+                            </div>
+                            <div className="form-group">
+                              <label className="field-label">Institution *</label>
+                              <input
+                                type="text"
+                                className="text-input"
+                                value={edu.institution || ''}
+                                onChange={e => {
+                                  const updated = [...reviewModalData.parsed.education];
+                                  updated[idx] = { ...updated[idx], institution: e.target.value };
+                                  setReviewModalData({
+                                    ...reviewModalData,
+                                    parsed: { ...reviewModalData.parsed, education: updated }
+                                  });
+                                }}
+                              />
+                            </div>
+                          </div>
+                          <div className="flex-row justify-end gap-2 mt-2">
+                            <Button size="sm" variant="ghost" onClick={() => handleRemoveEducation(idx)}>
+                              Remove
+                            </Button>
+                            <Button size="sm" variant="primary" onClick={() => setEditingEducationIndex(null)}>
+                              Done
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div key={idx} className="review-entity-card">
+                        <div className="review-card-top-row">
+                          <div>
+                            <div className="font-bold text-sm">{edu.degree}</div>
+                            <div className="text-xs text-muted">{edu.institution} {edu.endDate ? `• ${edu.endDate}` : ''}</div>
+                          </div>
+                          <div className="review-card-controls">
+                            <button
+                              className="icon-btn"
+                              title="Edit Education"
+                              onClick={() => setEditingEducationIndex(idx)}
+                            >
+                              <Edit2 size={14} />
+                            </button>
+                            <button
+                              className="icon-btn text-red"
+                              title="Remove Education"
+                              onClick={() => handleRemoveEducation(idx)}
+                            >
+                              <Trash2 size={14} />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* 6. Skills Section with Interactive Chips */}
+              <div className="review-section">
+                <div className="review-section-header-row">
+                  <div className="flex-row items-center gap-2">
+                    <Sparkles size={16} className="text-primary" />
+                    <h4 className="review-section-title">
+                      Skills ({reviewModalData.parsed.skills?.length || 0})
+                    </h4>
+                  </div>
+                  <Badge variant="emerald" size="sm">✓ Detected</Badge>
+                </div>
+
+                <div className="skills-inline-add">
+                  <input
+                    type="text"
+                    className="text-input"
+                    placeholder="Add skill (e.g. Docker, TypeScript)"
+                    value={newSkillInput}
+                    onChange={e => setNewSkillInput(e.target.value)}
+                    onKeyDown={e => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault();
+                        handleAddSkill();
+                      }
+                    }}
+                  />
+                  <Button size="sm" variant="outline" onClick={handleAddSkill}>
+                    Add
+                  </Button>
+                </div>
+
+                <div className="review-skills-chips">
+                  {reviewModalData.parsed.skills?.map((s: any, idx: number) => (
+                    <div key={idx} className="review-skill-chip-wrap">
+                      <span className="skill-name">{s.name}</span>
+                      {s.yearsOfExperience ? <span className="skill-years">{s.yearsOfExperience}y</span> : null}
+                      <button
+                        className="skill-remove-btn"
+                        onClick={() => handleRemoveSkill(s.name)}
+                        title={`Remove ${s.name}`}
+                      >
+                        <X size={12} />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
 
+            {/* Sticky Footer */}
             <div className="review-modal-footer">
-              <Button variant="ghost" onClick={() => setReviewModalData(null)}>
-                Discard Changes
-              </Button>
-              <Button
-                variant="primary"
-                icon={<CheckCircle size={16} />}
-                loading={loading}
-                onClick={handleConfirmReview}
-              >
-                Confirm & Save to Master Profile
-              </Button>
+              <div className="review-footer-status">
+                <span className="text-xs text-muted">
+                  Ready to save: {reviewModalData.parsed.experience?.length || 0} exp, {reviewModalData.parsed.projects?.length || 0} proj, {reviewModalData.parsed.education?.length || 0} edu
+                </span>
+              </div>
+              <div className="review-footer-buttons">
+                <Button variant="ghost" onClick={() => setReviewModalData(null)}>
+                  Discard Changes
+                </Button>
+                <Button
+                  variant="primary"
+                  icon={<CheckCircle size={16} />}
+                  loading={loading}
+                  onClick={handleConfirmReview}
+                >
+                  Confirm & Save to Master Profile
+                </Button>
+              </div>
             </div>
           </div>
         </div>

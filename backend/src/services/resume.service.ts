@@ -125,10 +125,21 @@ export class ResumeService {
       });
     }
 
-    // 2. Save experiences
+    // 2. Save experiences (with intelligent deduplication)
     if (Array.isArray(confirmedData.experience)) {
+      const existingExps = profile.experiences || [];
       for (const exp of confirmedData.experience) {
         if (!exp.company || !exp.jobTitle) continue;
+        const compNorm = exp.company.toLowerCase().trim();
+        const titleNorm = exp.jobTitle.toLowerCase().trim();
+
+        // Check if an existing experience entry matches this company and title
+        const duplicate = existingExps.some((e: any) =>
+          e.company.toLowerCase().trim() === compNorm &&
+          e.jobTitle.toLowerCase().trim() === titleNorm
+        );
+        if (duplicate) continue;
+
         const startDate = exp.startDate ? new Date(exp.startDate) : new Date('2020-01-01');
         const endDate = exp.isCurrent || !exp.endDate ? null : new Date(exp.endDate);
 
@@ -149,10 +160,20 @@ export class ResumeService {
       }
     }
 
-    // 3. Save education
+    // 3. Save education (with deduplication)
     if (Array.isArray(confirmedData.education)) {
+      const existingEdu = profile.educations || [];
       for (const edu of confirmedData.education) {
         if (!edu.institution || !edu.degree) continue;
+        const instNorm = edu.institution.toLowerCase().trim();
+        const degNorm = edu.degree.toLowerCase().trim();
+
+        const duplicate = existingEdu.some((e: any) =>
+          e.institution.toLowerCase().trim() === instNorm &&
+          e.degree.toLowerCase().trim() === degNorm
+        );
+        if (duplicate) continue;
+
         await CandidateProfileRepository.createEducation(profile.id, {
           institution: edu.institution,
           degree: edu.degree,
@@ -166,10 +187,15 @@ export class ResumeService {
       }
     }
 
-    // 4. Save certifications (only actual certifications)
+    // 4. Save certifications (with deduplication)
     if (Array.isArray(confirmedData.certifications)) {
+      const existingCerts = profile.certifications || [];
       for (const cert of confirmedData.certifications) {
         if (!cert.name) continue;
+        const nameNorm = cert.name.toLowerCase().trim();
+        const duplicate = existingCerts.some((c: any) => c.name.toLowerCase().trim() === nameNorm);
+        if (duplicate) continue;
+
         await CandidateProfileRepository.createCertification(profile.id, {
           name: cert.name,
           issuingOrganization: cert.issuingOrganization || 'Accredited Issuer',
@@ -195,10 +221,15 @@ export class ResumeService {
       }
     }
 
-    // 6. Save projects
+    // 6. Save projects (with deduplication)
     if (Array.isArray(confirmedData.projects)) {
+      const existingProjects = profile.projects || [];
       for (const proj of confirmedData.projects) {
         if (!proj.name) continue;
+        const nameNorm = proj.name.toLowerCase().trim();
+        const duplicate = existingProjects.some((p: any) => p.name.toLowerCase().trim() === nameNorm);
+        if (duplicate) continue;
+
         await CandidateProfileRepository.createProject(profile.id, {
           name: proj.name,
           description: proj.description,

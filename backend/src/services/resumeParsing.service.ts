@@ -106,7 +106,7 @@ export class ResumeParsingService {
     // 3. Section Slicing (tolerant of formatting variations)
     const sections = this.extractSections(rawText);
 
-    const summary = sections.summary || (lines.length > 2 ? lines.slice(1, 4).join(' ') : '');
+    const summary = sections.summary || (lines.length > 2 ? lines.slice(1, 4).filter(l => !this.isContactOrAddressLine(l)).join(' ') : '');
     const experience = this.parseExperiences(sections.experience, rawText);
     const education = this.parseEducation(sections.education);
     const certifications = this.parseCertifications(sections.certifications);
@@ -155,42 +155,68 @@ export class ResumeParsingService {
   /**
    * Split raw text into recognized semantic sections.
    * Tolerant of multiple variations like "Work History", "Core Competencies", "Career Objective", etc.
+   * Preserves section purity and does not leak contact lines into summary.
    */
   public static extractSections(rawText: string): Record<string, string> {
     const lines = rawText.split('\n');
     const sections: Record<string, string[]> = {
+      objective: [],
       summary: [],
       experience: [],
       education: [],
       skills: [],
       projects: [],
-      certifications: []
+      certifications: [],
+      languages: []
     };
 
-    let currentSection = 'summary';
+    let currentSection: string | null = null;
 
     for (const rawLine of lines) {
       const line = rawLine.trim();
       if (!line) continue;
       const cleanHeading = line.toUpperCase().replace(/[^A-Z]/g, '');
 
-      if (/^(PROFESSIONALSUMMARY|SUMMARY|PROFILE|CAREEROBJECTIVE|OBJECTIVE|ABOUTME|EXECUTIVEPROFILE)$/.test(cleanHeading)) {
+      // Check if line is a section heading
+      if (/^(PROFESSIONALSUMMARY|SUMMARY|PROFILESUMMARY|CAREERSUMMARY|EXECUTIVEPROFILE|ABOUTME)$/.test(cleanHeading)) {
         currentSection = 'summary';
         continue;
-      } else if (/^(EXPERIENCE|WORKEXPERIENCE|PROFESSIONALEXPERIENCE|EMPLOYMENTHISTORY|WORKHISTORY|CAREERHISTORY)$/.test(cleanHeading)) {
+      } else if (/^(CAREEROBJECTIVE|OBJECTIVE|PROFESSIONALOBJECTIVE)$/.test(cleanHeading)) {
+        currentSection = 'objective';
+        continue;
+      } else if (/^(EXPERIENCE|WORKEXPERIENCE|PROFESSIONALEXPERIENCE|EMPLOYMENTHISTORY|WORKHISTORY|CAREERHISTORY|PROFESSIONALBACKGROUND)$/.test(cleanHeading)) {
         currentSection = 'experience';
         continue;
-      } else if (/^(EDUCATION|ACADEMICBACKGROUND|ACADEMICQUALIFICATIONS|ACADEMICS|EDUCATIONALBACKGROUND)$/.test(cleanHeading)) {
+      } else if (/^(EDUCATION|ACADEMICBACKGROUND|ACADEMICQUALIFICATIONS|ACADEMICS|EDUCATIONALBACKGROUND|EDUCATIONALQUALIFICATIONS)$/.test(cleanHeading)) {
         currentSection = 'education';
         continue;
-      } else if (/^(SKILLS|TECHNICALSKILLS|CORESKILLS|CORECOMPETENCIES|TECHNICALEXPERTISE|AREASOFEXPERTISE|TOOLS|TECHNOLOGIES)$/.test(cleanHeading)) {
+      } else if (/^(SKILLS|KEYSKILLS|TECHNICALSKILLS|CORESKILLS|CORECOMPETENCIES|TECHNICALEXPERTISE|AREASOFEXPERTISE|TOOLS|TECHNOLOGIES|METHODOLOGIES)$/.test(cleanHeading)) {
         currentSection = 'skills';
         continue;
-      } else if (/^(PROJECTS|KEYPROJECTS|MAJORPROJECTS|PROJECTEXPERIENCE|SIGNIFICANTPROJECTS)$/.test(cleanHeading)) {
+      } else if (/^(PROJECTS|KEYPROJECTS|MAJORPROJECTS|PROJECTEXPERIENCE|SELECTEDPROJECTS|SIGNIFICANTPROJECTS)$/.test(cleanHeading)) {
         currentSection = 'projects';
         continue;
       } else if (/^(CERTIFICATIONS|CERTIFICATION|LICENSES|LICENSESANDCERTIFICATIONS|PROFESSIONALCERTIFICATIONS)$/.test(cleanHeading)) {
         currentSection = 'certifications';
+        continue;
+      } else if (/^(LANGUAGES|LANGUAGESKNOWN)$/.test(cleanHeading)) {
+        currentSection = 'languages';
+        continue;
+      }
+
+      // If we haven't hit a section yet, ignore contact/header noise from polluting summary
+      if (!currentSection) {
+        if (!this.isContactOrAddressLine(line)) {
+          // pre-heading text, only include if substantial
+          if (line.length > 40 && !line.includes('@')) {
+            sections.summary.push(line);
+          }
+        }
+        continue;
+      }
+
+      // Filter contact or header noise from being dumped inside summary
+      if (currentSection === 'summary' && this.isContactOrAddressLine(line)) {
         continue;
       }
 
@@ -203,15 +229,22 @@ export class ResumeParsingService {
     for (const [k, v] of Object.entries(sections)) {
       result[k] = v.join('\n').trim();
     }
+
+    // If career objective exists and summary is empty, preserve objective in summary
+    if (!result.summary && result.objective) {
+      result.summary = result.objective;
+    }
+
     return result;
   }
 
   public static isContactOrAddressLine(line: string): boolean {
     const trimmed = line.trim();
-    if (!trimmed || trimmed.length > 70) return true;
+    if (!trimmed || trimmed.length > 90) return false;
 
     if (/[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}/i.test(trimmed)) return true;
     if (/(?:\+?\d{1,3}[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}/.test(trimmed)) return true;
+    if (/\b(?:phone|mobile|tel|contact|email|linkedin|github)\b/i.test(trimmed) && trimmed.length < 50) return true;
     if (/\b\d{5,6}\b/.test(trimmed)) return true; // Postal codes
 
     if (/[•|*]/.test(trimmed) && (trimmed.includes('@') || /\d/.test(trimmed))) return true;
@@ -227,9 +260,6 @@ export class ResumeParsingService {
       'resume', 'curriculum vitae'
     ];
     const stripped = lower.replace(/[^a-z\s]/g, '').trim();
-    if (/\b(years|yrs|experience)\b/i.test(trimmed)) return true;
-    if (/\d+/.test(trimmed)) return true;
-
     if (sectionHeaders.some(h => stripped === h)) return true;
 
     return false;
@@ -240,7 +270,7 @@ export class ResumeParsingService {
       'python', 'java', 'docker', 'kubernetes', 'aws', 'sql', 'javascript', 'typescript',
       'c++', 'c#', 'ruby', 'php', 'golang', 'rust', 'react', 'angular', 'vue',
       'manager', 'engineer', 'developer', 'lead', 'architect', 'consultant', 'analyst',
-      'specialist', 'executive', 'director', 'officer'
+      'specialist', 'executive', 'director', 'officer', 'tester', 'qa', 'sdet'
     ];
 
     for (let i = 0; i < Math.min(10, lines.length); i++) {
@@ -281,91 +311,157 @@ export class ResumeParsingService {
     return 'Candidate';
   }
 
+  /**
+   * Generalized, robust experience extraction that does NOT rely on hardcoded companies or roles.
+   * Handles multi-line titles, employers, durations ("6 years"), date ranges, and bullet segmentation.
+   */
   private static parseExperiences(sectionText: string, fullText: string): ParsedExperience[] {
     const textToScan = sectionText || fullText;
     const lines = textToScan.split('\n').map(l => l.trim()).filter(Boolean);
     const experiences: ParsedExperience[] = [];
 
-    const employerTokens = [
-      'Tata Consultancy Services', 'TCS', 'Mphasis', 'Infosys', 'Wipro', 'Cognizant',
-      'Accenture', 'ThoughtWorks', 'Capgemini', 'IBM', 'HCL', 'Tech Mahindra', 'Persistent Systems',
-      'Google', 'Microsoft', 'Amazon', 'Meta', 'Apple', 'Netflix', 'Oracle', 'Cisco'
-    ];
+    // Date range pattern: e.g. "Jan 2020 - Present", "06/2018 to 12/2021", "2018 - 2022"
+    const dateRangeRegex = /(?:([A-Za-z]{3}\s*\d{4}|\d{1,2}\/\d{4}|\d{4})\s*(?:—|–|-|to)\s*([A-Za-z]{3}\s*\d{4}|\d{1,2}\/\d{4}|\d{4}|Present|Current|Till\s*Date))/i;
+    // Duration pattern: e.g. "6 years", "2 yrs 4 mos", "3+ years"
+    const durationRegex = /\b(\d+(?:\.\d+)?\+?\s*(?:years?|yrs?)(?:\s*(?:and|&)?\s*\d+\s*(?:months?|mos?))?)\b/i;
 
-    const roleTokens = [
-      'PROJECT MANAGER', 'TECHNICAL & PROJECT LEAD', 'PROJECT LEAD', 'TECHNICAL LEAD',
-      'SENIOR SOFTWARE ENGINEER', 'SOFTWARE ENGINEER', 'SENIOR ENGINEER', 'QA AUTOMATION ENGINEER',
-      'DATA ANALYST', 'FULL STACK DEVELOPER', 'DEVOPS ENGINEER', 'SOLUTIONS ARCHITECT',
-      'PRODUCT MANAGER', 'DELIVERY LEAD', 'SCRUM MASTER', 'SYSTEMS ENGINEER'
-    ];
+    // Role indicator keywords
+    const roleKeywordRegex = /\b(engineer|developer|analyst|architect|consultant|manager|lead|director|specialist|tester|qa|sdet|administrator|designer|officer|scientist|associate|intern|programmer|coordinator|executive)\b/i;
 
-    const dateRangeRegex = /(?:([A-Za-z]{3}\s*\d{4}|\d{4})\s*(?:—|–|-|to)\s*([A-Za-z]{3}\s*\d{4}|\d{4}|Present))/i;
+    // Company indicators: e.g. Pvt Ltd, Ltd, Inc, LLC, Technologies, Solutions, Corp, Systems, Software, Labs, etc.
+    const companyIndicatorRegex = /\b(pvt\.?\s*ltd\.?|ltd\.?|inc\.?|llc|corp\.?|corporation|technologies|technology|solutions|systems|services|software|consulting|labs|group|enterprises|bank|aviation)\b/i;
 
     let currentExp: Partial<ParsedExperience> | null = null;
+
+    const commitCurrentExp = () => {
+      if (currentExp && (currentExp.jobTitle || currentExp.company)) {
+        experiences.push(this.finalizeExperience(currentExp, experiences.length));
+      }
+      currentExp = null;
+    };
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      const matchedRole = roleTokens.find(r => line.toUpperCase().replace(/\s+/g, '').includes(r.replace(/\s+/g, '')));
-      const isRoleLine = Boolean(matchedRole) || /^(senior engineer|lead engineer|project manager|delivery lead|scrum master|technical lead|software engineer|lead developer|architect|sdet|qa engineer|consultant|engineering manager)\b/i.test(line);
-      const dateMatch = line.match(dateRangeRegex);
+      // Check for bullet lines first
+      const isBullet = line.startsWith('•') || line.startsWith('-') || line.startsWith('*') || /^\d+\.\s/.test(line);
 
-      if (isRoleLine && !line.includes('•') && !line.includes('Years of Experience')) {
-        if (currentExp && currentExp.jobTitle) {
-          experiences.push(this.finalizeExperience(currentExp, experiences.length));
-        }
-        const titleStr = matchedRole ? this.toTitleCase(matchedRole) : line.split('|')[0].trim();
-        const newExp: any = {
-          jobTitle: titleStr,
-          responsibilities: [],
-          technologies: []
-        };
-        if (line.includes('|')) {
-          const parts = line.split('|');
-          const possibleDate = parts[1]?.trim();
-          const pDateMatch = possibleDate?.match(dateRangeRegex);
-          if (pDateMatch) {
-            newExp.startDate = pDateMatch[1];
-            newExp.endDate = /present/i.test(pDateMatch[2]) ? undefined : pDateMatch[2];
-            newExp.isCurrent = /present/i.test(pDateMatch[2]);
-          }
-        }
-        currentExp = newExp;
+      // Check for date and duration matches
+      const dateMatch = line.match(dateRangeRegex);
+      const durationMatch = line.match(durationRegex);
+
+      // Is this line a job title?
+      // A job title line contains role keywords, is usually not a bullet, and doesn't look like an employer only
+      const hasRoleKeyword = roleKeywordRegex.test(line);
+      const hasCompanyKeyword = companyIndicatorRegex.test(line);
+
+      // Check if line is "Key Responsibilities:" or "Responsibilities:" header
+      if (/^(key\s*)?responsibilities\s*:?$/i.test(line)) {
         continue;
       }
 
-      if (currentExp) {
-        if (!currentExp.company) {
-          const matchedCompany = employerTokens.find(c => line.toLowerCase().includes(c.toLowerCase()));
-          if (matchedCompany) {
-            currentExp.company = matchedCompany;
-            continue;
-          } else if (!dateMatch && !line.startsWith('•') && line.length < 50) {
-            currentExp.company = line;
+      if (!isBullet) {
+        // Case 1: Line has pipe/separator combining Title and Employer or Date (e.g. "Senior Test Engineer | Machine Vogue" or "Title | Jan 2020 - Present")
+        if (line.includes('|') || line.includes(' - ') || line.includes(' – ') || line.includes(' — ')) {
+          const sep = line.includes('|') ? '|' : (line.includes(' — ') ? ' — ' : (line.includes(' – ') ? ' – ' : ' - '));
+          const parts = line.split(sep).map(p => p.trim());
+
+          // If parts contain role keywords
+          if (parts.some(p => roleKeywordRegex.test(p))) {
+            commitCurrentExp();
+
+            const rolePart = parts.find(p => roleKeywordRegex.test(p)) || parts[0];
+            const otherParts = parts.filter(p => p !== rolePart);
+
+            const newExp: Partial<ParsedExperience> = {
+              jobTitle: rolePart,
+              responsibilities: [],
+              technologies: []
+            };
+
+            for (const part of otherParts) {
+              const dMatch = part.match(dateRangeRegex);
+              const durMatch = part.match(durationRegex);
+              if (dMatch) {
+                newExp.startDate = dMatch[1];
+                newExp.endDate = /present|current|till\s*date/i.test(dMatch[2]) ? undefined : dMatch[2];
+                newExp.isCurrent = /present|current|till\s*date/i.test(dMatch[2]);
+              } else if (durMatch) {
+                newExp.duration = durMatch[1];
+              } else if (!newExp.company && part.length < 60) {
+                newExp.company = part;
+              }
+            }
+
+            currentExp = newExp;
             continue;
           }
         }
 
-        if (dateMatch && (!currentExp.startDate || !currentExp.endDate)) {
-          currentExp.startDate = dateMatch[1];
-          currentExp.endDate = /present/i.test(dateMatch[2]) ? undefined : dateMatch[2];
-          currentExp.isCurrent = /present/i.test(dateMatch[2]);
+        // Case 2: Line is a distinct Role Title (e.g. "Senior Test Engineer / Business Analyst")
+        if (hasRoleKeyword && line.length < 80 && !dateMatch) {
+          // If we already have a role title but no company, maybe this line is something else or a second role
+          if (currentExp && !currentExp.company && !currentExp.jobTitle) {
+            currentExp.jobTitle = line;
+            continue;
+          }
+
+          commitCurrentExp();
+          currentExp = {
+            jobTitle: line,
+            responsibilities: [],
+            technologies: []
+          };
           continue;
         }
 
-        if (line.startsWith('•') || line.startsWith('-') || line.length > 25) {
-          const bullet = line.replace(/^[•\-\s*]+/, '').trim();
-          if (bullet.length > 10) {
-            currentExp.responsibilities = currentExp.responsibilities || [];
-            currentExp.responsibilities.push(bullet);
+        // Case 3: Line contains Company keyword (e.g. "Machine Vogue Technology Pvt Ltd.")
+        if (hasCompanyKeyword && line.length < 80) {
+          if (currentExp && !currentExp.company) {
+            currentExp.company = line;
+            continue;
+          } else if (!currentExp) {
+            // Company first pattern: Start exp with company, wait for role title
+            currentExp = {
+              company: line,
+              responsibilities: [],
+              technologies: []
+            };
+            continue;
           }
+        }
+
+        // Case 4: Line contains Date or Duration alone (e.g. "6 years" or "Jan 2020 - Present")
+        if (currentExp && (dateMatch || durationMatch)) {
+          if (dateMatch && !currentExp.startDate) {
+            currentExp.startDate = dateMatch[1];
+            currentExp.endDate = /present|current|till\s*date/i.test(dateMatch[2]) ? undefined : dateMatch[2];
+            currentExp.isCurrent = /present|current|till\s*date/i.test(dateMatch[2]);
+          }
+          if (durationMatch && !currentExp.duration) {
+            currentExp.duration = durationMatch[1];
+          }
+          continue;
+        }
+
+        // Case 5: If currentExp exists and lacks company, and line is a short non-bullet string (< 50 chars), it's likely the company
+        if (currentExp && !currentExp.company && line.length < 50 && !dateMatch && !durationMatch) {
+          currentExp.company = line;
+          continue;
+        }
+      }
+
+      // Collect responsibilities / bullets under the current experience
+      if (currentExp) {
+        const cleanBullet = line.replace(/^[•\-\*\d\.\s]+/, '').trim();
+        if (cleanBullet.length > 8) {
+          currentExp.responsibilities = currentExp.responsibilities || [];
+          currentExp.responsibilities.push(cleanBullet);
         }
       }
     }
 
-    if (currentExp && currentExp.jobTitle) {
-      experiences.push(this.finalizeExperience(currentExp, experiences.length));
-    }
+    commitCurrentExp();
 
     return experiences;
   }
@@ -373,20 +469,21 @@ export class ResumeParsingService {
   private static finalizeExperience(exp: Partial<ParsedExperience>, idx: number): ParsedExperience {
     const bullets = exp.responsibilities && exp.responsibilities.length > 0
       ? exp.responsibilities
-      : ['Contributed to key organizational initiatives and technical deliverables.'];
+      : ['Contributed to core deliverables and organizational initiatives.'];
 
     return {
       company: exp.company || 'Enterprise Organization',
-      jobTitle: exp.jobTitle || 'Software Professional',
+      jobTitle: exp.jobTitle || 'Professional Role',
       location: exp.location || '',
       employmentType: 'Full-time',
-      startDate: exp.startDate || '2019',
-      endDate: exp.isCurrent ? undefined : (exp.endDate || '2023'),
+      startDate: exp.startDate || '',
+      endDate: exp.isCurrent ? undefined : (exp.endDate || ''),
+      duration: exp.duration || '',
       isCurrent: Boolean(exp.isCurrent),
       description: bullets[0] || 'Professional delivery and responsibilities.',
       responsibilities: bullets,
       achievements: bullets.slice(0, 2),
-      technologies: ['Agile', 'Jira', 'SQL'],
+      technologies: exp.technologies && exp.technologies.length > 0 ? exp.technologies : ['Agile', 'Jira'],
       displayOrder: idx
     };
   }
@@ -396,30 +493,54 @@ export class ResumeParsingService {
     const lines = educationText.split('\n').map(l => l.trim()).filter(Boolean);
     const items: ParsedEducation[] = [];
 
-    let degree = '';
-    let institution = '';
-    let year = '';
+    let currentEdu: Partial<ParsedEducation> | null = null;
 
     for (const line of lines) {
-      if (/degree|bachelor|master|b\.tech|b\.e\.|b\.sc|m\.tech|mca|phd|associate/i.test(line)) {
-        degree = line.replace(/^[•\-\s*]+/, '').trim();
-      } else if (/university|college|institute|school|academy/i.test(line)) {
-        institution = line.replace(/^[•\-\s*]+/, '').trim();
-      }
-      const yMatch = line.match(/\b(19\d{2}|20\d{2})\b/);
-      if (yMatch && !year) {
-        year = yMatch[1];
+      const clean = line.replace(/^[•\-\*\s]+/, '').trim();
+      const isDegree = /bachelor|master|b\.tech|b\.e\.|b\.sc|m\.tech|mca|mba|phd|associate|degree|diploma/i.test(clean);
+      const isInstitution = /university|college|institute|school|academy/i.test(clean);
+      const yearMatch = clean.match(/\b(19\d{2}|20\d{2})\b/);
+
+      if (isDegree) {
+        if (currentEdu && (currentEdu.degree || currentEdu.institution)) {
+          items.push({
+            degree: currentEdu.degree || "Bachelor's Degree",
+            institution: currentEdu.institution || "Accredited University",
+            fieldOfStudy: currentEdu.fieldOfStudy || '',
+            location: currentEdu.location || '',
+            startDate: undefined,
+            endDate: currentEdu.endDate || undefined,
+            gradeGpa: '',
+            description: ''
+          });
+        }
+        currentEdu = {
+          degree: clean,
+          institution: '',
+          endDate: yearMatch ? yearMatch[1] : undefined
+        };
+      } else if (isInstitution) {
+        if (!currentEdu) {
+          currentEdu = { degree: "Bachelor's Degree", institution: clean };
+        } else {
+          currentEdu.institution = clean;
+        }
+        if (yearMatch && !currentEdu.endDate) {
+          currentEdu.endDate = yearMatch[1];
+        }
+      } else if (currentEdu && yearMatch && !currentEdu.endDate) {
+        currentEdu.endDate = yearMatch[1];
       }
     }
 
-    if (degree || institution) {
+    if (currentEdu && (currentEdu.degree || currentEdu.institution)) {
       items.push({
-        degree: degree || "Bachelor's Degree",
-        institution: institution || "Accredited University",
-        fieldOfStudy: '',
-        location: '',
+        degree: currentEdu.degree || "Bachelor's Degree",
+        institution: currentEdu.institution || "Accredited University",
+        fieldOfStudy: currentEdu.fieldOfStudy || '',
+        location: currentEdu.location || '',
         startDate: undefined,
-        endDate: year || undefined,
+        endDate: currentEdu.endDate || undefined,
         gradeGpa: '',
         description: ''
       });
@@ -450,21 +571,64 @@ export class ResumeParsingService {
     });
   }
 
+  /**
+   * Generalized Project extraction. Parses multiple distinct projects with names, descriptions, and roles.
+   */
   private static parseProjects(projectsText: string): ParsedProject[] {
     if (!projectsText) return [];
     const lines = projectsText.split('\n').map(l => l.trim()).filter(Boolean);
     if (lines.length === 0) return [];
 
-    return [{
-      name: lines[0].replace(/^[•\-\s*]+/, '').trim() || 'Core Deliverable Project',
-      description: lines.slice(1, 4).join(' ') || 'Implemented key engineering architecture and delivery objectives.',
-      role: 'Contributor',
-      technologies: ['Agile', 'Jira', 'CI/CD'],
-      url: '',
-      startDate: undefined,
-      endDate: undefined,
-      displayOrder: 0
-    }];
+    const projects: ParsedProject[] = [];
+    let currentProj: Partial<ParsedProject> | null = null;
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const isBullet = line.startsWith('•') || line.startsWith('-') || line.startsWith('*');
+      const clean = line.replace(/^[•\-\*\s]+/, '').trim();
+
+      // If non-bullet and short to medium length, treat as project title / header
+      if (!isBullet && clean.length > 3 && clean.length < 60) {
+        if (currentProj && currentProj.name) {
+          projects.push({
+            name: currentProj.name,
+            description: currentProj.description || 'Contributed to project delivery and specifications.',
+            role: currentProj.role || 'Contributor',
+            technologies: currentProj.technologies || ['Agile', 'Jira'],
+            url: '',
+            startDate: undefined,
+            endDate: undefined,
+            displayOrder: projects.length
+          });
+        }
+        currentProj = {
+          name: clean,
+          description: '',
+          technologies: []
+        };
+      } else if (currentProj) {
+        if (!currentProj.description) {
+          currentProj.description = clean;
+        } else {
+          currentProj.description += ` ${clean}`;
+        }
+      }
+    }
+
+    if (currentProj && currentProj.name) {
+      projects.push({
+        name: currentProj.name,
+        description: currentProj.description || 'Contributed to project delivery and specifications.',
+        role: currentProj.role || 'Contributor',
+        technologies: currentProj.technologies || ['Agile', 'Jira'],
+        url: '',
+        startDate: undefined,
+        endDate: undefined,
+        displayOrder: projects.length
+      });
+    }
+
+    return projects;
   }
 
   /**
@@ -491,10 +655,14 @@ export class ResumeParsingService {
       'jenkins': { name: 'Jenkins', category: 'TOOL' },
       'ci/cd': { name: 'CI/CD', category: 'TECHNICAL' },
       'git': { name: 'Git', category: 'TOOL' },
+      'maven': { name: 'Maven', category: 'TOOL' },
+      'eclipse': { name: 'Eclipse', category: 'TOOL' },
       'jira': { name: 'Jira', category: 'TOOL' },
       'confluence': { name: 'Confluence', category: 'TOOL' },
       'agile': { name: 'Agile Methodologies', category: 'TECHNICAL' },
       'scrum': { name: 'Scrum', category: 'TECHNICAL' },
+      'kanban': { name: 'Kanban', category: 'TECHNICAL' },
+      'bpmn': { name: 'BPMN', category: 'TECHNICAL' },
       'project management': { name: 'Project Management', category: 'TECHNICAL' },
       'leadership': { name: 'Leadership', category: 'SOFT' },
       'communication': { name: 'Communication', category: 'SOFT' },
