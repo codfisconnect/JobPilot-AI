@@ -479,7 +479,7 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
             <p style={{ margin: '4px 0 0', fontSize: '0.85rem' }}>Use the Add Job Source URL form above to connect your first career page.</p>
           </div>
         ) : (
-          <div style={{ overflowX: 'auto' }}>
+          <div className="admin-table-scroll-wrap">
             <table className="admin-data-table">
               <thead>
                 <tr>
@@ -489,7 +489,7 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
                   <th>Last Sync</th>
                   <th>Next Scheduled Sync</th>
                   <th>Status</th>
-                  <th>Created / Updated / Expired</th>
+                  <th>Sync Result</th>
                   <th>Actions</th>
                 </tr>
               </thead>
@@ -597,8 +597,10 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
                       </td>
 
                       <td>
-                        <div style={{ fontSize: '0.82rem', color: 'var(--text-primary, #f8fafc)' }}>
-                          <span style={{ color: '#4ade80' }}>+{src.jobsCreated ?? 0}</span> / <span style={{ color: '#818cf8' }}>~{src.jobsUpdated ?? 0}</span> / <span style={{ color: '#f87171' }}>-{src.jobsExpired ?? 0}</span>
+                        <div style={{ fontSize: '0.82rem', color: 'var(--text-primary, #f8fafc)', whiteSpace: 'nowrap' }}>
+                          <span style={{ color: '#4ade80', fontWeight: 600 }}>{src.jobsCreated ?? 0}</span> added,{' '}
+                          <span style={{ color: '#818cf8', fontWeight: 600 }}>{src.jobsUpdated ?? 0}</span> updated,{' '}
+                          <span style={{ color: '#f87171', fontWeight: 600 }}>{src.jobsExpired ?? 0}</span> expired
                         </div>
                       </td>
 

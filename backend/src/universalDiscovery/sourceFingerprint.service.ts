@@ -111,6 +111,17 @@ export class SourceFingerprintService {
         signals.push('HTML references SmartRecruiters');
       }
 
+      // Check Phenom patterns
+      if (
+        lowerHtml.includes('phenompeople.com') ||
+        lowerHtml.includes('phapp') ||
+        lowerHtml.includes('eagerloadrefinesearch')
+      ) {
+        atsVendor = 'PHENOM';
+        confidence = 95;
+        signals.push('HTML references Phenom careers platform');
+      }
+
       // Check SPA frameworks
       if (
         lowerHtml.includes('__next_data__') ||

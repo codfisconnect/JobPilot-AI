@@ -357,11 +357,10 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
                     <Button
                       variant="primary"
                       size="sm"
-                      icon={<ArrowRight size={14} />}
-                      onClick={() => onNavigate('jobs', job.id)}
+                      icon={<Send size={14} />}
+                      onClick={() => onNavigate('analysis', job.id)}
                     >
-                      <span className="desktop-only-text">View / Apply</span>
-                      <span className="mobile-only-text">Apply</span>
+                      <span>Apply</span>
                     </Button>
                   </div>
                 </div>
