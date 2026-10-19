@@ -22,13 +22,13 @@
 
 @media (max-width: 768px) {
   .app-page-content {
-    padding: 16px 14px calc(24px + var(--sab));
+    padding: 16px 14px calc(76px + var(--sab));
   }
 }
 
 @media (max-width: 480px) {
   .app-page-content {
-    padding: 12px 10px calc(20px + var(--sab));
+    padding: 12px 10px calc(72px + var(--sab));
   }
 }
 

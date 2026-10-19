@@ -39,8 +39,14 @@ jobs:
           echo "Sync Summary:"
           echo "$HTTP_BODY"
 
-          if [ "$HTTP_STATUS" -ne 200 ]; then
-            echo "::error::Automated sync failed with status $HTTP_STATUS"
+          if [ "$HTTP_STATUS" -eq 401 ] || [ "$HTTP_STATUS" -eq 403 ]; then
+            echo "::error::Authentication failed ($HTTP_STATUS). Verify JOB_SYNC_CRON_SECRET in GitHub Repository Secrets matches Render production backend environment."
+            exit 1
+          elif [ "$HTTP_STATUS" -eq 502 ] || [ "$HTTP_STATUS" -eq 503 ] || [ "$HTTP_STATUS" -eq 504 ]; then
+            echo "::error::Production backend unavailable or timed out ($HTTP_STATUS) at $API_URL."
+            exit 1
+          elif [ "$HTTP_STATUS" -ne 200 ]; then
+            echo "::error::Automated sync failed with HTTP status $HTTP_STATUS"
             exit 1
           fi
 

@@ -97,7 +97,8 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onOpenSourceUrl
 
       <div className="job-card-actions">
         <Button variant="outline" size="sm" onClick={(e) => { e.stopPropagation(); onSelect(job); }}>
-          View Details
+          <span className="desktop-only-text">View Details</span>
+          <span className="mobile-only-text">Details</span>
         </Button>
         <Button
           variant="primary"
@@ -113,7 +114,8 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onOpenSourceUrl
             }
           }}
         >
-          View / Apply
+          <span className="desktop-only-text">View / Apply</span>
+          <span className="mobile-only-text">Apply</span>
         </Button>
       </div>
     </Card>

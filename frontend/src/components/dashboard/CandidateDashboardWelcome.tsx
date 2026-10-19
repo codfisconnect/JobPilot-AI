@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import {
   CheckCircle2,
-  Clock,
   Circle,
   Sparkles,
   AlertCircle,
@@ -66,7 +65,17 @@ export const CandidateDashboardWelcome: React.FC<CandidateDashboardWelcomeProps>
       role="status"
       aria-live="polite"
     >
+      {/* 3D Perspective Grid Background Floor */}
+      <div className="pilot-loader-grid-container" aria-hidden="true">
+        <div className="pilot-loader-horizon" />
+        <div className="pilot-loader-grid-floor" />
+      </div>
+
       <div className="pilot-welcome-card">
+        {/* Glowing Top & Bottom Neon Accent Lines */}
+        <div className="pilot-loader-accent-line pilot-loader-accent-top" aria-hidden="true" />
+        <div className="pilot-loader-accent-line pilot-loader-accent-bottom" aria-hidden="true" />
+
         {/* Brand Badge */}
         <div className="welcome-badge-row">
           <div className="welcome-brand-badge">
@@ -94,7 +103,11 @@ export const CandidateDashboardWelcome: React.FC<CandidateDashboardWelcomeProps>
             <span>Workspace Preparation</span>
             {!readiness.error && (
               <span className="welcome-checklist-status-active">
-                <Clock size={13} className="welcome-spinner" />
+                <span className="welcome-active-dots" aria-hidden="true">
+                  <span className="welcome-active-dot" />
+                  <span className="welcome-active-dot" />
+                  <span className="welcome-active-dot" />
+                </span>
                 <span>
                   {readiness.isReady ? 'Ready' : 'Preparing your personalized dashboard…'}
                 </span>
@@ -108,7 +121,7 @@ export const CandidateDashboardWelcome: React.FC<CandidateDashboardWelcomeProps>
               {readiness.profile ? (
                 <CheckCircle2 className="checklist-icon ready" />
               ) : (
-                <Clock className="checklist-icon loading welcome-spinner" />
+                <span className="checklist-pulse-dot" aria-hidden="true" />
               )}
               <span>Profile</span>
             </div>

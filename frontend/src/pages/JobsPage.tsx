@@ -118,35 +118,8 @@ export const JobsPage: React.FC<JobsPageProps> = ({
       }
     } catch (err: any) {
       console.error('Failed to load canonical jobs:', err);
-      // Fallback: If DB table is empty or unauthenticated in dev, fetch prototype jobs gracefully
-      try {
-        const protoJobs = await api.getJobs();
-        const mapped = protoJobs.map((pj: any) => ({
-          id: pj.id,
-          title: pj.role,
-          company: { id: 'comp-' + pj.id, name: pj.company },
-          description: pj.rawText || pj.role,
-          responsibilities: pj.responsibilities || [],
-          requirements: pj.qualifications || [],
-          preferredQualifications: [],
-          remoteType: (pj.workMode?.toUpperCase().includes('REMOTE') ? 'REMOTE' : 'ON_SITE') as any,
-          employmentType: 'FULL_TIME' as any,
-          status: 'ACTIVE' as any,
-          sourceType: pj.source || 'PROTOTYPE',
-          sourceName: pj.source || 'Predefined',
-          sourceUrl: pj.sourceUrl || '#',
-          applicationUrl: pj.applicationUrl || pj.sourceUrl,
-          firstSeenAt: new Date().toISOString(),
-          lastSeenAt: new Date().toISOString(),
-          skills: (pj.mustHaveSkills || []).map((s: string) => ({ id: s, name: s, category: 'TECHNICAL', type: 'REQUIRED' as any }))
-        }));
-        setJobs(mapped);
-        setTotalPages(1);
-        setTotalCount(mapped.length);
-      } catch (fErr: any) {
-        const norm = normalizeApiError(err, 'Unable to fetch job opportunities');
-        setError(norm.message);
-      }
+      const norm = normalizeApiError(err, 'Unable to fetch job opportunities');
+      setError(norm.message);
     } finally {
       setLoading(false);
     }
@@ -235,9 +208,10 @@ export const JobsPage: React.FC<JobsPageProps> = ({
       {/* Header & Main Controls */}
       <div className="jobs-header-row">
         <div>
-          <h2 className="jobs-page-title">Explore Career Opportunities</h2>
+          <h2 className="jobs-page-title">Explore Opportunities</h2>
           <p className="jobs-page-sub">
-            Discover opportunities from connected company career sources with automated deduplication and source transparency.
+            <span className="desktop-only-text">Discover opportunities from connected company career sources with automated deduplication and source transparency.</span>
+            <span className="mobile-only-text">Find verified jobs from trusted company sources.</span>
           </p>
         </div>
 
@@ -359,6 +333,41 @@ export const JobsPage: React.FC<JobsPageProps> = ({
           )}
         </div>
       </div>
+
+      {/* Active Filter Chips Bar */}
+      {activeFilterCount > 0 && (
+        <div className="active-filter-chips-row">
+          <span className="chips-label">Filters:</span>
+          {remoteFilter && (
+            <button className="filter-chip" onClick={() => setRemoteFilter('')}>
+              {remoteFilter.replace('_', ' ')} <X size={12} />
+            </button>
+          )}
+          {employmentFilter && (
+            <button className="filter-chip" onClick={() => setEmploymentFilter('')}>
+              {employmentFilter.replace('_', ' ')} <X size={12} />
+            </button>
+          )}
+          {companyFilter && (
+            <button className="filter-chip" onClick={() => setCompanyFilter('')}>
+              {companyFilter} <X size={12} />
+            </button>
+          )}
+          {postedDateFilter && (
+            <button className="filter-chip" onClick={() => setPostedDateFilter('')}>
+              Past {postedDateFilter}d <X size={12} />
+            </button>
+          )}
+          {locationFilter && (
+            <button className="filter-chip" onClick={() => setLocationFilter('')}>
+              {locationFilter} <X size={12} />
+            </button>
+          )}
+          <button className="filter-clear-all-btn" onClick={handleResetFilters}>
+            Clear all
+          </button>
+        </div>
+      )}
 
       {/* Results Header */}
       <div className="jobs-results-meta">

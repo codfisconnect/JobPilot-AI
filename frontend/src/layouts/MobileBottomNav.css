@@ -1,0 +1,80 @@
+.mobile-bottom-nav {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: calc(60px + var(--sab));
+  padding-bottom: var(--sab);
+  background: var(--bg-secondary);
+  border-top: 1px solid var(--border-primary);
+  z-index: 1000;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  justify-content: space-around;
+  align-items: center;
+  box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme="light"] .mobile-bottom-nav {
+  background: rgba(255, 255, 255, 0.95);
+  box-shadow: 0 -4px 16px rgba(15, 23, 42, 0.06);
+}
+
+.mobile-bottom-nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  flex: 1;
+  height: 100%;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  cursor: pointer;
+  padding: 6px 2px;
+  transition: all 0.2s ease;
+  min-width: 0;
+  touch-action: manipulation;
+}
+
+.mobile-bottom-nav-item:hover,
+.mobile-bottom-nav-item:focus-visible {
+  color: var(--accent-primary);
+}
+
+.mobile-bottom-nav-item.active {
+  color: var(--accent-primary);
+}
+
+.mobile-nav-icon-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 24px;
+}
+
+.mobile-nav-active-pill {
+  position: absolute;
+  top: -6px;
+  width: 16px;
+  height: 3px;
+  background: var(--accent-primary);
+  border-radius: 3px;
+}
+
+.mobile-nav-label {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  white-space: nowrap;
+}
+
+@media (max-width: 768px) {
+  .mobile-bottom-nav {
+    display: flex;
+  }
+}

@@ -306,15 +306,30 @@ export class JobRepositoryV1 {
     }
 
     // Determine sorting
-    let orderBy: Prisma.JobOrderByWithRelationInput = { postedAt: 'desc' };
+    let orderBy: Prisma.JobOrderByWithRelationInput[] = [
+      { postedAt: 'desc' },
+      { createdAt: 'desc' }
+    ];
     if (params.sortBy === 'oldest') {
-      orderBy = { postedAt: 'asc' };
+      orderBy = [
+        { postedAt: 'asc' },
+        { createdAt: 'asc' }
+      ];
     } else if (params.sortBy === 'salary') {
-      orderBy = { salaryMax: 'desc' };
+      orderBy = [
+        { salaryMax: 'desc' },
+        { createdAt: 'desc' }
+      ];
     } else if (params.sortBy === 'company') {
-      orderBy = { company: { name: 'asc' } };
+      orderBy = [
+        { company: { name: 'asc' } },
+        { createdAt: 'desc' }
+      ];
     } else if (params.sortBy === 'location') {
-      orderBy = { location: 'asc' };
+      orderBy = [
+        { location: 'asc' },
+        { createdAt: 'desc' }
+      ];
     }
 
     const [total, rawItems] = await Promise.all([

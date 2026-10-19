@@ -10,7 +10,7 @@ describe('Candidate Jobs Discovery & Exploration Suite (Regression for 0 Jobs Bu
   let candidateUser: any;
 
   let testCompanyA: any;
-  let testCompanyB: any;
+  let testCompanyB: an677776y;
   let jobA: any;
   let jobB: any;
 
@@ -205,6 +205,27 @@ describe('Candidate Jobs Discovery & Exploration Suite (Regression for 0 Jobs Bu
     assert.strictEqual(res.status, 200);
     assert.strictEqual(res.body.success, true);
     assert.ok(Array.isArray(res.body.data));
+  });
+
+  it('12. Regression: GET /api/v1/jobs?pageSize=6&sortBy=latest returns exactly 6 items with canonical pagination and newest ordering', async () => {
+    const res = await supertest(app).get('/api/v1/jobs?pageSize=6&sortBy=latest');
+    assert.strictEqual(res.status, 200);
+    assert.strictEqual(res.body.success, true);
+    assert.strictEqual(res.body.data.length, 6);
+    assert.ok(res.body.pagination);
+    assert.strictEqual(res.body.pagination.page, 1);
+    assert.strictEqual(res.body.pagination.pageSize, 6);
+    assert.ok(res.body.pagination.total >= 6);
+    assert.ok(res.body.pagination.totalPages >= 1);
+
+    // Verify ordering is descending by timestamp
+    for (let i = 0; i < res.body.data.length - 1; i++) {
+      const current = res.body.data[i];
+      const next = res.body.data[i + 1];
+      const currentTime = new Date(current.postedAt || current.createdAt).getTime();
+      const nextTime = new Date(next.postedAt || next.createdAt).getTime();
+      assert.ok(currentTime >= nextTime, 'Latest jobs must be ordered newest to oldest');
+    }
   });
 
   after(async () => {

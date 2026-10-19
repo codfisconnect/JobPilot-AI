@@ -774,3 +774,193 @@
   from { transform: translateY(100%); }
   to { transform: translateY(0); }
 }
+
+/* ==========================================================================
+   Active Filter Chips Bar
+   ========================================================================== */
+.active-filter-chips-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 0;
+}
+
+.chips-label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.filter-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px;
+  border-radius: var(--radius-full, 9999px);
+  background: rgba(99, 102, 241, 0.12);
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: #a5b4fc;
+  font-size: 0.775rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.filter-chip:hover {
+  background: rgba(99, 102, 241, 0.22);
+}
+
+.filter-clear-all-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.775rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 4px 8px;
+  text-decoration: underline;
+}
+
+.filter-clear-all-btn:hover {
+  color: var(--accent-primary);
+}
+
+/* Mobile Filter Button Base */
+.mobile-filter-btn {
+  display: none;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 14px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-subtle);
+  background: var(--bg-surface);
+  color: var(--text-primary);
+  font-size: 0.825rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mobile-filter-badge {
+  background: var(--accent-primary);
+  color: #fff;
+  font-size: 0.7rem;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Desktop vs Mobile text helpers */
+.mobile-only-text {
+  display: none;
+}
+.desktop-only-text {
+  display: inline;
+}
+
+/* ==========================================================================
+   Responsive Breakpoints for JobsPage & JobCards
+   ========================================================================== */
+@media (max-width: 1024px) {
+  .jobs-grid-display {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .jobs-page {
+    gap: 16px;
+  }
+
+  .mobile-only-text {
+    display: inline;
+  }
+  .desktop-only-text {
+    display: none;
+  }
+
+  .desktop-only-filters {
+    display: none !important;
+  }
+
+  .mobile-filter-btn {
+    display: inline-flex;
+  }
+
+  .jobs-header-row {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .jobs-actions-group {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .jobs-page-title {
+    font-size: 1.25rem;
+  }
+
+  .search-filter-bar {
+    padding: 8px 12px;
+  }
+
+  .search-input-wrap {
+    max-width: 100%;
+    width: 100%;
+  }
+
+  .jobs-grid-display {
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .canonical-job-card {
+    padding: 14px 16px;
+    gap: 8px;
+  }
+
+  .job-title-heading {
+    font-size: 1.05rem;
+    line-height: 1.35;
+  }
+
+  .job-meta-details {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 8px 12px;
+    font-size: 0.775rem;
+  }
+
+  .job-skills-container {
+    min-height: auto;
+    gap: 4px;
+  }
+
+  .job-card-actions {
+    margin-top: 4px;
+    padding-top: 8px;
+  }
+
+  .jobs-pagination-bar {
+    gap: 10px;
+    margin-top: 8px;
+  }
+}
+
+@media (max-width: 480px) {
+  .jobs-actions-group button {
+    flex: 1;
+  }
+
+  .job-card-actions button {
+    flex: 1;
+    font-size: 0.775rem;
+    padding: 6px 8px;
+  }
+}

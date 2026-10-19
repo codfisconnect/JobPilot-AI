@@ -110,14 +110,27 @@
 
 @media (max-width: 768px) {
   .app-topbar {
-    padding: 0 16px;
-    padding-left: calc(16px + var(--sal));
-    padding-right: calc(16px + var(--sar));
-    height: 58px;
+    padding: 0 14px;
+    padding-left: calc(14px + var(--sal));
+    padding-right: calc(14px + var(--sar));
+    height: 54px;
   }
 
   .mobile-menu-toggle-btn {
     display: flex;
+    width: 36px;
+    height: 36px;
+    padding: 6px;
+  }
+
+  .topbar-sub {
+    display: none;
+  }
+
+  .topbar-title {
+    font-size: 0.95rem;
+    font-weight: 800;
+    letter-spacing: -0.01em;
   }
 
   .btn-label-desktop {
@@ -128,6 +141,11 @@
     display: inline;
   }
 
+  .topbar-upload-btn {
+    padding: 6px 10px;
+    font-size: 0.8rem;
+  }
+
   .meta-details {
     display: none;
   }
@@ -135,10 +153,7 @@
 
 @media (max-width: 380px) {
   .topbar-title {
-    font-size: 0.9rem;
-  }
-  .topbar-sub {
-    font-size: 0.7rem;
+    font-size: 0.88rem;
   }
   .app-topbar {
     padding: 0 10px;

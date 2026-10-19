@@ -1,6 +1,7 @@
 import React, { useState, lazy, Suspense } from 'react';
 import { AppShell } from "./layouts/AppShell";
 import { DashboardPage } from "./pages/DashboardPage";
+import { useAuth } from "./context/AuthContext";
 
 // Lazy-loaded routes for code-splitting non-critical paths
 const ProfilePage = lazy(() => import("./pages/ProfilePage").then(m => ({ default: m.ProfilePage })));
@@ -20,17 +21,10 @@ const AuthPage = lazy(() => import("./pages/AuthPage").then(m => ({ default: m.A
 const AdminRoot = lazy(() => import("./pages/admin/AdminRoot").then(m => ({ default: m.AdminRoot })));
 const AdminLoginPage = lazy(() => import("./pages/admin/AdminLoginPage").then(m => ({ default: m.AdminLoginPage })));
 
+import { PilotMamaLoadingScreen } from "./components/common/PilotMamaLoadingScreen";
+
 const RouteLoadingFallback: React.FC = () => (
-  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '300px', width: '100%' }}>
-    <div style={{
-      width: '32px',
-      height: '32px',
-      borderRadius: '50%',
-      border: '3px solid rgba(99, 102, 241, 0.2)',
-      borderTopColor: '#6366f1',
-      animation: 'spin 0.8s linear infinite'
-    }} />
-  </div>
+  <PilotMamaLoadingScreen fullScreen={false} statusText="Loading section…" />
 );
 
 export const App: React.FC = () => {
@@ -134,6 +128,13 @@ export const App: React.FC = () => {
       window.history.pushState({}, '', targetPath);
     }
   };
+
+  const { isLoading: isAuthLoading } = useAuth();
+
+  // Initial Full-Viewport Bootstrap Loading Screen
+  if (isAuthLoading) {
+    return <PilotMamaLoadingScreen fullScreen={true} statusText="Initializing your career workspace…" />;
+  }
 
   // Dedicated Administrative Portal Layout (isolated from candidate navigation)
   if (currentTab === 'admin-login') {

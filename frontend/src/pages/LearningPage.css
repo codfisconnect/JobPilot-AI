@@ -158,3 +158,69 @@
     gap: 8px;
   }
 }
+
+/* ==========================================================================
+   Career Page Responsive Container & Header
+   ========================================================================== */
+.career-page-container {
+  padding: 24px;
+  max-width: 1300px;
+  margin: 0 auto;
+}
+
+.career-page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 24px;
+  flex-wrap: wrap;
+  gap: 16px;
+}
+
+.career-page-title {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--text-primary, #f8fafc);
+  margin: 0 0 6px 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.career-page-subtitle {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--text-muted, #94a3b8);
+}
+
+.career-header-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+@media (max-width: 768px) {
+  .career-page-container {
+    padding: 14px 12px;
+  }
+
+  .career-page-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .career-page-title {
+    font-size: 1.25rem;
+  }
+
+  .career-header-actions {
+    width: 100%;
+  }
+
+  .career-header-actions button {
+    flex: 1;
+    justify-content: center;
+  }
+}
