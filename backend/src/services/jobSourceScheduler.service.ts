@@ -148,13 +148,27 @@ export class JobSourceSchedulerService {
         return { success: true, status: 'SKIPPED' };
       }
 
+      let endpoint = config.jobsEndpoint || config.sourceUrl;
+      try {
+        const u = new URL(endpoint);
+        if (u.searchParams.get('rows') === '50') {
+          u.searchParams.set('rows', '1000');
+          endpoint = u.toString();
+        }
+      } catch {}
+
+      const meta = (config.discoveryMetadata as any) || {};
+
       const discovery: DiscoveryResult = {
         detectedType: config.sourceType as any,
         sourceUrl: config.sourceUrl,
-        jobsEndpoint: config.jobsEndpoint || config.sourceUrl,
+        jobsEndpoint: endpoint,
         companyName: config.company.name,
         officialDomain: config.company.officialDomain || '',
         jobCount: config.jobsFound,
+        expectedJobCount: meta.expectedJobCount ?? null,
+        completeness: meta.completeness ?? 'UNKNOWN',
+        paginationSupported: meta.paginationSupported ?? true,
         mappingConfig: (config.mappingConfig as any) || {},
         sampleJobs: []
       };

@@ -13,7 +13,8 @@ export class IcimsAdapter implements IJobSourceStrategy {
     if (context.fingerprint.atsVendor === 'ICIMS') return true;
     if (context.normalizedUrl.domain.includes('icims.com')) return true;
     if (context.fingerprint.iframeSources.some(src => src.includes('icims.com'))) return true;
-    if (context.initialHtml && context.initialHtml.includes('icims.com')) return true;
+    // Only handle if the page itself is an iCIMS hosted frame/portal, not merely a custom careers site mentioning icims in an external link
+    if (context.initialHtml && (context.initialHtml.includes('icims_iframe') || context.initialHtml.includes('jobs.icims.com'))) return true;
     return false;
   }
 

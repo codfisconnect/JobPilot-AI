@@ -138,11 +138,20 @@ export class DiscoveredApiStrategy implements IJobSourceStrategy {
 
               const completeness = CompletenessEstimatorService.evaluate(mappedJobs.length, expectedCount);
 
+              let normalizedJobsEndpoint = targetProbeUrl;
+              try {
+                const u = new URL(targetProbeUrl);
+                if (u.searchParams.get('rows') === '50') {
+                  u.searchParams.set('rows', '1000');
+                  normalizedJobsEndpoint = u.toString();
+                }
+              } catch {}
+
               return {
                 matched: true,
                 strategyName: this.name,
                 sourceType: 'JSON_API',
-                jobsEndpoint: targetProbeUrl,
+                jobsEndpoint: normalizedJobsEndpoint,
                 httpMethod: 'GET',
                 companyName,
                 officialDomain: domain,
