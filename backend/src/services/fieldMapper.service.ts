@@ -3,6 +3,8 @@ export interface DiscoveredFieldMapping {
   titleField?: string;
   departmentField?: string;
   locationField?: string;
+  countryField?: string;
+  cityField?: string;
   workModeField?: string;
   employmentTypeField?: string;
   experienceField?: string;
@@ -127,7 +129,15 @@ export class FieldMapperService {
 
     // 4. Location
     mapping.locationField = this.findMatchingKey(keys, [
-      'Job_Posting_Location', 'jobPostingLocation', 'job_posting_location', 'location', 'city', 'office', 'workplace', 'region', 'State', 'state', 'Country', 'country'
+      'displayLocation', 'display_location', 'Job_Posting_Location', 'jobPostingLocation', 'job_posting_location', 'locations', 'location', 'city', 'office', 'workplace', 'region', 'State', 'state', 'Country', 'country'
+    ]);
+
+    mapping.countryField = this.findMatchingKey(keys, [
+      'countryName', 'country_name', 'country', 'countryCode', 'country_code'
+    ]);
+
+    mapping.cityField = this.findMatchingKey(keys, [
+      'city', 'cityName', 'city_name', 'town'
     ]);
 
     // 5. Work Mode / Remote
@@ -343,6 +353,8 @@ export class FieldMapperService {
         }
         return String(locVal);
       })(),
+      country: getVal(mapping.countryField) ? String(getVal(mapping.countryField)) : undefined,
+      city: getVal(mapping.cityField) ? String(getVal(mapping.cityField)) : undefined,
       remoteType: getVal(mapping.workModeField) ? String(getVal(mapping.workModeField)) : undefined,
       employmentType: getVal(mapping.employmentTypeField) ? String(getVal(mapping.employmentTypeField)) : undefined,
       salaryMin,

@@ -46,26 +46,33 @@ export class DiscoveredApiStrategy implements IJobSourceStrategy {
     const { companyName, domain } = JobSourceDiscoveryService.extractCompanyMetadata(normalizedUrl.normalizedUrl, initialHtml);
 
     for (const ep of candidateList) {
-      // Create endpoint variants: raw and with preserved query/search parameters
+      // Create endpoint variants: raw and with search/discovery query parameters
       const probeUrls = [ep];
       try {
         const epObj = new URL(ep);
-        // If current normalizedUrl has search params (e.g. country, q, searchType), copy relevant ones
+        // Do NOT copy regional filters (e.g. country, city, location) to connector ingestion - discovery MUST be global!
         for (const [k, v] of Object.entries(normalizedUrl.searchParams)) {
+          const lowerK = k.toLowerCase();
+          if (['country', 'city', 'state', 'location', 'region'].includes(lowerK)) {
+            continue; // Skip regional filter so we fetch global inventory
+          }
           if (!epObj.searchParams.has(k)) {
             epObj.searchParams.set(k, v);
           }
         }
+        if (!epObj.searchParams.has('q')) epObj.searchParams.set('q', '');
         if (!epObj.searchParams.has('searchType')) epObj.searchParams.set('searchType', '/search');
         if (!epObj.searchParams.has('lang')) epObj.searchParams.set('lang', 'en');
-        if (!epObj.searchParams.has('rows')) epObj.searchParams.set('rows', '50');
+        // Request up to 1000 items directly if the endpoint supports it (standard Solr/API rows)
+        if (!epObj.searchParams.has('rows')) epObj.searchParams.set('rows', '1000');
+        if (!epObj.searchParams.has('start')) epObj.searchParams.set('start', '0');
         if (!epObj.searchParams.has('facetFields')) epObj.searchParams.set('facetFields', 'countryName,city,teams,experienceLevel,remote,typeOfEmployment');
         probeUrls.push(epObj.toString());
       } catch {}
 
       for (const targetProbeUrl of probeUrls) {
         try {
-          const res = await safeFetchUrl(targetProbeUrl, { timeoutMs: 7000 });
+          const res = await safeFetchUrl(targetProbeUrl, { timeoutMs: 12000 });
           if (res.status === 200 && res.text.trim()) {
             const payload = JSON.parse(res.text);
             const { jobs, rootPath } = FieldMapperService.extractJobsArray(payload);
@@ -76,8 +83,36 @@ export class DiscoveredApiStrategy implements IJobSourceStrategy {
               const mapping = FieldMapperService.inferDeterministicMapping(jobs);
               mapping.rootJobsPath = rootPath;
 
+              const allDiscoveredDocs = [...jobs];
+
+              // Pagination support: If expected total is greater than jobs returned and endpoint supports start/offset, paginate to collect complete inventory
+              if (expectedCount && expectedCount > allDiscoveredDocs.length) {
+                try {
+                  const paginatedUrlObj = new URL(targetProbeUrl);
+                  const rowsParam = paginatedUrlObj.searchParams.get('rows');
+                  const pageSize = rowsParam ? parseInt(rowsParam, 10) : jobs.length;
+                  let currentStart = allDiscoveredDocs.length;
+                  let pageCount = 0;
+                  const maxPages = 20;
+
+                  while (allDiscoveredDocs.length < expectedCount && pageCount < maxPages) {
+                    paginatedUrlObj.searchParams.set('start', String(currentStart));
+                    const nextRes = await safeFetchUrl(paginatedUrlObj.toString(), { timeoutMs: 10000 });
+                    if (nextRes.status !== 200 || !nextRes.text.trim()) break;
+                    const nextPayload = JSON.parse(nextRes.text);
+                    const { jobs: nextJobs } = FieldMapperService.extractJobsArray(nextPayload);
+                    if (!nextJobs || nextJobs.length === 0) break;
+                    allDiscoveredDocs.push(...nextJobs);
+                    currentStart += nextJobs.length;
+                    pageCount++;
+                  }
+                } catch (pageErr: any) {
+                  logger.warn(`[DiscoveredApiStrategy] Pagination error: ${pageErr.message}`);
+                }
+              }
+
               const mappedJobs: DiscoveredJobRaw[] = [];
-              for (const item of jobs) {
+              for (const item of allDiscoveredDocs) {
                 const mapped = FieldMapperService.mapRecord(item, mapping, {
                   companyName,
                   companyDomain: domain,
@@ -90,9 +125,12 @@ export class DiscoveredApiStrategy implements IJobSourceStrategy {
                     externalJobId: mapped.externalJobId,
                     title: mapped.title,
                     location: mapped.location,
+                    country: mapped.country || item.countryName || item.country || undefined,
+                    city: mapped.city || item.city || undefined,
                     description: mapped.description,
                     applicationUrl: mapped.applicationUrl || (item.jobUrl ? item.jobUrl : undefined),
                     postedAt: mapped.postedAt,
+                    employmentType: mapped.employmentType,
                     rawPayload: item
                   });
                 }
@@ -111,7 +149,7 @@ export class DiscoveredApiStrategy implements IJobSourceStrategy {
                 jobs: mappedJobs,
                 expectedJobCount: expectedCount,
                 completeness: completeness.completeness,
-                paginationSupported: false,
+                paginationSupported: (expectedCount !== null && expectedCount > jobs.length) || true,
                 mappingConfig: mapping
               };
             }

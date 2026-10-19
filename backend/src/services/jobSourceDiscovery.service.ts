@@ -334,6 +334,18 @@ export class JobSourceDiscoveryService {
           }
         }
 
+        if (mapped && mapped.title) {
+          if (!mapped.country && (rawItem.country || (rawItem.rawPayload && (rawItem.rawPayload.countryName || rawItem.rawPayload.country)))) {
+            mapped.country = rawItem.country || rawItem.rawPayload.countryName || rawItem.rawPayload.country;
+          }
+          if (!mapped.city && (rawItem.city || (rawItem.rawPayload && rawItem.rawPayload.city))) {
+            mapped.city = rawItem.city || rawItem.rawPayload.city;
+          }
+          if (!mapped.location && (rawItem.location || (rawItem.rawPayload && (rawItem.rawPayload.displayLocation || rawItem.rawPayload.location)))) {
+            mapped.location = rawItem.location || rawItem.rawPayload.displayLocation || rawItem.rawPayload.location;
+          }
+        }
+
         const normalized = JobNormalizationService.normalize(mapped);
         const { job, isNew } = await JobRepositoryV1.upsertNormalizedJob(company.id, normalized);
         seenJobIds.push(job.id);
@@ -367,12 +379,14 @@ export class JobSourceDiscoveryService {
     // 6. Update health and stats on CompanySource & JobSourceConfiguration
     await CompanyRepository.updateSourceHealth(companySource.id, true);
 
+    const isPartial = discovery.completeness === 'PARTIAL' || (discovery.expectedJobCount && rawRecords.length < discovery.expectedJobCount);
+
     await prisma.jobSourceConfiguration.update({
       where: { id: configId },
       data: {
         companyId: company.id,
         companySourceId: companySource.id,
-        healthStatus: SourceHealth.HEALTHY,
+        healthStatus: isPartial ? SourceHealth.DEGRADED : SourceHealth.HEALTHY,
         lastSyncAt: new Date(),
         lastSuccessfulSyncAt: new Date(),
         lastSyncError: null,

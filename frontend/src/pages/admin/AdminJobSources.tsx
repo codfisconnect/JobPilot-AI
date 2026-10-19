@@ -524,9 +524,30 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
                       </td>
 
                       <td>
-                        <span style={{ fontWeight: 600, color: 'var(--text-primary, #f8fafc)' }}>
-                          {src.jobsFound || 0}
-                        </span>
+                        {(() => {
+                          const meta = src.discoveryMetadata as any;
+                          const expected = meta?.expectedJobCount;
+                          const found = src.jobsFound || 0;
+                          const isPartial = src.healthStatus === 'DEGRADED' || (expected && found < expected);
+                          if (isPartial && expected && found < expected) {
+                            return (
+                              <div>
+                                <span style={{ fontWeight: 700, color: '#fbbf24' }}>
+                                  {found} / {expected}
+                                </span>
+                                <div style={{ fontSize: '0.72rem', color: '#f59e0b', fontWeight: 600 }}>PARTIAL</div>
+                              </div>
+                            );
+                          }
+                          return (
+                            <div>
+                              <span style={{ fontWeight: 600, color: 'var(--text-primary, #f8fafc)' }}>
+                                {found}
+                              </span>
+                              <div style={{ fontSize: '0.72rem', color: '#94a3b8' }}>discovered</div>
+                            </div>
+                          );
+                        })()}
                       </td>
 
                       <td>
@@ -547,20 +568,32 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
                       </td>
 
                       <td>
-                        <span style={{
-                          display: 'inline-flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          padding: '3px 8px',
-                          borderRadius: '12px',
-                          fontSize: '0.75rem',
-                          fontWeight: 600,
-                          background: isHealthy ? 'rgba(34, 197, 94, 0.15)' : isFailing ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)',
-                          color: isHealthy ? '#4ade80' : isFailing ? '#f87171' : '#fbbf24'
-                        }}>
-                          <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }} />
-                          {src.healthStatus}
-                        </span>
+                        {(() => {
+                          const meta = src.discoveryMetadata as any;
+                          const expected = meta?.expectedJobCount;
+                          const found = src.jobsFound || 0;
+                          const isPartial = src.healthStatus === 'DEGRADED' || (expected && found < expected);
+                          const statusLabel = isPartial ? 'PARTIAL' : src.healthStatus;
+                          const badgeColor = isHealthy ? '#4ade80' : isFailing ? '#f87171' : '#fbbf24';
+                          const badgeBg = isHealthy ? 'rgba(34, 197, 94, 0.15)' : isFailing ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)';
+
+                          return (
+                            <span style={{
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                              padding: '3px 8px',
+                              borderRadius: '12px',
+                              fontSize: '0.75rem',
+                              fontWeight: 600,
+                              background: badgeBg,
+                              color: badgeColor
+                            }}>
+                              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }} />
+                              {statusLabel}
+                            </span>
+                          );
+                        })()}
                       </td>
 
                       <td>

@@ -151,12 +151,20 @@ describe('Universal Job Discovery Engine V2 Test Suite', () => {
     assert.ok(result.sampleJobs.length > 0);
   });
 
-  // 9. Live Diagnostic Test: Publicis Sapient
-  it('Live Diagnostic: Publicis Sapient careers URL discovers jobs without regression', async () => {
-    const url = 'https://careers.publicissapient.com/job-search?q=&country=India';
+  // 9. Live Diagnostic Test: Publicis Sapient Global Inventory
+  it('Live Diagnostic: Publicis Sapient discovers COMPLETE global job inventory with multiple countries', async () => {
+    // Tests both the default URL and a regional parameter URL to ensure ingestion is always global
+    const url = 'https://careers.publicissapient.com/job-search';
     const result = await UniversalDiscoveryOrchestrator.discover(url);
 
-    assert.ok(result.discoveredJobCount > 0, `Expected jobs discovered for Publicis Sapient, got: ${result.discoveredJobCount}`);
+    assert.ok(result.discoveredJobCount >= 300, `Expected complete global inventory (>= 300), got: ${result.discoveredJobCount}`);
+    assert.strictEqual(result.completeness, 'COMPLETE');
+    assert.ok(result.allDiscoveredJobs && result.allDiscoveredJobs.length >= 300);
+
+    const countries = new Set(result.allDiscoveredJobs.map(j => j.country).filter(Boolean));
+    assert.ok(countries.has('India'), 'Should contain Indian opportunities');
+    assert.ok(countries.has('United States') || countries.has('France') || countries.has('Germany') || countries.has('United Kingdom'), 'Should contain international opportunities');
+    assert.ok(countries.size >= 5, `Expected multiple countries across global inventory, got: ${countries.size}`);
   });
 
   // 10. Live Diagnostic Test: Virtusa (Embedded JSON / Phenom)

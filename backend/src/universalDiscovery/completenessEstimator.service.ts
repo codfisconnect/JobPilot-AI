@@ -57,7 +57,8 @@ export class CompletenessEstimatorService {
 
     const candidateKeys = [
       'totalJobCount', 'totalJobs', 'totalCount', 'total', 'count', 'total_count',
-      'totalRecords', 'recordsTotal', 'jobCount', 'total_results', 'totalResults'
+      'totalRecords', 'recordsTotal', 'jobCount', 'total_results', 'totalResults',
+      'numFound'
     ];
 
     for (const key of candidateKeys) {
@@ -70,8 +71,8 @@ export class CompletenessEstimatorService {
       }
     }
 
-    // Check one level deep: payload.meta, payload.pagination, payload.page
-    for (const sub of ['meta', 'pagination', 'paging', 'page', 'summary']) {
+    // Check one level deep: payload.response, payload.meta, payload.pagination, payload.page
+    for (const sub of ['response', 'meta', 'pagination', 'paging', 'page', 'summary', 'data']) {
       if (payload[sub] && typeof payload[sub] === 'object') {
         const found = this.extractReportedTotal(payload[sub]);
         if (found !== null) return found;
