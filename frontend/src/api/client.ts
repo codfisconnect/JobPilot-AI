@@ -142,6 +142,25 @@ export class ApiClient {
     return res;
   }
 
+  async loginWithGoogle(credential: string): Promise<AuthResponse> {
+    const res = await this.request<AuthResponse>('/auth/google', {
+      method: 'POST',
+      body: JSON.stringify({ credential })
+    });
+    this.setToken(res.accessToken);
+    return res;
+  }
+
+  async loginWithLinkedIn(token: string): Promise<AuthResponse> {
+    const res = await this.request<AuthResponse>('/auth/linkedin', {
+      method: 'POST',
+      body: JSON.stringify({ token })
+    });
+    this.setToken(res.accessToken);
+    return res;
+  }
+
+
   private refreshPromise: Promise<AuthResponse> | null = null;
 
   async refresh(): Promise<AuthResponse> {

@@ -126,4 +126,69 @@ export class AuthController {
       next(err);
     }
   }
+
+  static async googleAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { credential } = req.body;
+      const verified = await authService.verifyGoogleCredential(credential);
+
+      const { user, accessToken, refreshToken } = await authService.authenticateSocialUser({
+        provider: 'GOOGLE',
+        providerSubjectId: verified.subject,
+        email: verified.email,
+        fullName: verified.name,
+        avatarUrl: verified.picture,
+        emailVerified: verified.emailVerified
+      });
+
+      res.cookie(REFRESH_COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          user,
+          accessToken
+        },
+        meta: {
+          requestId: (req as any).id,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  static async linkedinAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { token } = req.body;
+      const verified = await authService.verifyLinkedInToken(token);
+
+      const { user, accessToken, refreshToken } = await authService.authenticateSocialUser({
+        provider: 'LINKEDIN',
+        providerSubjectId: verified.subject,
+        email: verified.email,
+        fullName: verified.name,
+        avatarUrl: verified.picture,
+        emailVerified: true
+      });
+
+      res.cookie(REFRESH_COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
+
+      res.status(200).json({
+        success: true,
+        data: {
+          user,
+          accessToken
+        },
+        meta: {
+          requestId: (req as any).id,
+          timestamp: new Date().toISOString()
+        }
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
+

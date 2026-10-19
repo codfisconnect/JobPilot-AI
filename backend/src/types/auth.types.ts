@@ -22,5 +22,8 @@ export interface SanitizedUser {
   candidateProfile?: {
     id: string;
     fullName: string;
+    avatarUrl?: string | null;
   } | null;
+  connectedProviders?: string[];
 }
+

@@ -1,5 +1,5 @@
 import { prisma } from '../database/prisma.js';
-import { User, UserRole, CandidateProfile } from '@prisma/client';
+import { User, UserRole, CandidateProfile, AuthProvider, ProviderAccount } from '@prisma/client';
 
 export interface CreateUserData {
   email: string;
@@ -63,6 +63,91 @@ export class UserRepository {
         tokenHash,
         expiresAt: { gt: new Date() }
       }
+    });
+  }
+
+  async findByProviderSubject(provider: AuthProvider, providerSubjectId: string): Promise<(User & { candidateProfile: CandidateProfile | null; providerAccounts: ProviderAccount[] }) | null> {
+    const account = await prisma.providerAccount.findUnique({
+      where: {
+        provider_providerSubjectId: {
+          provider,
+          providerSubjectId
+        }
+      },
+      include: {
+        user: {
+          include: {
+            candidateProfile: true,
+            providerAccounts: true
+          }
+        }
+      }
+    });
+    return account?.user || null;
+  }
+
+  async linkProviderAccount(userId: string, provider: AuthProvider, providerSubjectId: string, providerEmail?: string): Promise<ProviderAccount> {
+    return prisma.providerAccount.upsert({
+      where: {
+        provider_providerSubjectId: {
+          provider,
+          providerSubjectId
+        }
+      },
+      update: {
+        providerEmail: providerEmail?.toLowerCase().trim() || null
+      },
+      create: {
+        userId,
+        provider,
+        providerSubjectId,
+        providerEmail: providerEmail?.toLowerCase().trim() || null
+      }
+    });
+  }
+
+  async createSocialUser(data: {
+    email: string;
+    fullName?: string;
+    avatarUrl?: string;
+    provider: AuthProvider;
+    providerSubjectId: string;
+    emailVerified?: boolean;
+  }): Promise<User & { candidateProfile: CandidateProfile | null; providerAccounts: ProviderAccount[] }> {
+    const normalizedEmail = data.email.toLowerCase().trim();
+    return prisma.user.create({
+      data: {
+        email: normalizedEmail,
+        // Secure random non-guessable hash since password auth is not used for social accounts directly
+        passwordHash: `oauth:${data.provider}:${data.providerSubjectId}`,
+        role: UserRole.CANDIDATE,
+        emailVerified: data.emailVerified ?? true,
+        candidateProfile: {
+          create: {
+            fullName: data.fullName?.trim() || normalizedEmail.split('@')[0],
+            avatarUrl: data.avatarUrl || null,
+            authProvider: data.provider
+          }
+        },
+        providerAccounts: {
+          create: {
+            provider: data.provider,
+            providerSubjectId: data.providerSubjectId,
+            providerEmail: normalizedEmail
+          }
+        }
+      },
+      include: {
+        candidateProfile: true,
+        providerAccounts: true
+      }
+    });
+  }
+
+  async getProviderAccounts(userId: string): Promise<ProviderAccount[]> {
+    return prisma.providerAccount.findMany({
+      where: { userId },
+      orderBy: { createdAt: 'asc' }
     });
   }
 
