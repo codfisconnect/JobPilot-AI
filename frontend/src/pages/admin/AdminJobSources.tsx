@@ -542,7 +542,7 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
 
                       <td>
                         <span style={{ fontSize: '0.85rem', color: '#facc15' }}>
-                          {src.lastSyncAt ? 'Every 6 hrs' : 'Pending First Sync'}
+                          {src.lastSyncAt ? 'Every 30 mins' : 'Pending First Sync'}
                         </span>
                       </td>
 
@@ -693,7 +693,7 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
               <div><strong>Original Careers URL:</strong> <a href={selectedSourceDetail.sourceUrl} target="_blank" rel="noreferrer" style={{ color: '#818cf8', wordBreak: 'break-all' }}>{selectedSourceDetail.sourceUrl}</a></div>
               <div><strong>Detected Jobs Endpoint:</strong> <span style={{ color: '#cbd5e1', wordBreak: 'break-all' }}>{selectedSourceDetail.jobsEndpoint || 'Direct Page'}</span></div>
               <div><strong>Automatic Sync:</strong> <span style={{ color: selectedSourceDetail.enabled ? '#4ade80' : '#f87171', fontWeight: 600 }}>{selectedSourceDetail.enabled ? 'Enabled' : 'Disabled'}</span></div>
-              <div><strong>Schedule:</strong> Every 6 hours</div>
+              <div><strong>Schedule:</strong> Every 30 minutes</div>
               <div><strong>Parser Type:</strong> {selectedSourceDetail.parserType}</div>
               <div><strong>Health Status:</strong> {selectedSourceDetail.healthStatus}</div>
               <div><strong>Jobs Discovered:</strong> {selectedSourceDetail.jobsFound || 0}</div>
@@ -701,7 +701,7 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
               <div><strong>Jobs Updated:</strong> ~{selectedSourceDetail.jobsUpdated || 0}</div>
               <div><strong>Jobs Expired:</strong> -{selectedSourceDetail.jobsExpired || 0}</div>
               <div><strong>Last Sync:</strong> {formatRelativeTime(selectedSourceDetail.lastSyncAt)}</div>
-              <div><strong>Next Scheduled Sync:</strong> {selectedSourceDetail.lastSyncAt ? 'In ~6 hours' : 'Pending'}</div>
+              <div><strong>Next Scheduled Sync:</strong> {selectedSourceDetail.lastSyncAt ? 'Every 30 mins' : 'Pending'}</div>
               <div><strong>Last Successful Sync:</strong> {formatRelativeTime(selectedSourceDetail.lastSuccessfulSyncAt)}</div>
               {selectedSourceDetail.lastSyncError && (
                 <div style={{ color: '#f87171' }}><strong>Last Error:</strong> {selectedSourceDetail.lastSyncError}</div>

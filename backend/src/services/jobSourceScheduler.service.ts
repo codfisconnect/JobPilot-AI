@@ -28,6 +28,8 @@ export interface SchedulerRunResult {
 }
 
 export class JobSourceSchedulerService {
+  public static readonly SYNC_INTERVAL_MINUTES = 30; // Canonical sync frequency: 30 minutes
+  public static readonly SYNC_INTERVAL_HUMAN = 'Every 30 mins'; // Standard human-readable representation
   private static readonly GLOBAL_LOCK_ID = 918273645; // Deterministic BigInt key for PostgreSQL advisory lock
   private static readonly MAX_CONCURRENCY = 4; // Bounded worker concurrency
   private static readonly STALE_THRESHOLD_DAYS = 14;

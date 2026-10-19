@@ -98,7 +98,7 @@ describe('Job Source Automatic Scheduler & Source Reconciliation Test Suite', ()
       assert.strictEqual(res.status, 403);
     });
 
-    it('should accept request with valid x-job-sync-secret', async () => {
+    it('should accept request with valid x-job-sync-secret and return 30-minute sync interval', async () => {
       const res = await supertest(app)
         .post('/api/v1/internal/job-sources/sync-all')
         .set('x-job-sync-secret', TEST_SECRET)
@@ -107,6 +107,10 @@ describe('Job Source Automatic Scheduler & Source Reconciliation Test Suite', ()
       assert.strictEqual(res.status, 200);
       assert.strictEqual(res.body.success, true);
       assert.ok(typeof res.body.data.totalSources === 'number');
+      assert.strictEqual(res.body.data.syncIntervalMinutes, 30);
+      assert.strictEqual(res.body.data.syncIntervalHuman, 'Every 30 mins');
+      assert.strictEqual(JobSourceSchedulerService.SYNC_INTERVAL_MINUTES, 30);
+      assert.strictEqual(JobSourceSchedulerService.SYNC_INTERVAL_HUMAN, 'Every 30 mins');
     });
 
     it('should accept request with valid Authorization: Bearer <secret>', async () => {
@@ -117,6 +121,7 @@ describe('Job Source Automatic Scheduler & Source Reconciliation Test Suite', ()
 
       assert.strictEqual(res.status, 200);
       assert.strictEqual(res.body.success, true);
+      assert.strictEqual(res.body.data.syncIntervalMinutes, 30);
     });
   });
 
