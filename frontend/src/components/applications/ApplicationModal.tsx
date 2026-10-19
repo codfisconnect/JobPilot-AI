@@ -231,11 +231,6 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       setSubmittedApp(res);
       onSuccess(res);
 
-      // Strictly open career URL ONLY for external non-Codewalla applications
-      if (job.applicationUrl || job.sourceUrl) {
-        window.open(job.applicationUrl || job.sourceUrl, '_blank', 'noopener,noreferrer');
-      }
-
       setCurrentStep('success');
     } catch (err: any) {
       alert(`External navigation failed: ${err.message}`);
@@ -650,11 +645,11 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                 ) : (
                   <Button
                     variant="primary"
-                    icon={<ExternalLink size={16} />}
+                    icon={<Send size={16} />}
                     loading={isSubmitting}
                     onClick={handleStartExternalApplication}
                   >
-                    Open Application & Start (External)
+                    Start Application
                   </Button>
                 )}
               </div>
