@@ -45,17 +45,17 @@ export const LearningPlanItemCard: React.FC<LearningPlanItemProps> = ({
   const resources = item.verifiedResources || [];
 
   return (
-    <Card style={{
-      background: 'rgba(30, 41, 59, 0.6)',
-      border: '1px solid rgba(255, 255, 255, 0.08)',
-      borderRadius: '10px',
-      padding: '18px',
-      marginBottom: '14px'
+    <Card className="career-card" style={{
+      background: 'var(--bg-surface)',
+      border: '1px solid var(--border-primary)',
+      borderRadius: 'var(--radius-md)',
+      padding: '18px 20px',
+      boxShadow: 'var(--shadow-sm)'
     }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '10px' }}>
-        <div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 600, color: '#f8fafc' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '12px', flexWrap: 'wrap', gap: '10px' }}>
+        <div style={{ flex: 1, minWidth: '220px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px', flexWrap: 'wrap' }}>
+            <h4 style={{ margin: 0, fontSize: '1.05rem', fontWeight: 700, color: 'var(--text-primary)' }}>
               {item.skillName}
             </h4>
             <Badge variant={getPriorityBadge(item.priority)} size="sm">
@@ -65,7 +65,7 @@ export const LearningPlanItemCard: React.FC<LearningPlanItemProps> = ({
               {item.classification === 'MISSING' ? 'Skill Gap' : 'Transferable'}
             </Badge>
           </div>
-          <p style={{ margin: 0, fontSize: '0.82rem', color: '#94a3b8', lineHeight: 1.4 }}>
+          <p style={{ margin: 0, fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.45 }}>
             {item.rationale}
           </p>
         </div>
@@ -75,12 +75,13 @@ export const LearningPlanItemCard: React.FC<LearningPlanItemProps> = ({
             value={item.status}
             onChange={(e) => onUpdateStatus(item.id, e.target.value)}
             style={{
-              background: 'rgba(15, 23, 42, 0.8)',
-              border: '1px solid rgba(255, 255, 255, 0.15)',
-              borderRadius: '6px',
-              padding: '6px 10px',
-              color: '#f8fafc',
-              fontSize: '0.8rem',
+              background: 'var(--input-bg)',
+              border: '1px solid var(--border-primary)',
+              borderRadius: 'var(--radius-sm)',
+              padding: '6px 12px',
+              color: 'var(--text-primary)',
+              fontSize: '0.82rem',
+              fontWeight: 500,
               outline: 'none',
               cursor: 'pointer'
             }}
@@ -92,11 +93,11 @@ export const LearningPlanItemCard: React.FC<LearningPlanItemProps> = ({
         </div>
       </div>
 
-      <div style={{ background: 'rgba(15, 23, 42, 0.4)', padding: '10px 14px', borderRadius: '6px', marginBottom: '12px' }}>
-        <span style={{ fontSize: '0.78rem', color: '#818cf8', fontWeight: 600, display: 'block', marginBottom: '2px' }}>
+      <div style={{ background: 'var(--bg-secondary)', padding: '10px 14px', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', marginBottom: '12px' }}>
+        <span style={{ fontSize: '0.78rem', color: 'var(--accent-primary)', fontWeight: 600, display: 'block', marginBottom: '2px' }}>
           Suggested Action:
         </span>
-        <span style={{ fontSize: '0.82rem', color: '#cbd5e1' }}>
+        <span style={{ fontSize: '0.84rem', color: 'var(--text-secondary)', lineHeight: 1.4 }}>
           {item.suggestedAction}
         </span>
       </div>
@@ -104,7 +105,7 @@ export const LearningPlanItemCard: React.FC<LearningPlanItemProps> = ({
       {/* Verified Official Resources */}
       {resources.length > 0 && (
         <div>
-          <span style={{ fontSize: '0.78rem', color: '#94a3b8', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
+          <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)', fontWeight: 600, display: 'block', marginBottom: '6px' }}>
             Verified Reputable Resources (Official Documentation & Tutorials):
           </span>
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
@@ -120,10 +121,11 @@ export const LearningPlanItemCard: React.FC<LearningPlanItemProps> = ({
                   gap: '6px',
                   background: 'rgba(99, 102, 241, 0.1)',
                   border: '1px solid rgba(99, 102, 241, 0.25)',
-                  color: '#818cf8',
-                  padding: '4px 10px',
-                  borderRadius: '6px',
-                  fontSize: '0.8rem',
+                  color: 'var(--accent-primary)',
+                  padding: '5px 12px',
+                  borderRadius: 'var(--radius-sm)',
+                  fontSize: '0.82rem',
+                  fontWeight: 500,
                   textDecoration: 'none'
                 }}
               >

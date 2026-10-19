@@ -224,3 +224,29 @@
     justify-content: center;
   }
 }
+
+/* Career Grid Layout */
+.career-overview-grid {
+  display: grid;
+  grid-template-columns: 1.25fr 1fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+@media (max-width: 960px) {
+  .career-overview-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+}
+
+.career-card {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1),
+              border-color 0.2s ease;
+}
+
+.career-card:hover {
+  border-color: var(--accent-primary);
+}
+
