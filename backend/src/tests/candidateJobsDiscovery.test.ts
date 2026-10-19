@@ -10,7 +10,7 @@ describe('Candidate Jobs Discovery & Exploration Suite (Regression for 0 Jobs Bu
   let candidateUser: any;
 
   let testCompanyA: any;
-  let testCompanyB: an677776y;
+  let testCompanyB: any;
   let jobA: any;
   let jobB: any;
 
