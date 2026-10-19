@@ -7,6 +7,12 @@ generator client {
   provider = "prisma-client-js"
 }
 
+enum AuthProvider {
+  GOOGLE
+  LINKEDIN
+  EMAIL
+}
+
 enum UserRole {
   CANDIDATE
   EMPLOYER
@@ -47,6 +53,7 @@ model User {
   instituteProfile InstituteProfile?
 
   refreshTokens   RefreshToken[]
+  providerAccounts ProviderAccount[]
   subscriptions   Subscription[]
   creditWallet    CreditWallet?
   creditLedgers   CreditLedger[]
@@ -54,6 +61,22 @@ model User {
   employerMembers EmployerMember[]
 
   @@map("users")
+}
+
+model ProviderAccount {
+  id                String       @id @default(uuid())
+  userId            String       @map("user_id")
+  provider          AuthProvider
+  providerSubjectId String       @map("provider_subject_id")
+  providerEmail     String?      @map("provider_email")
+  createdAt         DateTime     @default(now()) @map("created_at")
+  updatedAt         DateTime     @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerSubjectId])
+  @@index([userId])
+  @@map("provider_accounts")
 }
 
 model RefreshToken {
@@ -103,6 +126,8 @@ model CandidateProfile {
   postalCode    String?  @map("postal_code")
   summary       String?
   bio           String?
+  avatarUrl     String?  @map("avatar_url")
+  authProvider  AuthProvider? @map("auth_provider")
   linkedinUrl   String?  @map("linkedin_url")
   githubUrl     String?  @map("github_url")
   portfolioUrl  String?  @map("portfolio_url")

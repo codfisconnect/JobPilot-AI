@@ -1,24 +1,31 @@
 .profile-page {
   display: flex;
   flex-direction: column;
-  gap: 28px;
+  gap: 24px;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .profile-header-banner {
   background: var(--bg-surface);
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-lg);
-  padding: 28px;
+  padding: 24px 28px;
   display: flex;
   align-items: center;
   justify-content: space-between;
+  box-shadow: var(--shadow-sm);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .banner-tag-row {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   margin-bottom: 6px;
+  flex-wrap: wrap;
 }
 
 .profile-tag {
@@ -34,6 +41,15 @@
   font-weight: 800;
   color: var(--text-primary);
   letter-spacing: -0.02em;
+  word-break: break-word;
+}
+
+.profile-headline {
+  color: #818cf8;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin: 4px 0;
+  word-break: break-word;
 }
 
 .profile-roles {
@@ -43,35 +59,55 @@
   margin-top: 4px;
 }
 
+.profile-quick-contacts {
+  display: flex;
+  gap: 16px;
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  flex-wrap: wrap;
+  margin-top: 6px;
+}
+
 .profile-grid {
   display: grid;
   grid-template-columns: 1fr 1.2fr;
   gap: 24px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .profile-col {
   display: flex;
   flex-direction: column;
   gap: 24px;
+  min-width: 0;
 }
 
 .profile-section-card {
   display: flex;
   flex-direction: column;
   gap: 16px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg);
+  padding: 22px;
+  box-shadow: var(--shadow-sm);
+  box-sizing: border-box;
 }
 
 .section-head-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
 }
 
 .section-title {
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 1.125rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -86,6 +122,8 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .form-group label {
@@ -97,7 +135,7 @@
 .form-group input,
 .form-group select,
 .form-group textarea {
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--input-bg);
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-md);
   padding: 10px 14px;
@@ -105,6 +143,8 @@
   font-size: 0.875rem;
   outline: none;
   transition: border-color 0.15s ease;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .form-group input:focus,
@@ -117,6 +157,8 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 16px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .skill-tags-cloud {
@@ -160,17 +202,18 @@
 .experiences-editor-list {
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 16px;
 }
 
 .exp-card-block {
-  background: rgba(0, 0, 0, 0.2);
+  background: rgba(0, 0, 0, 0.12);
   border: 1px solid var(--border-subtle);
   border-radius: var(--radius-md);
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 12px;
+  box-sizing: border-box;
 }
 
 .exp-role-title {
@@ -209,6 +252,7 @@
   font-size: 0.8125rem;
   padding: 4px 6px;
   outline: none;
+  box-sizing: border-box;
 }
 
 .highlight-bullet input:focus {
@@ -217,29 +261,33 @@
 }
 
 /* ==========================================================================
-   Responsive Breakpoints for ProfilePage
+   Responsive Breakpoints for ProfilePage (Mobile 320px-430px, Tablet, Desktop)
    ========================================================================== */
 
-@media (max-width: 900px) {
+@media (max-width: 992px) {
   .profile-grid {
     grid-template-columns: 1fr;
     gap: 20px;
+  }
+}
+
+@media (max-width: 768px) {
+  .profile-page {
+    gap: 18px;
   }
 
   .profile-header-banner {
     flex-direction: column;
     align-items: flex-start;
     gap: 16px;
-    padding: 20px;
+    padding: 18px;
   }
 
   .profile-header-banner button {
     width: 100%;
     justify-content: center;
   }
-}
 
-@media (max-width: 600px) {
   .form-row {
     grid-template-columns: 1fr;
     gap: 12px;
@@ -247,5 +295,30 @@
 
   .profile-section-card {
     padding: 16px;
+  }
+
+  .profile-name {
+    font-size: 1.45rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .profile-header-banner {
+    padding: 14px;
+    border-radius: var(--radius-md);
+  }
+
+  .profile-section-card {
+    padding: 14px 12px;
+    border-radius: var(--radius-md);
+  }
+
+  .profile-name {
+    font-size: 1.3rem;
+  }
+
+  .profile-quick-contacts {
+    flex-direction: column;
+    gap: 6px;
   }
 }

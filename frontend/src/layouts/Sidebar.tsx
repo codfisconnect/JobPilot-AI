@@ -110,7 +110,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <div className="sidebar-user-section" style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ overflow: 'hidden' }}>
               <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                {user.candidateProfile?.fullName || user.email.split('@')[0]}
+                {activeCandidate?.name || user.candidateProfile?.fullName || user.email.split('@')[0]}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                 {user.role}
