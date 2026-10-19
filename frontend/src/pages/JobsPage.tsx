@@ -45,6 +45,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
 
   // Filter params
   const [searchQuery, setSearchQuery] = useState('');
+  const [countryFilter, setCountryFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
   const [remoteFilter, setRemoteFilter] = useState('');
   const [employmentFilter, setEmploymentFilter] = useState('');
@@ -99,6 +100,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
     try {
       const res = await apiClient.getCanonicalJobs({
         query: searchQuery.trim() || undefined,
+        country: countryFilter.trim() || undefined,
         location: locationFilter.trim() || undefined,
         remoteType: remoteFilter || undefined,
         employmentType: employmentFilter || undefined,
@@ -123,12 +125,12 @@ export const JobsPage: React.FC<JobsPageProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, locationFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
+  }, [searchQuery, countryFilter, locationFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
 
   // Initial and reactive fetch upon filter modifications
   useEffect(() => {
     fetchCanonicalJobs(1);
-  }, [remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
+  }, [countryFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -137,6 +139,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
 
   const handleResetFilters = () => {
     setSearchQuery('');
+    setCountryFilter('');
     setLocationFilter('');
     setRemoteFilter('');
     setEmploymentFilter('');
@@ -148,6 +151,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
   };
 
   const activeFilterCount = [
+    countryFilter,
     remoteFilter,
     employmentFilter,
     sourceFilter,
@@ -253,6 +257,27 @@ export const JobsPage: React.FC<JobsPageProps> = ({
         </form>
 
         <div className="filter-controls-row desktop-only-filters">
+          {/* Country */}
+          <select
+            className="filter-select"
+            value={countryFilter}
+            onChange={e => setCountryFilter(e.target.value)}
+            aria-label="Country Filter"
+          >
+            <option value="">All Countries</option>
+            <option value="India">India</option>
+            <option value="United States">United States</option>
+            <option value="United Kingdom">United Kingdom</option>
+            <option value="Germany">Germany</option>
+            <option value="France">France</option>
+            <option value="Australia">Australia</option>
+            <option value="Canada">Canada</option>
+            <option value="Colombia">Colombia</option>
+            <option value="Romania">Romania</option>
+            <option value="Costa Rica">Costa Rica</option>
+            <option value="Mexico">Mexico</option>
+          </select>
+
           {/* Work Mode */}
           <select
             className="filter-select"
@@ -338,6 +363,11 @@ export const JobsPage: React.FC<JobsPageProps> = ({
       {activeFilterCount > 0 && (
         <div className="active-filter-chips-row">
           <span className="chips-label">Filters:</span>
+          {countryFilter && (
+            <button className="filter-chip" onClick={() => setCountryFilter('')}>
+              {countryFilter} <X size={12} />
+            </button>
+          )}
           {remoteFilter && (
             <button className="filter-chip" onClick={() => setRemoteFilter('')}>
               {remoteFilter.replace('_', ' ')} <X size={12} />
@@ -491,6 +521,28 @@ export const JobsPage: React.FC<JobsPageProps> = ({
                   <option value="company">Company (A-Z)</option>
                   <option value="location">Location (A-Z)</option>
                   <option value="salary">Highest Salary</option>
+                </select>
+              </div>
+
+              {/* Country */}
+              <div className="drawer-filter-group">
+                <label><Globe size={14} /> Country</label>
+                <select
+                  value={countryFilter}
+                  onChange={e => setCountryFilter(e.target.value)}
+                >
+                  <option value="">All Countries</option>
+                  <option value="India">India</option>
+                  <option value="United States">United States</option>
+                  <option value="United Kingdom">United Kingdom</option>
+                  <option value="Germany">Germany</option>
+                  <option value="France">France</option>
+                  <option value="Australia">Australia</option>
+                  <option value="Canada">Canada</option>
+                  <option value="Colombia">Colombia</option>
+                  <option value="Romania">Romania</option>
+                  <option value="Costa Rica">Costa Rica</option>
+                  <option value="Mexico">Mexico</option>
                 </select>
               </div>
 
