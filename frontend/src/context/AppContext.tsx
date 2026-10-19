@@ -8,6 +8,7 @@ interface AppContextType {
   activeCandidate: CandidateProfile | null;
   candidates: CandidateProfile[];
   setActiveCandidate: (candidate: CandidateProfile) => void;
+  updateActiveCandidate: (updated: Partial<CandidateProfile>) => void;
   refreshCandidates: () => Promise<void>;
   isLoading: boolean;
   toastMessage: string | null;
@@ -29,6 +30,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setToastMessage(null);
     }, 4000);
   };
+
+  const updateActiveCandidate = useCallback((updated: Partial<CandidateProfile>) => {
+    setActiveCandidate(prev => {
+      if (!prev) return null;
+      const nextCandidate = { ...prev, ...updated };
+      setCandidates(prevList =>
+        prevList.map(c => (c.id === nextCandidate.id ? nextCandidate : c))
+      );
+      return nextCandidate;
+    });
+  }, []);
 
   const setActiveAndPersistCandidate = (candidate: CandidateProfile) => {
     setActiveCandidate(candidate);
@@ -161,6 +173,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         activeCandidate,
         candidates,
         setActiveCandidate: setActiveAndPersistCandidate,
+        updateActiveCandidate,
         refreshCandidates,
         isLoading,
         toastMessage,

@@ -3,6 +3,7 @@ import { Card } from "../components/common/Card";
 import { Button } from "../components/common/Button";
 import { Badge } from "../components/common/Badge";
 import { useAuth } from "../context/AuthContext";
+import { useApp } from "../context/AppContext";
 import { apiClient } from "../api/client";
 import {
   User,
@@ -18,7 +19,8 @@ import {
 import './SettingsPage.css';
 
 export const SettingsPage: React.FC = () => {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUserProfile } = useAuth();
+  const { updateActiveCandidate } = useApp();
 
   // Settings State
   const [activeTab, setActiveTab] = useState<'account' | 'password' | 'notifications' | 'privacy' | 'billing'>('account');
@@ -49,7 +51,10 @@ export const SettingsPage: React.FC = () => {
     try {
       setSaving(true);
       setMessage(null);
-      await apiClient.updateCandidateProfile({ fullName });
+      const updated = await apiClient.updateCandidateProfile({ fullName });
+      // Immediately synchronize global auth user and candidate context
+      updateUserProfile({ fullName: updated?.fullName || fullName });
+      updateActiveCandidate({ name: updated?.fullName || fullName });
       setMessage({ text: 'Account settings updated successfully!', type: 'success' });
     } catch (err: any) {
       setMessage({ text: err.message || 'Failed to update account settings.', type: 'error' });

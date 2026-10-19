@@ -26,12 +26,11 @@ import {
   AlertCircle
 } from 'lucide-react';
 import './ProfilePage.css';
-
 import { ResumeUploadManager } from '../components/profile/ResumeUploadManager';
 
 export const ProfilePage: React.FC = () => {
-  const { activeCandidate, refreshCandidates, showToast } = useApp();
-  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { activeCandidate, updateActiveCandidate, refreshCandidates, showToast } = useApp();
+  const { isAuthenticated, isLoading: isAuthLoading, updateUserProfile } = useAuth();
   const [profile, setProfile] = useState<any>(activeCandidate);
   const [isSaving, setIsSaving] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -177,19 +176,33 @@ export const ProfilePage: React.FC = () => {
     try {
       setIsSaving(true);
       // Save to V1
-      await apiClient.updateCandidateProfile({
+      const updated = await apiClient.updateCandidateProfile({
         fullName: profile.name,
         headline: profile.headline,
         email: profile.email,
         phone: profile.phone,
         location: profile.location,
         summary: profile.summary
-      }).catch(() => {});
+      }).catch(() => null);
 
       // Fallback save to prototype API if candidate ID matches prototype
       if (profile.id) {
         await api.updateCandidate(profile.id, profile).catch(() => {});
       }
+
+      // Immediately propagate verified candidate identity to AuthContext and AppContext
+      const canonicalName = updated?.fullName || profile.name;
+      const canonicalHeadline = updated?.headline || profile.headline;
+      updateUserProfile({ fullName: canonicalName });
+      updateActiveCandidate({
+        name: canonicalName,
+        headline: canonicalHeadline,
+        email: profile.email,
+        phone: profile.phone,
+        location: profile.location,
+        summary: profile.summary
+      });
+
       showToast('Master candidate profile updated successfully!');
     } catch (err: any) {
       alert(`Failed to save: ${err.message}`);

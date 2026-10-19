@@ -9,6 +9,7 @@ interface AuthContextType {
   login: (credentials: { email: string; password: string }) => Promise<User>;
   register: (data: { email: string; password: string; fullName?: string }) => Promise<User>;
   logout: () => Promise<void>;
+  updateUserProfile: (updatedFields: { fullName?: string }) => void;
   error: string | null;
   clearError: () => void;
 }
@@ -47,6 +48,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => {
       mounted = false;
     };
+  }, []);
+
+  const updateUserProfile = useCallback((updatedFields: { fullName?: string }) => {
+    setUser(prevUser => {
+      if (!prevUser) return null;
+      return {
+        ...prevUser,
+        candidateProfile: prevUser.candidateProfile
+          ? {
+              ...prevUser.candidateProfile,
+              fullName: updatedFields.fullName !== undefined ? updatedFields.fullName : prevUser.candidateProfile.fullName
+            }
+          : updatedFields.fullName
+            ? { id: 'temp-profile', fullName: updatedFields.fullName }
+            : null
+      };
+    });
   }, []);
 
   const login = useCallback(async (credentials: { email: string; password: string }) => {
@@ -106,6 +124,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         login,
         register,
         logout,
+        updateUserProfile,
         error,
         clearError
       }}

@@ -4,6 +4,7 @@ import { Card } from "../components/common/Card";
 import { Badge } from "../components/common/Badge";
 import { Button } from "../components/common/Button";
 import { useAuth } from "../context/AuthContext";
+import { useApp } from "../context/AppContext";
 import { apiClient } from "../api/client";
 import {
   User,
@@ -39,6 +40,7 @@ interface DashboardPageProps {
 
 export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const { user } = useAuth();
+  const { activeCandidate } = useApp();
   
   // Independent State Streams
   const [latestJobs, setLatestJobs] = useState<any[]>([]);
@@ -172,7 +174,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   if ((profile?.certifications?.length || 0) > 0 || (profile?.projects?.length || 0) > 0) completionPoints += 5;
   const completeness = Math.min(100, completionPoints);
 
-  const candidateName = profile?.fullName || user?.candidateProfile?.fullName || user?.email?.split('@')[0] || 'Candidate';
+  const candidateName = activeCandidate?.name || profile?.fullName || user?.candidateProfile?.fullName || user?.email?.split('@')[0] || 'Candidate';
   const masterResume = resumes.find(r => r.isMaster) || resumes[0];
 
   const formatRelativeDate = (dateStr?: string) => {

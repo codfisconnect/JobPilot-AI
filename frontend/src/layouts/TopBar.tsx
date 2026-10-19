@@ -21,8 +21,8 @@ export const TopBar: React.FC<TopBarProps> = ({
   const { activeCandidate } = useApp();
   const { user } = useAuth();
 
-  const candidateName = user?.candidateProfile?.fullName || activeCandidate?.name;
-  const headline = (user?.candidateProfile as any)?.headline || (activeCandidate ? `${activeCandidate.yearsOfExperience}y exp • ${activeCandidate.targetRoles[0] || ''}` : null);
+  const candidateName = activeCandidate?.name || user?.candidateProfile?.fullName;
+  const headline = activeCandidate?.headline || (user?.candidateProfile as any)?.headline || (activeCandidate ? `${activeCandidate.yearsOfExperience}y exp • ${activeCandidate.targetRoles?.[0] || ''}` : null);
 
   return (
     <header className="app-topbar">

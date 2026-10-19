@@ -22,7 +22,13 @@ const envSchema = z.object({
   ADMIN_EMAIL: z.string().email().default('admin@pilotmama.io'),
   ADMIN_PASSWORD: z.string().min(8).default('Admin@PilotMama2026!'),
   // Production-grade Job Source Scheduler Secret
-  JOB_SYNC_CRON_SECRET: z.string().optional().default('')
+  JOB_SYNC_CRON_SECRET: z.string().optional().default(''),
+  // Social OAuth Authentication (Google & LinkedIn)
+  GOOGLE_CLIENT_ID: z.string().optional().default(''),
+  GOOGLE_CLIENT_SECRET: z.string().optional().default(''),
+  LINKEDIN_CLIENT_ID: z.string().optional().default(''),
+  LINKEDIN_CLIENT_SECRET: z.string().optional().default(''),
+  APP_BASE_URL: z.string().default('http://localhost:5173')
 });
 
 
