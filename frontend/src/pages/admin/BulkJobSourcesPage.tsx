@@ -543,35 +543,35 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
                   marginTop: '16px'
                 }}
               >
-                <div style={{ padding: '14px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                <div style={{ padding: '14px', background: 'var(--bg-surface-hover)', border: '1px solid var(--border-subtle)', borderRadius: '8px' }}>
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Total Sources</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800 }}>{activeJob.totalSources}</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)' }}>{activeJob.totalSources}</div>
                 </div>
-                <div style={{ padding: '14px', background: 'rgba(74, 222, 128, 0.08)', borderRadius: '8px', borderLeft: '3px solid #4ade80' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#4ade80' }}>✓ Completed</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#4ade80' }}>{activeJob.completedSources}</div>
+                <div style={{ padding: '14px', background: 'var(--color-success-bg)', borderRadius: '8px', borderLeft: '3px solid var(--text-success)' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-success)' }}>✓ Completed</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-success)' }}>{activeJob.completedSources}</div>
                 </div>
-                <div style={{ padding: '14px', background: 'rgba(250, 204, 21, 0.08)', borderRadius: '8px', borderLeft: '3px solid #facc15' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#facc15' }}>⚡ Partial</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#facc15' }}>{activeJob.partialSources}</div>
+                <div style={{ padding: '14px', background: 'var(--color-warning-bg)', borderRadius: '8px', borderLeft: '3px solid var(--text-warning)' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-warning)' }}>⚡ Partial</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-warning)' }}>{activeJob.partialSources}</div>
                 </div>
-                <div style={{ padding: '14px', background: 'rgba(99, 102, 241, 0.08)', borderRadius: '8px', borderLeft: '3px solid #818cf8' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#818cf8' }}>→ Running</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#818cf8' }}>{activeJob.runningSources}</div>
+                <div style={{ padding: '14px', background: 'rgba(99, 102, 241, 0.12)', borderRadius: '8px', borderLeft: '3px solid var(--text-link)' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-link)' }}>→ Running</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-link)' }}>{activeJob.runningSources}</div>
                 </div>
-                <div style={{ padding: '14px', background: 'rgba(148, 163, 184, 0.08)', borderRadius: '8px', borderLeft: '3px solid #94a3b8' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>◌ Queued</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#94a3b8' }}>{activeJob.queuedSources}</div>
+                <div style={{ padding: '14px', background: 'var(--bg-surface-hover)', borderRadius: '8px', borderLeft: '3px solid var(--text-muted)' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>◌ Queued</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-muted)' }}>{activeJob.queuedSources}</div>
                 </div>
-                <div style={{ padding: '14px', background: 'rgba(239, 68, 68, 0.08)', borderRadius: '8px', borderLeft: '3px solid #f87171' }}>
-                  <div style={{ fontSize: '0.8rem', color: '#f87171' }}>✕ Failed</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f87171' }}>{activeJob.failedSources}</div>
+                <div style={{ padding: '14px', background: 'var(--color-danger-bg)', borderRadius: '8px', borderLeft: '3px solid var(--text-danger)' }}>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--text-danger)' }}>✕ Failed</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-danger)' }}>{activeJob.failedSources}</div>
                 </div>
               </div>
 
               {/* Progress Bar */}
               <div style={{ marginTop: '16px' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '6px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.85rem', marginBottom: '6px', color: 'var(--text-secondary)' }}>
                   <span>
                     Batch Progress: <strong>{activeJob.completedSources + activeJob.partialSources + activeJob.failedSources} / {activeJob.totalSources}</strong>
                   </span>
@@ -579,7 +579,7 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
                     Discovered Jobs: <strong>{activeJob.totalJobsDiscovered}</strong> (Created: {activeJob.totalJobsCreated}, Updated: {activeJob.totalJobsUpdated})
                   </span>
                 </div>
-                <div style={{ width: '100%', height: '8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px', overflow: 'hidden' }}>
+                <div style={{ width: '100%', height: '8px', background: 'var(--border-subtle)', borderRadius: '4px', overflow: 'hidden' }}>
                   <div
                     style={{
                       height: '100%',
@@ -844,9 +844,9 @@ https://www.virtusa.com/careers/job-search/global/en`}
                   width: '100%',
                   padding: '14px',
                   borderRadius: '8px',
-                  border: '1px solid var(--border-subtle, #334155)',
-                  background: 'rgba(0, 0, 0, 0.25)',
-                  color: 'var(--text-primary, #f8fafc)',
+                  border: '1px solid var(--border-subtle)',
+                  background: 'var(--bg-canvas)',
+                  color: 'var(--text-primary)',
                   fontFamily: 'monospace',
                   fontSize: '0.9rem',
                   lineHeight: 1.5,
@@ -863,7 +863,7 @@ https://www.virtusa.com/careers/job-search/global/en`}
                     style={{
                       padding: '6px 12px',
                       borderRadius: '6px',
-                      background: 'rgba(0,0,0,0.3)',
+                      background: 'var(--bg-canvas)',
                       color: 'var(--text-primary)',
                       border: '1px solid var(--border-subtle)'
                     }}
@@ -1048,15 +1048,15 @@ https://www.virtusa.com/careers/job-search/global/en`}
 
       {/* Item Details Modal */}
       {selectedItemDetail && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ background: 'var(--bg-surface, #1e293b)', border: '1px solid var(--border-subtle, #334155)', borderRadius: '12px', padding: '24px', maxWidth: '640px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-overlay)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '24px', maxWidth: '640px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0 }}>
+              <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
                 {selectedItemDetail.companyName || selectedItemDetail.companyHint || 'Source Details'}
               </h3>
               <button
                 onClick={() => setSelectedItemDetail(null)}
-                style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer', fontSize: '1.2rem' }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '1.2rem' }}
               >
                 ✕
               </button>

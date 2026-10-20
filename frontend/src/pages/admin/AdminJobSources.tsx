@@ -249,26 +249,26 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
 
       {/* Sync Outcome Modal */}
       {syncModalResult && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
-          <div style={{ background: 'var(--bg-surface, #1e293b)', border: '1px solid var(--border-subtle, #334155)', borderRadius: '12px', padding: '24px', maxWidth: '420px', width: '100%', boxShadow: '0 20px 25px -5px rgba(0,0,0,0.5)' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-overlay)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+          <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '24px', maxWidth: '420px', width: '100%', boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#4ade80', fontWeight: 700 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--text-success)', fontWeight: 700 }}>
                 <CheckCircle2 size={20} />
                 <span>Sync Completed Successfully</span>
               </div>
-              <button onClick={() => setSyncModalResult(null)} style={{ background: 'none', border: 'none', color: '#94a3b8', cursor: 'pointer' }}>
+              <button onClick={() => setSyncModalResult(null)} style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer' }}>
                 <X size={18} />
               </button>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.9rem', marginBottom: '20px' }}>
-              <div style={{ padding: '10px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px' }}><strong>Created:</strong> {syncModalResult.created}</div>
-              <div style={{ padding: '10px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px' }}><strong>Updated:</strong> {syncModalResult.updated}</div>
-              <div style={{ padding: '10px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px' }}><strong>Skipped:</strong> {syncModalResult.skipped}</div>
-              <div style={{ padding: '10px', background: 'rgba(255,255,255,0.04)', borderRadius: '8px' }}><strong>Failed:</strong> {syncModalResult.failed}</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px', fontSize: '0.9rem', marginBottom: '20px', color: 'var(--text-primary)' }}>
+              <div style={{ padding: '10px', background: 'var(--bg-surface-hover)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}><strong>Created:</strong> {syncModalResult.created}</div>
+              <div style={{ padding: '10px', background: 'var(--bg-surface-hover)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}><strong>Updated:</strong> {syncModalResult.updated}</div>
+              <div style={{ padding: '10px', background: 'var(--bg-surface-hover)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}><strong>Skipped:</strong> {syncModalResult.skipped}</div>
+              <div style={{ padding: '10px', background: 'var(--bg-surface-hover)', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}><strong>Failed:</strong> {syncModalResult.failed}</div>
             </div>
             <button
               onClick={() => setSyncModalResult(null)}
-              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--accent-primary, #6366f1)', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer' }}
+              style={{ width: '100%', padding: '10px', borderRadius: '8px', background: 'var(--accent-primary)', color: '#fff', border: 'none', fontWeight: 600, cursor: 'pointer' }}
             >
               Done
             </button>
@@ -277,11 +277,11 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
       )}
 
       {/* A. Add Job Source Card */}
-      <div className="admin-metric-card" style={{ padding: '24px', background: 'var(--bg-surface, #1e293b)' }}>
+      <div className="admin-metric-card" style={{ padding: '24px', background: 'var(--bg-surface)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Radio size={20} style={{ color: 'var(--accent-primary, #6366f1)' }} />
-            <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0 }}>Add Job Source</h2>
+            <Radio size={20} style={{ color: 'var(--accent-primary)' }} />
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>Add Job Source</h2>
           </div>
           <button
             type="button"
@@ -292,8 +292,8 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
               gap: '6px',
               padding: '6px 12px',
               borderRadius: '6px',
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid var(--border-subtle, #334155)',
+              background: 'var(--bg-surface-hover)',
+              border: '1px solid var(--border-subtle)',
               color: 'var(--text-primary)',
               fontSize: '0.85rem',
               fontWeight: 600,
@@ -303,7 +303,7 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
             <Layers size={14} /> + Bulk Add Sources
           </button>
         </div>
-        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary, #94a3b8)', marginBottom: '16px' }}>
+        <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)', marginBottom: '16px' }}>
           Enter any company careers or jobs URL. Pilot Mama automatically detects APIs, ATS platforms, embedded job data, HTML listings, and other public job-source structures.
         </p>
 
@@ -320,9 +320,9 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
                 width: '100%',
                 padding: '12px 16px',
                 borderRadius: '8px',
-                border: '1px solid var(--border-subtle, #334155)',
-                background: 'rgba(0, 0, 0, 0.2)',
-                color: 'var(--text-primary, #f8fafc)',
+                border: '1px solid var(--border-subtle)',
+                background: 'var(--bg-canvas)',
+                color: 'var(--text-primary)',
                 fontSize: '0.95rem'
               }}
             />
