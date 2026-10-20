@@ -161,50 +161,20 @@ export class WorkdayApplicationStrategy {
         'Application review completed. All required fields verified against candidate profile.'
       );
 
-      // 9. SUBMISSION GATE: Check ATS >= 80% & Candidate Auto-Apply Permission
-      if (task.atsCompatibilityScore < 80) {
-        addStep(
-          'ATS_GATE_HELD',
-          'READY_TO_SUBMIT',
-          `ATS compatibility score (${task.atsCompatibilityScore}%) is below automatic submission threshold (80%). Ready for candidate review.`
-        );
-
-        return {
-          success: true,
-          finalState: 'READY_TO_SUBMIT',
-          stepsExecuted: steps
-        };
-      }
-
-      if (!autoApplyEnabled) {
-        addStep(
-          'READY_TO_SUBMIT',
-          'READY_TO_SUBMIT',
-          'Application prepared and verified. Standing by for candidate final submission confirmation.'
-        );
-
-        return {
-          success: true,
-          finalState: 'READY_TO_SUBMIT',
-          stepsExecuted: steps
-        };
-      }
-
-      // 10. SUBMITTING & VERIFYING SUBMISSION
-      addStep('SUBMITTING', 'SUBMITTING', 'Transmitting verified application to Workday portal.');
-      
-      const refId = `WD-${Math.random().toString(36).substring(2, 9).toUpperCase()}`;
+      // 9. SUBMISSION GATE: Workday requires explicit candidate consent and authenticated browser session
+      // In accordance with zero-fake-evidence mandates:
+      // Never synthesize fake application references (e.g. WD-XXXXX) or falsely mark APPLIED without actual Workday submission proof.
       addStep(
-        'VERIFYING_SUBMISSION',
-        'APPLIED',
-        `Submission confirmed by Workday. Application Reference: ${refId}`,
-        { reference: refId }
+        'WORKDAY_TERMS_AND_AUTH_GATE',
+        'USER_ACTION_REQUIRED',
+        'Workday requires candidate account authentication, terms consent, and voluntary disclosures verification. Ready for candidate-authorized submission.'
       );
 
       return {
         success: true,
-        finalState: 'APPLIED',
-        confirmationReference: refId,
+        finalState: 'USER_ACTION_REQUIRED',
+        userActionType: 'TERMS_CONSENT',
+        userActionReason: 'Workday candidate account credentials, terms consent, and voluntary disclosures must be explicitly authorized by candidate.',
         stepsExecuted: steps
       };
     } catch (err: any) {
