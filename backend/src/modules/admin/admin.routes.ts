@@ -15,6 +15,10 @@ adminRouter.use(requireRole([UserRole.ADMIN]));
 
 // 2. Admin Job Sources Endpoints (Universal Discovery & Management)
 adminRouter.post('/job-sources/discover', AdminJobSourcesController.discoverAndConnect);
+adminRouter.get('/job-sources/discovery-tasks', AdminJobSourcesController.getDiscoveryTasks);
+adminRouter.get('/job-sources/discovery-tasks/:id', AdminJobSourcesController.getDiscoveryTaskById);
+adminRouter.post('/job-sources/discovery-tasks/:id/cancel', AdminJobSourcesController.cancelDiscoveryTask);
+adminRouter.post('/job-sources/discovery-tasks/:id/retry', AdminJobSourcesController.retryDiscoveryTask);
 adminRouter.get('/job-sources', AdminJobSourcesController.listSources);
 adminRouter.get('/job-sources/:id', AdminJobSourcesController.getSourceById);
 adminRouter.post('/job-sources/:id/sync', AdminJobSourcesController.syncSource);

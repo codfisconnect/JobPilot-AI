@@ -19,3 +19,5 @@ resumes/generated/*
 /backend/storage/
 /storage/
 !backend/src/storage/
+.vercel
+.env*

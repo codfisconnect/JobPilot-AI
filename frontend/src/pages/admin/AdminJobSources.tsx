@@ -39,21 +39,20 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
 
   // Discovery Form State
   const [urlInput, setUrlInput] = useState('');
-  const [discovering, setDiscovering] = useState(false);
-  const [discoveryStep, setDiscoveryStep] = useState(0);
+  const [isSubmittingUrl, setIsSubmittingUrl] = useState(false);
   const [discoveryError, setDiscoveryError] = useState<NormalizedError | null>(null);
   const [discoverySuccess, setDiscoverySuccess] = useState<any | null>(null);
 
-  // Discovery step labels matching requirement
-  const discoverySteps = [
-    'URL validated',
-    'Source analyzed',
-    'Job source detected',
-    'Data structure identified',
-    'Jobs discovered',
-    'Jobs normalized',
-    'Jobs synchronized'
-  ];
+  // Persistent Queue State
+  const [queueState, setQueueState] = useState<{
+    current: any | null;
+    queued: any[];
+    recent: any[];
+  }>({
+    current: null,
+    queued: [],
+    recent: []
+  });
 
   // Sync Progress State
   const [syncingId, setSyncingId] = useState<string | null>(null);
@@ -83,9 +82,36 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
     }
   };
 
+  const loadQueueState = async () => {
+    try {
+      const q = await apiClient.getDiscoveryTasks();
+      if (q) {
+        setQueueState({
+          current: q.current || null,
+          queued: q.queued || [],
+          recent: q.recent || []
+        });
+      }
+    } catch (err) {
+      // Quiet fail on periodic polling
+    }
+  };
+
   useEffect(() => {
     loadSources();
-  }, []);
+    loadQueueState();
+
+    // Poll queue state every 3 seconds for real-time transitions
+    const interval = setInterval(() => {
+      loadQueueState();
+      // If there's an active discovery running, also check if connected sources table needs refresh
+      if (queueState.current) {
+        loadSources();
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [queueState.current?.id]);
 
   useEffect(() => {
     if (preselectedSourceId) {
@@ -95,30 +121,64 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
 
   const handleDiscover = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!urlInput.trim()) return;
+    const targetUrl = urlInput.trim();
+    if (!targetUrl) return;
 
     try {
-      setDiscovering(true);
+      setIsSubmittingUrl(true);
       setDiscoveryError(null);
       setDiscoverySuccess(null);
-      setDiscoveryStep(0);
 
-      // Animate progress states smoothly
-      const interval = setInterval(() => {
-        setDiscoveryStep(prev => (prev < discoverySteps.length - 2 ? prev + 1 : prev));
-      }, 700);
-
-      const res = await apiClient.discoverJobSource(urlInput.trim());
-
-      clearInterval(interval);
-      setDiscoveryStep(discoverySteps.length - 1);
-      setDiscoverySuccess(res);
+      // NON-BLOCKING: Submit URL to queue, clear input immediately
       setUrlInput('');
+
+      const res = await apiClient.discoverJobSource(targetUrl);
+
+      if (res.isAlreadyConnected) {
+        setDiscoverySuccess({
+          message: 'Source is already connected and active.',
+          company: res.task?.companyName,
+          alreadyConnected: true
+        });
+      } else if (res.isDuplicate) {
+        setDiscoverySuccess({
+          message: 'Discovery for this source is already in progress or queued.',
+          alreadyQueued: true
+        });
+      } else {
+        setDiscoverySuccess({
+          message: 'Job source added to discovery queue.',
+          task: res.task
+        });
+      }
+
+      // Immediately refresh queue state and connected sources
+      await loadQueueState();
       await loadSources();
     } catch (err: unknown) {
-      setDiscoveryError(normalizeApiError(err, 'No public job source was discoverable from this page.'));
+      setDiscoveryError(normalizeApiError(err, 'Failed to queue job source for discovery.'));
     } finally {
-      setDiscovering(false);
+      setIsSubmittingUrl(false);
+    }
+  };
+
+  const handleCancelTask = async (taskId: string) => {
+    try {
+      await apiClient.cancelDiscoveryTask(taskId);
+      await loadQueueState();
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Failed to cancel task');
+      setActionError(normalized.message);
+    }
+  };
+
+  const handleRetryTask = async (taskId: string) => {
+    try {
+      await apiClient.retryDiscoveryTask(taskId);
+      await loadQueueState();
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Failed to retry task');
+      setActionError(normalized.message);
     }
   };
 
@@ -315,7 +375,7 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
               placeholder="https://company.com/careers"
               value={urlInput}
               onChange={e => setUrlInput(e.target.value)}
-              disabled={discovering}
+              disabled={isSubmittingUrl}
               style={{
                 width: '100%',
                 padding: '12px 16px',
@@ -329,7 +389,7 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
           </div>
           <button
             type="submit"
-            disabled={discovering || !urlInput.trim()}
+            disabled={isSubmittingUrl || !urlInput.trim()}
             style={{
               padding: '12px 24px',
               borderRadius: '8px',
@@ -338,17 +398,17 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
               border: 'none',
               fontWeight: 600,
               fontSize: '0.95rem',
-              cursor: discovering ? 'not-allowed' : 'pointer',
+              cursor: isSubmittingUrl || !urlInput.trim() ? 'not-allowed' : 'pointer',
               display: 'inline-flex',
               alignItems: 'center',
               gap: '8px',
-              opacity: discovering || !urlInput.trim() ? 0.7 : 1
+              opacity: isSubmittingUrl || !urlInput.trim() ? 0.7 : 1
             }}
           >
-            {discovering ? (
+            {isSubmittingUrl ? (
               <>
                 <Loader2 size={18} className="animate-spin" />
-                <span>Discovering...</span>
+                <span>Queueing...</span>
               </>
             ) : (
               <>
@@ -359,106 +419,214 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
           </button>
         </form>
 
-        {/* Live Discovery Progress Stepper */}
-        {discovering && (
-          <div style={{ marginTop: '20px', padding: '16px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.2)', borderRadius: '8px' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '10px' }}>
-              <Loader2 size={16} className="animate-spin" style={{ color: '#818cf8' }} />
-              <span style={{ fontWeight: 600, color: '#818cf8', fontSize: '0.9rem' }}>
-                {discoverySteps[discoveryStep]}
-              </span>
-            </div>
-            <div style={{ height: '4px', width: '100%', background: 'rgba(255,255,255,0.1)', borderRadius: '2px', overflow: 'hidden' }}>
-              <div
-                style={{
-                  height: '100%',
-                  background: 'var(--accent-primary, #6366f1)',
-                  width: `${((discoveryStep + 1) / discoverySteps.length) * 100}%`,
-                  transition: 'width 0.4s ease'
-                }}
-              />
-            </div>
-          </div>
-        )}
-
-        {/* Discovery Success Summary Banner */}
+        {/* Feedback message banner after enqueuing */}
         {discoverySuccess && (
-          <div style={{ marginTop: '20px', padding: '16px', borderRadius: '8px', background: 'rgba(34, 197, 94, 0.1)', border: '1px solid rgba(34, 197, 94, 0.25)', color: '#4ade80' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700 }}>
-                <CheckCircle2 size={18} />
-                <span>
-                  {discoverySuccess.discovery?.detectedType === 'EMBEDDED_DATA'
-                    ? `Discovered ${discoverySuccess.discovery?.jobCount} jobs from embedded Next.js page data.`
-                    : discoverySuccess.discovery?.detectedType === 'JSON_API'
-                    ? `Discovered ${discoverySuccess.discovery?.jobCount} jobs via API feed.`
-                    : discoverySuccess.discovery?.detectedType === 'JSON_LD'
-                    ? `Discovered ${discoverySuccess.discovery?.jobCount} jobs via JSON-LD metadata.`
-                    : `Discovered ${discoverySuccess.discovery?.jobCount} jobs using page structure.`}
-                </span>
-              </div>
-              <button
-                onClick={() => onViewJobs?.(discoverySuccess.discovery?.company)}
-                style={{ padding: '6px 12px', borderRadius: '6px', background: 'rgba(34, 197, 94, 0.2)', border: 'none', color: '#fff', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
-              >
-                View Jobs →
-              </button>
+          <div style={{ marginTop: '16px', padding: '12px 16px', borderRadius: '8px', background: 'rgba(99, 102, 241, 0.1)', border: '1px solid rgba(99, 102, 241, 0.25)', color: '#a5b4fc', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.9rem' }}>
+              <CheckCircle2 size={18} style={{ color: '#818cf8' }} />
+              <span>{discoverySuccess.message}</span>
             </div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: '10px', fontSize: '0.85rem', color: 'var(--text-primary, #f8fafc)' }}>
-              <div><strong>Company:</strong> {discoverySuccess.discovery?.company}</div>
-              <div><strong>Source:</strong> {discoverySuccess.discovery?.atsType || discoverySuccess.discovery?.detectedType}</div>
-              {discoverySuccess.discovery?.strategy && (
-                <div><strong>Strategy:</strong> {discoverySuccess.discovery?.strategy}</div>
-              )}
-              <div><strong>Jobs Discovered:</strong> {discoverySuccess.discovery?.jobCount}</div>
-              {discoverySuccess.discovery?.expectedJobCount !== null && discoverySuccess.discovery?.expectedJobCount !== undefined && (
-                <div><strong>Expected Jobs:</strong> {discoverySuccess.discovery?.expectedJobCount}</div>
-              )}
-              {discoverySuccess.discovery?.completeness && (
-                <div><strong>Completeness:</strong> {discoverySuccess.discovery?.completeness}</div>
-              )}
-              <div><strong>Created:</strong> {discoverySuccess.sync?.created}</div>
-              <div><strong>Updated:</strong> {discoverySuccess.sync?.updated}</div>
-              <div><strong>Status:</strong> {discoverySuccess.discovery?.completeness === 'PARTIAL' ? 'Partial' : 'Complete / Healthy'}</div>
-            </div>
+            <button
+              onClick={() => setDiscoverySuccess(null)}
+              style={{ background: 'none', border: 'none', color: '#a5b4fc', cursor: 'pointer', fontSize: '1.2rem', lineHeight: 1 }}
+            >
+              ×
+            </button>
           </div>
         )}
 
         {/* Discovery Failure Banner */}
         {discoveryError && (
-          <div style={{ marginTop: '20px', padding: '16px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', color: '#f87171' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, marginBottom: '6px' }}>
+          <div style={{ marginTop: '16px', padding: '12px 16px', borderRadius: '8px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.25)', color: '#f87171' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontWeight: 700, marginBottom: '4px' }}>
               <XCircle size={18} />
-              <span>Discovery Notice</span>
-              {discoveryError.code && (
-                <span style={{ fontSize: '0.75rem', padding: '2px 6px', borderRadius: '4px', background: 'rgba(239, 68, 68, 0.2)', marginLeft: '6px' }}>
-                  {discoveryError.code}
-                </span>
-              )}
+              <span>Notice: {discoveryError.message}</span>
             </div>
-            <p style={{ margin: '0 0 10px', fontSize: '0.88rem' }}>
-              Discovery failed: {discoveryError.message}
-            </p>
             {discoveryError.details && (
-              <pre style={{ margin: '0 0 12px', padding: '8px', background: 'rgba(0, 0, 0, 0.25)', borderRadius: '4px', fontSize: '0.75rem', overflowX: 'auto', whiteSpace: 'pre-wrap', color: '#fca5a5' }}>
+              <pre style={{ margin: '6px 0 0', padding: '8px', background: 'rgba(0, 0, 0, 0.25)', borderRadius: '4px', fontSize: '0.75rem', overflowX: 'auto', whiteSpace: 'pre-wrap', color: '#fca5a5' }}>
                 {discoveryError.details}
               </pre>
             )}
-            <div style={{ display: 'flex', gap: '10px' }}>
-              <button
-                type="button"
-                onClick={() => setDiscoveryError(null)}
-                style={{ padding: '6px 12px', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}
-              >
-                Dismiss
-              </button>
-              <button
-                type="button"
-                onClick={() => setShowAdvanced(!showAdvanced)}
-                style={{ padding: '6px 12px', borderRadius: '6px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.8rem' }}
-              >
-                Manual Source Configuration
-              </button>
+            <button
+              type="button"
+              onClick={() => setDiscoveryError(null)}
+              style={{ marginTop: '8px', padding: '4px 10px', borderRadius: '4px', background: 'rgba(255,255,255,0.08)', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.75rem' }}
+            >
+              Dismiss
+            </button>
+          </div>
+        )}
+
+        {/* B. CURRENT DISCOVERY PANEL */}
+        {queueState.current && (
+          <div style={{ marginTop: '24px', padding: '18px 20px', borderRadius: '10px', background: 'rgba(99, 102, 241, 0.08)', border: '1px solid rgba(99, 102, 241, 0.3)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px', flexWrap: 'wrap', gap: '8px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Loader2 size={18} className="animate-spin" style={{ color: '#818cf8' }} />
+                <h3 style={{ margin: 0, fontSize: '0.98rem', fontWeight: 700, color: '#c7d2fe' }}>
+                  CURRENT DISCOVERY
+                </h3>
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={() => handleCancelTask(queueState.current.id)}
+                  style={{ padding: '4px 10px', borderRadius: '6px', background: 'rgba(239, 68, 68, 0.15)', border: '1px solid rgba(239, 68, 68, 0.3)', color: '#f87171', fontSize: '0.8rem', fontWeight: 600, cursor: 'pointer' }}
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '12px', fontSize: '0.88rem' }}>
+              <div>
+                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted, #94a3b8)', display: 'block' }}>Target Career URL</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)', wordBreak: 'break-all' }}>{queueState.current.sourceUrl}</span>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted, #94a3b8)', display: 'block' }}>Status</span>
+                <span style={{ fontWeight: 700, color: '#818cf8', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#818cf8', animation: 'pulse 1.5s infinite' }} />
+                  DISCOVERING
+                </span>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted, #94a3b8)', display: 'block' }}>Jobs Found So Far</span>
+                <span style={{ fontWeight: 700, color: '#38bdf8' }}>{queueState.current.jobsDiscovered || 0} jobs</span>
+              </div>
+              <div>
+                <span style={{ fontSize: '0.75rem', textTransform: 'uppercase', color: 'var(--text-muted, #94a3b8)', display: 'block' }}>Pages Fetched</span>
+                <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>{queueState.current.pagesFetched || 1} pages</span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* C. QUEUED SOURCES PANEL */}
+        {queueState.queued.length > 0 && (
+          <div style={{ marginTop: '20px', padding: '16px 20px', borderRadius: '10px', background: 'rgba(30, 41, 59, 0.5)', border: '1px solid var(--border-subtle)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <Layers size={16} style={{ color: 'var(--accent-primary)' }} />
+                <h3 style={{ margin: 0, fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                  QUEUED SOURCES ({queueState.queued.length})
+                </h3>
+              </div>
+              <span style={{ fontSize: '0.78rem', color: 'var(--text-muted)' }}>FIFO Order — Processed sequentially</span>
+            </div>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {queueState.queued.map((item, idx) => (
+                <div
+                  key={item.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '10px 14px',
+                    borderRadius: '8px',
+                    background: 'var(--bg-canvas, rgba(15, 23, 42, 0.6))',
+                    border: '1px solid var(--border-subtle)',
+                    flexWrap: 'wrap',
+                    gap: '8px'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <span style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center', width: '22px', height: '22px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.2)', color: '#818cf8', fontWeight: 700, fontSize: '0.78rem' }}>
+                      {item.queuePosition || idx + 1}
+                    </span>
+                    <div>
+                      <div style={{ fontWeight: 600, fontSize: '0.88rem', color: 'var(--text-primary)' }}>
+                        {item.companyName || item.sourceUrl}
+                      </div>
+                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                        Queued • Position {item.queuePosition || idx + 1}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    <span style={{ fontSize: '0.75rem', padding: '3px 8px', borderRadius: '4px', background: 'rgba(234, 179, 8, 0.15)', color: '#fde047', fontWeight: 600 }}>
+                      QUEUED
+                    </span>
+                    <button
+                      onClick={() => handleCancelTask(item.id)}
+                      style={{ padding: '4px 8px', borderRadius: '4px', background: 'transparent', border: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-muted)', fontSize: '0.75rem', cursor: 'pointer' }}
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* D. RECENT RESULTS PANEL */}
+        {queueState.recent.length > 0 && (
+          <div style={{ marginTop: '20px', padding: '16px 20px', borderRadius: '10px', background: 'rgba(15, 23, 42, 0.3)', border: '1px solid var(--border-subtle)' }}>
+            <h3 style={{ margin: '0 0 10px 0', fontSize: '0.95rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+              RECENT DISCOVERY RESULTS
+            </h3>
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              {queueState.recent.slice(0, 5).map(res => (
+                <div
+                  key={res.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    padding: '8px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-canvas, rgba(15, 23, 42, 0.4))',
+                    border: '1px solid var(--border-subtle)',
+                    flexWrap: 'wrap',
+                    gap: '8px',
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                    {res.status === 'COMPLETED' ? (
+                      <CheckCircle2 size={16} style={{ color: '#4ade80' }} />
+                    ) : res.status === 'PARTIAL' ? (
+                      <AlertTriangle size={16} style={{ color: '#facc15' }} />
+                    ) : (
+                      <XCircle size={16} style={{ color: '#f87171' }} />
+                    )}
+                    <div>
+                      <span style={{ fontWeight: 600, color: 'var(--text-primary)' }}>
+                        {res.companyName || res.sourceUrl}
+                      </span>
+                      <span style={{ marginLeft: '8px', color: 'var(--text-muted)', fontSize: '0.78rem' }}>
+                        {res.status === 'COMPLETED' ? `✓ ${res.jobsCreated} created, ${res.jobsUpdated} updated (${res.jobsDiscovered} total)` : res.errorMessage || res.status}
+                      </span>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <span
+                      style={{
+                        fontSize: '0.72rem',
+                        padding: '2px 6px',
+                        borderRadius: '4px',
+                        fontWeight: 600,
+                        background: res.status === 'COMPLETED' ? 'rgba(34, 197, 94, 0.15)' : res.status === 'PARTIAL' ? 'rgba(234, 179, 8, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+                        color: res.status === 'COMPLETED' ? '#4ade80' : res.status === 'PARTIAL' ? '#facc15' : '#f87171'
+                      }}
+                    >
+                      {res.status}
+                    </span>
+                    {(res.status === 'FAILED' || res.status === 'CANCELLED') && (
+                      <button
+                        onClick={() => handleRetryTask(res.id)}
+                        style={{ padding: '2px 8px', borderRadius: '4px', background: 'rgba(99, 102, 241, 0.2)', border: 'none', color: '#818cf8', fontSize: '0.75rem', cursor: 'pointer', fontWeight: 600 }}
+                      >
+                        Retry
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
