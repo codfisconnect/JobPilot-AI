@@ -19,6 +19,7 @@ export interface DiscoveredJobRaw {
   requirements?: string[];
   skills?: string[];
   preferredSkills?: string[];
+  openingCount?: number;
   applicationUrl?: string;
   url?: string;
   postedAt?: string | Date;

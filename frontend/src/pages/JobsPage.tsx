@@ -449,6 +449,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
               key={job.id}
               job={job}
               onSelect={handleOpenJobDetail}
+              onApply={(j) => onSelectJobForAnalysis && onSelectJobForAnalysis(j.id)}
             />
           ))}
         </div>
@@ -487,6 +488,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
         isOpen={isDetailOpen}
         onClose={() => { setIsDetailOpen(false); setSelectedJob(null); }}
         onAnalyzeFit={onSelectJobForAnalysis}
+        onApply={onSelectJobForAnalysis}
       />
 
       {/* Mobile Filter Drawer / Bottom Sheet */}

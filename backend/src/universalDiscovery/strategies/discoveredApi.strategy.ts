@@ -40,6 +40,22 @@ export class DiscoveredApiStrategy implements IJobSourceStrategy {
       }
     }
 
+    // Inspect subdomains or links pointing to career portals (e.g. hiring.fynd.com, career.domain.com, etc.)
+    const careerLinkMatches = initialHtml.match(/https?:\/\/[a-zA-Z0-9\.\-_]+(?:\/careers|\/jobs|\/openings|\/positions)[^\s"'<>]*/gi) || [];
+    for (const link of careerLinkMatches) {
+      try {
+        const linkUrl = new URL(link);
+        if (linkUrl.hostname !== new URL(normalizedUrl.normalizedUrl).hostname && linkUrl.hostname.includes(normalizedUrl.domain)) {
+          // Associated career portal discovered
+          const portalRes = await safeFetchUrl(linkUrl.toString(), { timeoutMs: 8000 });
+          if (portalRes.status === 200) {
+            const portalEndpoints = JobSourceDiscoveryService.extractEndpointCandidatesFromHtml(linkUrl.toString(), portalRes.text);
+            portalEndpoints.forEach(ep => candidates.add(ep));
+          }
+        }
+      } catch {}
+    }
+
     const candidateList = Array.from(candidates);
     logger.info(`[DiscoveredApiStrategy] Testing ${candidateList.length} candidate endpoints from HTML & script bundles`);
 

@@ -111,10 +111,22 @@ export class SourceFingerprintService {
         signals.push('HTML references SmartRecruiters');
       }
 
+      // Check Phenom patterns
+      if (
+        lowerHtml.includes('phenompeople.com') ||
+        lowerHtml.includes('phapp') ||
+        lowerHtml.includes('eagerloadrefinesearch')
+      ) {
+        atsVendor = 'PHENOM';
+        confidence = 95;
+        signals.push('HTML references Phenom careers platform');
+      }
+
       // Check SPA frameworks
       if (
         lowerHtml.includes('__next_data__') ||
         lowerHtml.includes('self.__next_f') ||
+        lowerHtml.includes('data-page') ||
         lowerHtml.includes('data-reactroot') ||
         lowerHtml.includes('ng-version') ||
         lowerHtml.includes('v-app') ||
@@ -133,6 +145,7 @@ export class SourceFingerprintService {
       if (
         lowerHtml.includes('__next_f') ||
         lowerHtml.includes('__next_data__') ||
+        lowerHtml.includes('data-page') ||
         lowerHtml.includes('__initial_state__') ||
         lowerHtml.includes('application/json') ||
         lowerHtml.includes('phapp') ||

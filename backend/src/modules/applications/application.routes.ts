@@ -10,6 +10,10 @@ applicationRouter.use(authenticateJwt);
 // Analytics
 applicationRouter.get('/stats', ApplicationController.getStats);
 
+// Application Automation Agent Start & Status
+applicationRouter.post('/start', ApplicationController.startApplication);
+applicationRouter.get('/tasks/:taskId', ApplicationController.getTaskStatus);
+
 // Status and History
 applicationRouter.post('/:id/status', ApplicationController.updateStatus);
 applicationRouter.get('/:id/history', ApplicationController.getStatusHistory);

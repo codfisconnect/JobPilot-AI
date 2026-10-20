@@ -19,6 +19,7 @@ export interface ExtractedHtmlJob {
   requirements?: string[];
   skills?: string[];
   preferredSkills?: string[];
+  openingCount?: number;
   applicationUrl?: string;
   detailUrl?: string;
   postedAt?: string;
@@ -328,13 +329,42 @@ export class HtmlJobDiscoveryService {
 
               if (href.startsWith('mailto:') || aText.includes('apply') || href.includes('apply') || href.includes('linkedin.com/jobs')) {
                 applyUrl = resolved;
-              } else if (href.includes('job') || href.includes('career') || href.includes('opening') || href.includes('position')) {
+              } else if (
+                aText.includes('view detail') || aText.includes('view role') || aText.includes('view job') ||
+                aText.includes('job detail') || aText.includes('learn more') ||
+                href.includes('job') || href.includes('career') || href.includes('opening') || href.includes('position')
+              ) {
                 detailUrl = resolved;
               }
             });
 
             // 3. Extract Metadata & Description
             const metaFields = this.extractFieldsFromText(itemText);
+
+            // If location was not found via explicit label, inspect meta badges/spans
+            if (!metaFields.location) {
+              $item.find('[class*="meta"] span, [class*="badge"], [class*="tag"], [class*="location"], span, li').each((_, sEl) => {
+                if (metaFields.location) return;
+                const spanText = $(sEl).text().trim();
+                // Check for "City, State/Country" or "Infopark, Kochi" or similar location patterns
+                if (/^[A-Za-z\s]+,\s*[A-Za-z\s]+$/.test(spanText) && spanText.length >= 4 && spanText.length <= 60) {
+                  // Ensure it's not experience e.g. "Full-time" or "2-4 Years"
+                  if (!spanText.includes('Year') && !spanText.includes('time') && !spanText.includes('Opening')) {
+                    metaFields.location = spanText;
+                  }
+                }
+              });
+            }
+
+            // Extract opening/vacancy count if present (e.g. "3 Openings", "2 Vacancies")
+            let openingCount: number | undefined;
+            const openingMatch = itemText.match(/(\d+)\s*(?:openings?|vacancies|positions?|seats?)/i);
+            if (openingMatch) {
+              const parsedCount = parseInt(openingMatch[1], 10);
+              if (!isNaN(parsedCount) && parsedCount > 0 && parsedCount < 500) {
+                openingCount = parsedCount;
+              }
+            }
             
             // Extract responsibilities and requirements lists if present
             const responsibilities: string[] = [];
@@ -395,6 +425,7 @@ export class HtmlJobDiscoveryService {
                 responsibilities: responsibilities.length > 0 ? responsibilities : undefined,
                 requirements: requirements.length > 0 ? requirements : undefined,
                 skills: skills.length > 0 ? skills : undefined,
+                openingCount: openingCount,
                 applicationUrl: applyUrl || detailUrl || pageUrl,
                 detailUrl: detailUrl,
                 confidence: itemScore

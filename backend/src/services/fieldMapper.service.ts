@@ -20,6 +20,7 @@ export interface DiscoveredFieldMapping {
   postedAtField?: string;
   deadlineField?: string;
   activeField?: string;
+  openingsCountField?: string;
   rootJobsPath?: string; // e.g. "data" or "jobs" or "results" or "" (array root)
 }
 
@@ -212,6 +213,11 @@ export class FieldMapperService {
       'active', 'isActive', 'status', 'isOpen', 'open'
     ]);
 
+    // 17. Openings / Vacancy Count
+    mapping.openingsCountField = this.findMatchingKey(keys, [
+      'vacancy', 'openings', 'openingsCount', 'openings_count', 'positions', 'vacancies', 'headcount', 'count'
+    ]);
+
     return mapping;
   }
 
@@ -370,6 +376,15 @@ export class FieldMapperService {
       requirements,
       preferredQualifications,
       skills,
+      openingsCount: (() => {
+        const val = getVal(mapping.openingsCountField);
+        if (typeof val === 'number') return val;
+        if (typeof val === 'string') {
+          const parsed = parseInt(val, 10);
+          return isNaN(parsed) ? undefined : parsed;
+        }
+        return undefined;
+      })(),
       rawPayload: rawRecord
     };
   }

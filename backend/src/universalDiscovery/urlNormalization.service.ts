@@ -1,6 +1,7 @@
 export interface NormalizedUrlResult {
   rawUrl: string;
   normalizedUrl: string;
+  canonicalSourceUrl: string;
   baseUrl: string;
   domain: string;
   searchParams: Record<string, string>;
@@ -98,9 +99,19 @@ export class UrlNormalizationService {
       }
     }
 
+    // Canonical source URL without hash fragments
+    const canonicalObj = new URL(urlObj.toString());
+    canonicalObj.hash = '';
+    // Normalize trailing slash for root paths e.g. https://domain.com/careers/ -> https://domain.com/careers
+    let canonicalSourceUrl = canonicalObj.toString();
+    if (canonicalObj.pathname.length > 1 && canonicalSourceUrl.endsWith('/')) {
+      canonicalSourceUrl = canonicalSourceUrl.slice(0, -1);
+    }
+
     return {
       rawUrl: raw,
       normalizedUrl: urlObj.toString(),
+      canonicalSourceUrl,
       baseUrl: `${urlObj.protocol}//${urlObj.host}`,
       domain,
       searchParams,

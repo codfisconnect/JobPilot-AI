@@ -84,10 +84,12 @@
   border-radius: 12px;
   overflow: hidden;
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+  display: flex;
+  flex-direction: column;
 }
 
 .admin-table-controls {
-  padding: 16px 20px;
+  padding: 14px 20px;
   border-bottom: 1px solid var(--border-subtle, #334155);
   display: flex;
   align-items: center;
@@ -113,12 +115,12 @@
 
 .admin-search-input {
   width: 100%;
-  padding: 9px 12px 9px 38px;
+  padding: 8px 12px 8px 36px;
   background: var(--bg-canvas, #0f172a);
   border: 1px solid var(--border-subtle, #334155);
   border-radius: 8px;
   color: var(--text-primary, #f8fafc);
-  font-size: 0.875rem;
+  font-size: 0.85rem;
   outline: none;
 }
 
@@ -136,31 +138,62 @@
   outline: none;
 }
 
+.admin-table-scroll-wrap {
+  width: 100%;
+  overflow-x: auto;
+  max-height: 70vh;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(99, 102, 241, 0.4) transparent;
+}
+
 .admin-data-table {
   width: 100%;
-  border-collapse: collapse;
+  border-collapse: separate;
+  border-spacing: 0;
   text-align: left;
-  font-size: 0.875rem;
+  font-size: 0.85rem;
 }
 
 .admin-data-table th {
-  background: rgba(0, 0, 0, 0.2);
-  padding: 12px 20px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  background: #111827;
+  padding: 10px 16px;
   font-weight: 600;
   color: var(--text-secondary, #94a3b8);
-  border-bottom: 1px solid var(--border-subtle, #334155);
+  border-bottom: 2px solid var(--border-subtle, #334155);
   white-space: nowrap;
 }
 
 .admin-data-table td {
-  padding: 14px 20px;
+  padding: 10px 16px;
   border-bottom: 1px solid var(--border-subtle, #334155);
   color: var(--text-primary, #f8fafc);
   vertical-align: middle;
 }
 
+/* Sticky first column (Company) for accessible horizontal scrolling */
+.admin-data-table th:first-child,
+.admin-data-table td:first-child {
+  position: sticky;
+  left: 0;
+  z-index: 5;
+  background: #1e293b;
+  box-shadow: 2px 0 4px rgba(0, 0, 0, 0.15);
+}
+
+.admin-data-table th:first-child {
+  z-index: 15;
+  background: #111827;
+}
+
 .admin-data-table tr:hover td {
-  background-color: rgba(255, 255, 255, 0.02);
+  background-color: rgba(255, 255, 255, 0.03);
+}
+
+.admin-data-table tr:hover td:first-child {
+  background-color: #243046;
 }
 
 .admin-badge {

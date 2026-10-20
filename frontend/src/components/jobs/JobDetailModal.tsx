@@ -2,16 +2,17 @@ import React from 'react';
 import { CanonicalJob } from '../../types/job.types';
 import { Modal } from '../common/Modal';
 import { Button } from '../common/Button';
-import { MapPin, Briefcase, Building, ExternalLink, Calendar, CheckCircle2, ShieldCheck } from 'lucide-react';
+import { MapPin, Briefcase, Building, ExternalLink, Calendar, CheckCircle2, ShieldCheck, Send } from 'lucide-react';
 
 interface JobDetailModalProps {
   job: CanonicalJob | null;
   isOpen: boolean;
   onClose: () => void;
   onAnalyzeFit?: (jobId: string) => void;
+  onApply?: (jobId: string) => void;
 }
 
-export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onClose, onAnalyzeFit }) => {
+export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onClose, onAnalyzeFit, onApply }) => {
   if (!job) return null;
 
   const targetUrl = job.applicationUrl || job.sourceUrl;
@@ -128,7 +129,7 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onC
             </Button>
             {onAnalyzeFit && (
               <Button
-                variant="primary"
+                variant="outline"
                 onClick={() => {
                   onClose();
                   onAnalyzeFit(job.id);
@@ -138,11 +139,18 @@ export const JobDetailModal: React.FC<JobDetailModalProps> = ({ job, isOpen, onC
               </Button>
             )}
             <Button
-              variant="outline"
-              icon={<ExternalLink size={16} />}
-              onClick={() => window.open(targetUrl, '_blank', 'noopener,noreferrer')}
+              variant="primary"
+              icon={<Send size={16} />}
+              onClick={() => {
+                onClose();
+                if (onApply) {
+                  onApply(job.id);
+                } else if (onAnalyzeFit) {
+                  onAnalyzeFit(job.id);
+                }
+              }}
             >
-              Apply on Company Site
+              Apply
             </Button>
           </div>
         </div>

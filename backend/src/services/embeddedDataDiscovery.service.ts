@@ -2,7 +2,7 @@ import * as cheerio from 'cheerio';
 import { logger } from '../utils/logger.js';
 
 export interface EmbeddedDataResult {
-  sourceType: 'NEXT_JS_RSC' | 'NEXT_DATA' | 'EMBEDDED_JSON';
+  sourceType: 'NEXT_JS_RSC' | 'NEXT_DATA' | 'INERTIA_PAGE' | 'EMBEDDED_JSON';
   jobs: any[];
   rootPath?: string;
 }
@@ -16,7 +16,8 @@ export class EmbeddedDataDiscoveryService {
    * Safe extraction of embedded job state from modern web pages:
    * 1. Next.js React Server Component payloads (self.__next_f.push)
    * 2. Next.js pages router state (__NEXT_DATA__)
-   * 3. Generic application state script tags (application/json, window.__INITIAL_STATE__, etc.)
+   * 3. Inertia.js client-side page state (data-page attribute on app container)
+   * 4. Generic application state script tags (application/json, window.__INITIAL_STATE__, etc.)
    */
   public static extractEmbeddedJobsFromHtml(html: string): EmbeddedDataResult | null {
     if (!html || typeof html !== 'string') return null;
@@ -33,7 +34,13 @@ export class EmbeddedDataDiscoveryService {
       return nextDataResult;
     }
 
-    // 3. Try generic embedded JSON scripts
+    // 3. Try Inertia.js application state: <div id="app" data-page="...">
+    const inertiaResult = this.extractFromInertiaDataPage(html);
+    if (inertiaResult && inertiaResult.jobs.length > 0) {
+      return inertiaResult;
+    }
+
+    // 4. Try generic embedded JSON scripts
     const genericJsonResult = this.extractFromEmbeddedJsonScripts(html);
     if (genericJsonResult && genericJsonResult.jobs.length > 0) {
       return genericJsonResult;
@@ -145,6 +152,39 @@ export class EmbeddedDataDiscoveryService {
       }
     } catch (err: any) {
       logger.debug(`[EmbeddedDataDiscoveryService] __NEXT_DATA__ parse error: ${err.message}`);
+    }
+
+    return null;
+  }
+
+  /**
+   * Extracts data from standard Inertia.js application container attribute: <div id="app" data-page="...">
+   * Widely used by modern full-stack web frameworks (Laravel + Vue/React, Rails + Inertia, etc.)
+   */
+  private static extractFromInertiaDataPage(html: string): EmbeddedDataResult | null {
+    if (!html.includes('data-page')) return null;
+
+    try {
+      const $ = cheerio.load(html);
+      const appElement = $('[data-page]');
+      if (appElement.length === 0) return null;
+
+      const rawDataPage = appElement.attr('data-page');
+      if (!rawDataPage || rawDataPage.length > this.MAX_SCRIPT_SIZE_BYTES) return null;
+
+      const parsed = JSON.parse(rawDataPage);
+      const candidates = this.findJobArraysInObject(parsed);
+      if (candidates.length > 0) {
+        candidates.sort((a, b) => b.score - a.score || b.jobs.length - a.jobs.length);
+        logger.info(`[EmbeddedDataDiscoveryService] Discovered ${candidates[0].jobs.length} jobs from Inertia.js data-page`);
+        return {
+          sourceType: 'INERTIA_PAGE',
+          jobs: candidates[0].jobs,
+          rootPath: candidates[0].path
+        };
+      }
+    } catch (err: any) {
+      logger.debug(`[EmbeddedDataDiscoveryService] data-page parse error: ${err.message}`);
     }
 
     return null;

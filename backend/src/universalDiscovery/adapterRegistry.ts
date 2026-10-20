@@ -6,6 +6,8 @@ import { GreenhouseAdapter } from './adapters/greenhouse.adapter.js';
 import { LeverAdapter } from './adapters/lever.adapter.js';
 import { AshbyAdapter } from './adapters/ashby.adapter.js';
 import { SmartRecruitersAdapter } from './adapters/smartrecruiters.adapter.js';
+import { PhenomAdapter } from './adapters/phenom.adapter.js';
+import { InfosysAdapter } from './adapters/infosys.adapter.js';
 import { DirectJsonStrategy } from './strategies/directJson.strategy.js';
 import { JsonLdStrategy } from './strategies/jsonLd.strategy.js';
 import { EmbeddedStateStrategy } from './strategies/embeddedState.strategy.js';
@@ -24,6 +26,8 @@ export class AdapterRegistry {
     new LeverAdapter(),
     new AshbyAdapter(),
     new SmartRecruitersAdapter(),
+    new PhenomAdapter(),
+    new InfosysAdapter(),
 
     // Generic Structured Data Strategies (priorities 20 - 39)
     new DirectJsonStrategy(),

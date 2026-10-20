@@ -2,15 +2,16 @@ import React from 'react';
 import { CanonicalJob } from '../../types/job.types';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
-import { MapPin, Briefcase, ExternalLink, Building, DollarSign } from 'lucide-react';
+import { MapPin, Briefcase, ExternalLink, Building, DollarSign, Send } from 'lucide-react';
 
 interface JobCardProps {
   job: CanonicalJob;
   onSelect: (job: CanonicalJob) => void;
+  onApply?: (job: CanonicalJob) => void;
   onOpenSourceUrl?: (url: string) => void;
 }
 
-export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onOpenSourceUrl }) => {
+export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onApply, onOpenSourceUrl }) => {
   const formatSalary = () => {
     if (job.salaryMin && job.salaryMax) {
       return `${job.salaryCurrency || '$'}${Number(job.salaryMin).toLocaleString()} - ${Number(job.salaryMax).toLocaleString()}`;
@@ -103,19 +104,17 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onOpenSourceUrl
         <Button
           variant="primary"
           size="sm"
-          icon={<ExternalLink size={14} />}
+          icon={<Send size={14} />}
           onClick={(e) => {
             e.stopPropagation();
-            const targetUrl = job.applicationUrl || job.sourceUrl;
-            if (onOpenSourceUrl) {
-              onOpenSourceUrl(targetUrl);
+            if (onApply) {
+              onApply(job);
             } else {
-              window.open(targetUrl, '_blank', 'noopener,noreferrer');
+              onSelect(job);
             }
           }}
         >
-          <span className="desktop-only-text">View / Apply</span>
-          <span className="mobile-only-text">Apply</span>
+          <span>Apply</span>
         </Button>
       </div>
     </Card>
