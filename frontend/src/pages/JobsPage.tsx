@@ -11,6 +11,7 @@ import { api } from '../api/index';
 import { useApp } from '../context/AppContext';
 import { JobDescription } from '../types/index';
 import { normalizeApiError } from '../utils/errorUtils';
+import { getCanonicalCompanyName } from '../utils/companyUtils';
 import {
   Search,
   Filter,
@@ -79,11 +80,12 @@ export const JobsPage: React.FC<JobsPageProps> = ({
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
 
   const handleDirectApply = (job: CanonicalJob) => {
+    const canonicalCompany = getCanonicalCompanyName(job.company?.name, job.sourceUrl, job.applicationUrl);
     // Adapt CanonicalJob to JobDescription
     const adapted: JobDescription = {
       id: job.id,
       role: job.title,
-      company: job.company?.name || 'Company',
+      company: canonicalCompany,
       location: job.location || job.city || 'Remote',
       sourceType: (job.sourceType as any) || 'external',
       source: job.sourceName || job.sourceType,
@@ -553,31 +555,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
               setApplyingJob(null);
             }}
             job={applyingJob}
-            candidate={activeCandidate || {
-              id: 'candidate_me',
-              name: 'Candidate',
-              email: 'candidate@pilotmama.com',
-              phone: '+1 555-0199',
-              location: 'San Francisco, CA',
-              targetRoles: ['Software Engineer'],
-              yearsOfExperience: 5,
-              preferredLocations: ['Remote'],
-              expectedSalary: '$140,000',
-              noticePeriod: 'Immediate',
-              workPreference: 'Remote',
-              primarySkills: ['TypeScript', 'React', 'Node.js', 'System Architecture'],
-              secondarySkills: ['GraphQL', 'Docker', 'PostgreSQL'],
-              technologies: ['React', 'Node.js', 'PostgreSQL'],
-              companies: [],
-              education: [],
-              certifications: [],
-              projects: [],
-              summary: 'Experienced full stack software engineer.',
-              experiences: [],
-              isDemo: false,
-              createdAt: new Date().toISOString(),
-              updatedAt: new Date().toISOString()
-            }}
+            candidate={activeCandidate}
             onSuccess={(app) => {
               showToast?.(`Application started: ${app.role} at ${app.company}`);
             }}
