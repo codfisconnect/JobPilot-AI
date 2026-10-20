@@ -407,17 +407,13 @@ export class BulkJobSourceService {
    * Processes a single source item through universal discovery and onboarding.
    */
   public static async processSingleSourceItem(itemId: string): Promise<void> {
-    const item = await prisma.bulkSourceItem.findUnique({
-      where: { id: itemId }
-    });
-
-    if (!item || item.status === BulkSourceItemStatus.CANCELLED) {
-      return;
-    }
-
     const startTime = new Date();
-    await prisma.bulkSourceItem.update({
-      where: { id: itemId },
+    // Atomic claiming: ensure we only claim if status is QUEUED
+    const updateResult = await prisma.bulkSourceItem.updateMany({
+      where: {
+        id: itemId,
+        status: BulkSourceItemStatus.QUEUED
+      },
       data: {
         status: BulkSourceItemStatus.DISCOVERING,
         startedAt: startTime,
@@ -425,6 +421,17 @@ export class BulkJobSourceService {
         errorCode: null
       }
     });
+
+    if (updateResult.count === 0) {
+      // Already claimed or cancelled
+      return;
+    }
+
+    const item = await prisma.bulkSourceItem.findUnique({
+      where: { id: itemId }
+    });
+
+    if (!item) return;
 
     try {
       // Execute standard universal discovery & onboarding

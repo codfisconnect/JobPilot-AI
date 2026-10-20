@@ -93,9 +93,14 @@ export class AdminBulkJobSourcesController {
       const limit = parseInt(req.query.limit as string, 10) || 20;
       const skip = (page - 1) * limit;
 
+      const whereClause = {
+        id: { not: '00000000-0000-0000-0000-000000000001' }
+      };
+
       const [total, imports] = await Promise.all([
-        prisma.bulkSourceImport.count(),
+        prisma.bulkSourceImport.count({ where: whereClause }),
         prisma.bulkSourceImport.findMany({
+          where: whereClause,
           skip,
           take: limit,
           orderBy: { createdAt: 'desc' }
