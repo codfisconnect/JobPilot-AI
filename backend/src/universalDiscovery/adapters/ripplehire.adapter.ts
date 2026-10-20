@@ -3,6 +3,7 @@ import { safeFetchUrl } from '../../utils/safeFetch.js';
 import { CompletenessEstimatorService } from '../completenessEstimator.service.js';
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
+import { safeParseJson } from '../../utils/safeJson.js';
 import * as cheerio from 'cheerio';
 
 export class RippleHireAdapter implements IJobSourceStrategy {
@@ -74,7 +75,13 @@ export class RippleHireAdapter implements IJobSourceStrategy {
           break;
         }
 
-        const data = JSON.parse(res.text);
+        const jsonResult = safeParseJson(res.text, res.contentType || res.headers?.['content-type']);
+        if (!jsonResult.success || !jsonResult.data) {
+          logger.warn(`[RippleHireAdapter] Non-JSON payload on page ${page}`);
+          break;
+        }
+
+        const data = jsonResult.data;
         if (expectedCount === null && data.totalJobCount !== undefined) {
           expectedCount = data.totalJobCount;
         }

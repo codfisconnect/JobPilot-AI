@@ -104,6 +104,30 @@ export class SuccessFactorsAdapter implements IJobSourceStrategy {
       } catch {}
     }
 
+    // If still 0, invoke generic browser-rendered fallback (DWR AJAX client initialization)
+    if (allJobs.length === 0) {
+      try {
+        logger.info(`[SuccessFactorsAdapter] SAP SuccessFactors portal renders jobs dynamically via DWR client. Initiating generic browser discovery.`);
+        const { GenericBrowserDiscoveryService } = await import('../services/genericBrowserDiscovery.service.js');
+        const browserRes = await GenericBrowserDiscoveryService.discoverRenderedJobs(
+          normalizedUrl.normalizedUrl,
+          companyName,
+          { maxPages: 2 }
+        );
+        if (browserRes.jobs.length > 0) {
+          for (const bj of browserRes.jobs) {
+            const key = bj.externalJobId || bj.applicationUrl || bj.title;
+            if (!seenJobIds.has(key)) {
+              seenJobIds.add(key);
+              allJobs.push(bj);
+            }
+          }
+        }
+      } catch (browserErr: any) {
+        logger.warn(`[SuccessFactorsAdapter] Browser fallback warning: ${browserErr.message}`);
+      }
+    }
+
     // Extract total count if reported in HTML
     const reportedTotal = initialHtml ? CompletenessEstimatorService.extractReportedTotalFromHtml(initialHtml) : 0;
     const completeness = CompletenessEstimatorService.evaluate(allJobs.length, reportedTotal);

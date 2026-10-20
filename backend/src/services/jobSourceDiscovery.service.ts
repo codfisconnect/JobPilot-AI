@@ -14,6 +14,7 @@ import { EmbeddedDataDiscoveryService } from './embeddedDataDiscovery.service.js
 import { UniversalDiscoveryOrchestrator } from '../universalDiscovery/universalDiscoveryOrchestrator.js';
 import { CompletenessStatus } from '../universalDiscovery/types.js';
 import { CompletenessEstimatorService } from '../universalDiscovery/completenessEstimator.service.js';
+import { safeParseJson } from '../utils/safeJson.js';
 
 export interface DiscoveryResult {
   detectedType: 'DIRECT_JSON' | 'JSON_API' | 'HTML' | 'EMBEDDED_DATA' | 'JSON_LD' | 'DYNAMIC_API' | 'SPECIALIZED_ATS' | string;
@@ -67,8 +68,12 @@ export class JobSourceDiscoveryService {
       domain = domain.slice(4);
     }
 
-    let companyName = domain.split('.')[0];
-    companyName = companyName.charAt(0).toUpperCase() + companyName.slice(1);
+    const hostParts = domain.split('.');
+    let baseBrand = hostParts[0];
+    if (['careers', 'jobs', 'career', 'job', 'work'].includes(baseBrand.toLowerCase()) && hostParts.length > 2) {
+      baseBrand = hostParts[1];
+    }
+    let companyName = baseBrand.charAt(0).toUpperCase() + baseBrand.slice(1);
 
     if (html) {
       try {
@@ -135,13 +140,19 @@ export class JobSourceDiscoveryService {
 
     // Split on delimiters
     const parts = clean.split(/[|\-—:]/).map(p => p.trim()).filter(Boolean);
+    const genericSlogans = [
+      'careers', 'jobs', 'openings', 'positions', 'join us',
+      'do the work that matters', 'make an impact', 'explore opportunities',
+      'work with us', 'future of work', 'grow with us', 'home',
+      'career opportunities', 'job search', 'search jobs'
+    ];
+
     for (const part of parts) {
-      const lower = part.toLowerCase();
-      // Skip parts that are solely generic terms
+      const lower = part.toLowerCase().trim();
+      // Skip parts that match generic slogans or terms
       if (
-        lower === 'careers' || lower === 'jobs' || lower === 'openings' ||
-        lower === 'positions' || lower === 'join us' || lower.includes('jobs & culture') ||
-        lower.includes('culture & jobs') || lower.includes('home')
+        genericSlogans.some(s => lower === s || lower.startsWith(s + ' ') || lower.endsWith(' ' + s)) ||
+        lower.includes('jobs & culture') || lower.includes('culture & jobs')
       ) {
         continue;
       }
@@ -287,49 +298,66 @@ export class JobSourceDiscoveryService {
           } catch {}
         });
       } else {
-        const payload = JSON.parse(res.text);
-        const { jobs } = FieldMapperService.extractJobsArray(payload);
-        rawRecords = [...jobs];
+        const jsonResult = safeParseJson(res.text, res.contentType || res.headers?.['content-type']);
+        if (jsonResult.success && jsonResult.data) {
+          const payload = jsonResult.data;
+          const { jobs } = FieldMapperService.extractJobsArray(payload);
+          rawRecords = [...jobs];
 
-        // Universal pagination: Check if source reports more total jobs than returned in page 1
-        const reportedTotal = CompletenessEstimatorService.extractReportedTotal(payload);
-        if (reportedTotal !== null && reportedTotal !== undefined) {
-          discovery.expectedJobCount = reportedTotal;
-        }
-
-        if (reportedTotal && reportedTotal > rawRecords.length) {
-          try {
-            const paginatedUrlObj = new URL(discovery.jobsEndpoint);
-            const rowsParam = paginatedUrlObj.searchParams.get('rows');
-            const pageSize = rowsParam ? parseInt(rowsParam, 10) : (jobs.length || 20);
-            let currentOffset = rawRecords.length;
-            let pageCount = 0;
-            const maxPages = 50;
-
-            while (rawRecords.length < reportedTotal && pageCount < maxPages) {
-              if (paginatedUrlObj.searchParams.has('start')) {
-                paginatedUrlObj.searchParams.set('start', String(currentOffset));
-              } else if (paginatedUrlObj.searchParams.has('offset')) {
-                paginatedUrlObj.searchParams.set('offset', String(currentOffset));
-              } else if (paginatedUrlObj.searchParams.has('page')) {
-                const currentPage = Math.floor(currentOffset / pageSize) + 1;
-                paginatedUrlObj.searchParams.set('page', String(currentPage));
-              } else {
-                paginatedUrlObj.searchParams.set('start', String(currentOffset));
-              }
-
-              const nextRes = await safeFetchUrl(paginatedUrlObj.toString(), { timeoutMs: 12000 });
-              if (nextRes.status !== 200 || !nextRes.text.trim()) break;
-              const nextPayload = JSON.parse(nextRes.text);
-              const { jobs: nextJobs } = FieldMapperService.extractJobsArray(nextPayload);
-              if (!nextJobs || nextJobs.length === 0) break;
-              rawRecords.push(...nextJobs);
-              currentOffset += nextJobs.length;
-              pageCount++;
-            }
-          } catch (pageErr: any) {
-            logger.warn(`[JobSourceDiscoveryService] Pagination loop encountered warning: ${pageErr.message}`);
+          // Universal pagination: Check if source reports more total jobs than returned in page 1
+          const reportedTotal = CompletenessEstimatorService.extractReportedTotal(payload);
+          if (reportedTotal !== null && reportedTotal !== undefined) {
+            discovery.expectedJobCount = reportedTotal;
           }
+
+          if (reportedTotal && reportedTotal > rawRecords.length) {
+            try {
+              const paginatedUrlObj = new URL(discovery.jobsEndpoint);
+              const rowsParam = paginatedUrlObj.searchParams.get('rows');
+              const pageSize = rowsParam ? parseInt(rowsParam, 10) : (jobs.length || 20);
+              let currentOffset = rawRecords.length;
+              let pageCount = 0;
+              const maxPages = 50;
+
+              while (rawRecords.length < reportedTotal && pageCount < maxPages) {
+                if (paginatedUrlObj.searchParams.has('start')) {
+                  paginatedUrlObj.searchParams.set('start', String(currentOffset));
+                } else if (paginatedUrlObj.searchParams.has('offset')) {
+                  paginatedUrlObj.searchParams.set('offset', String(currentOffset));
+                } else if (paginatedUrlObj.searchParams.has('page')) {
+                  const currentPage = Math.floor(currentOffset / pageSize) + 1;
+                  paginatedUrlObj.searchParams.set('page', String(currentPage));
+                } else {
+                  paginatedUrlObj.searchParams.set('start', String(currentOffset));
+                }
+
+                const nextRes = await safeFetchUrl(paginatedUrlObj.toString(), { timeoutMs: 12000 });
+                if (nextRes.status !== 200 || !nextRes.text.trim()) break;
+                const nextJsonResult = safeParseJson(nextRes.text, nextRes.contentType || nextRes.headers?.['content-type']);
+                if (!nextJsonResult.success || !nextJsonResult.data) break;
+                const { jobs: nextJobs } = FieldMapperService.extractJobsArray(nextJsonResult.data);
+                if (!nextJobs || nextJobs.length === 0) break;
+                rawRecords.push(...nextJobs);
+                currentOffset += nextJobs.length;
+                pageCount++;
+              }
+            } catch (pageErr: any) {
+              logger.warn(`[JobSourceDiscoveryService] Pagination loop encountered warning: ${pageErr.message}`);
+            }
+          }
+        } else if (jsonResult.isHtml) {
+          logger.info(`[JobSourceDiscoveryService] Endpoint returned HTML instead of expected JSON. Attempting HTML and embedded state extraction.`);
+          const htmlResult = await HtmlJobDiscoveryService.extractJobsFromHtml(discovery.jobsEndpoint, res.text);
+          if (htmlResult && htmlResult.jobs.length > 0) {
+            rawRecords = htmlResult.jobs;
+          } else {
+            const embeddedResult = EmbeddedDataDiscoveryService.extractEmbeddedJobsFromHtml(res.text);
+            if (embeddedResult && embeddedResult.jobs.length > 0) {
+              rawRecords = embeddedResult.jobs;
+            }
+          }
+        } else {
+          logger.warn(`[JobSourceDiscoveryService] Failed to parse endpoint response safely: ${jsonResult.error}`);
         }
       }
     }

@@ -5,6 +5,7 @@ import { JobRecordScoringService } from '../jobRecordScoring.service.js';
 import { CompletenessEstimatorService } from '../completenessEstimator.service.js';
 import { DiscoveredJobRaw } from '../types.js';
 import { JobSourceDiscoveryService } from '../../services/jobSourceDiscovery.service.js';
+import { safeParseJson } from '../../utils/safeJson.js';
 
 export class CommonRestEndpointsStrategy implements IJobSourceStrategy {
   public readonly name = 'COMMON_REST_ENDPOINTS_STRATEGY';
@@ -34,8 +35,10 @@ export class CommonRestEndpointsStrategy implements IJobSourceStrategy {
       const probeUrl = `${baseOrigin}${p}`;
       try {
         const res = await safeFetchUrl(probeUrl, { timeoutMs: 4000 });
-        if (res.status === 200) {
-          const payload = JSON.parse(res.text);
+        if (res.status === 200 && res.text) {
+          const jsonResult = safeParseJson(res.text, res.contentType || res.headers?.['content-type']);
+          if (!jsonResult.success || !jsonResult.data) continue;
+          const payload = jsonResult.data;
           const { jobs, rootPath } = FieldMapperService.extractJobsArray(payload);
           const scoreCheck = JobRecordScoringService.scoreCandidateArray(jobs);
 

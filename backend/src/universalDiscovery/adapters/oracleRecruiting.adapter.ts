@@ -4,6 +4,7 @@ import { CompletenessEstimatorService } from '../completenessEstimator.service.j
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
 import { JobSourceDiscoveryService } from '../../services/jobSourceDiscovery.service.js';
+import { safeParseJson } from '../../utils/safeJson.js';
 
 export class OracleRecruitingAdapter implements IJobSourceStrategy {
   public readonly name = 'ORACLE_RECRUITING_ADAPTER';
@@ -95,7 +96,13 @@ export class OracleRecruitingAdapter implements IJobSourceStrategy {
           break;
         }
 
-        const data = JSON.parse(res.text);
+        const jsonResult = safeParseJson(res.text, res.contentType || res.headers?.['content-type']);
+        if (!jsonResult.success || !jsonResult.data) {
+          logger.warn(`[OracleRecruitingAdapter] Non-JSON payload received at offset ${offset}`);
+          break;
+        }
+
+        const data = jsonResult.data;
         const searchItem = data.items && data.items[0];
         if (!searchItem) break;
 

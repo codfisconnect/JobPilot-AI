@@ -3,6 +3,7 @@ import { safeFetchUrl } from '../../utils/safeFetch.js';
 import { CompletenessEstimatorService } from '../completenessEstimator.service.js';
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
+import { safeParseJson } from '../../utils/safeJson.js';
 
 export class SmartRecruitersAdapter implements IJobSourceStrategy {
   public readonly name = 'SMARTRECRUITERS_ADAPTER';
@@ -35,8 +36,13 @@ export class SmartRecruitersAdapter implements IJobSourceStrategy {
 
     try {
       const res = await safeFetchUrl(endpoint, { timeoutMs: 10000 });
-      if (res.status === 200) {
-        const payload = JSON.parse(res.text);
+      if (res.status === 200 && res.text) {
+        const jsonResult = safeParseJson(res.text, res.contentType || res.headers?.['content-type']);
+        if (!jsonResult.success || !jsonResult.data) {
+          logger.warn(`[SmartRecruitersAdapter] Non-JSON response received`);
+          return { matched: false } as any;
+        }
+        const payload = jsonResult.data;
         expectedCount = payload.totalFound !== undefined ? payload.totalFound : (payload.content ? payload.content.length : null);
         const rawJobs = payload.content || [];
 
