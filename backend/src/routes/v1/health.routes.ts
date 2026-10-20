@@ -6,8 +6,12 @@ export const healthRouter = Router();
 
 healthRouter.get('/health', async (req, res) => {
   const dbHealth = await checkDatabaseConnection();
+  const { resumeStorage } = await import('../../storage/index.js');
+  const storageHealth = resumeStorage.checkHealth
+    ? await resumeStorage.checkHealth()
+    : { status: 'READY' as const, provider: 'local', bucket: undefined, message: 'Local storage operational' };
 
-  const isHealthy = dbHealth.connected;
+  const isHealthy = dbHealth.connected && storageHealth.status !== 'UNAVAILABLE';
 
   res.status(isHealthy ? 200 : 503).json({
     success: true,
@@ -19,6 +23,12 @@ healthRouter.get('/health', async (req, res) => {
         connected: dbHealth.connected,
         latencyMs: dbHealth.latencyMs,
         error: dbHealth.error
+      },
+      storage: {
+        provider: storageHealth.provider,
+        status: storageHealth.status,
+        bucket: storageHealth.bucket,
+        message: storageHealth.message
       },
       uptimeSeconds: Math.floor(process.uptime()),
       timestamp: new Date().toISOString()

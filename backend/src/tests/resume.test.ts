@@ -428,4 +428,101 @@ B.S Abdur Rahman University, Chennai
       assert.strictEqual(res.status, 404);
     });
   });
+
+  describe('Storage Integrity, Loss Reconciliation & Replacement Upload Suite', () => {
+    let testResumeId: string;
+
+    it('should upload a resume and record persistent storage checksum', async () => {
+      const res = await request(app)
+        .post('/api/v1/resumes')
+        .set('Authorization', `Bearer ${tokenA}`)
+        .attach('resume', validPdfBuffer, 'test_integrity_doc.pdf');
+
+      assert.strictEqual(res.status, 201);
+      assert.ok(res.body.data.id);
+      assert.strictEqual(res.body.data.status, 'UPLOADED');
+      assert.ok(res.body.data.checksum);
+      assert.strictEqual(res.body.data.checksum.length, 64); // SHA-256
+
+      testResumeId = res.body.data.id;
+    });
+
+    it('should download resume document authorized by candidate ownership', async () => {
+      const res = await request(app)
+        .get(`/api/v1/resumes/${testResumeId}/download`)
+        .set('Authorization', `Bearer ${tokenA}`);
+
+      assert.strictEqual(res.status, 200);
+      assert.strictEqual(res.headers['content-type'], 'application/pdf');
+      assert.ok(res.body.length > 0);
+    });
+
+    it('should prevent Candidate B from downloading Candidate A resume document', async () => {
+      const res = await request(app)
+        .get(`/api/v1/resumes/${testResumeId}/download`)
+        .set('Authorization', `Bearer ${tokenB}`);
+
+      assert.strictEqual(res.status, 404);
+    });
+
+    it('should reconcile and mark FILE_MISSING if storage object is physically removed', async () => {
+      // Manually delete underlying storage file to simulate container redeploy / loss
+      const resume = await prisma.resume.findUnique({ where: { id: testResumeId } });
+      assert.ok(resume?.storageKey);
+
+      const { resumeStorage } = await import('../storage/index.js');
+      await resumeStorage.delete(resume.storageKey);
+
+      // Verify listing resumes reconciles status to FILE_MISSING
+      const listRes = await request(app)
+        .get('/api/v1/resumes')
+        .set('Authorization', `Bearer ${tokenA}`);
+
+      assert.strictEqual(listRes.status, 200);
+      const target = listRes.body.data.find((r: any) => r.id === testResumeId);
+      assert.ok(target);
+      assert.strictEqual(target.status, 'FILE_MISSING');
+    });
+
+    it('should return RESUME_FILE_MISSING error code without exposing storage key when parsing missing file', async () => {
+      const parseRes = await request(app)
+        .post(`/api/v1/resumes/${testResumeId}/parse`)
+        .set('Authorization', `Bearer ${tokenA}`);
+
+      assert.strictEqual(parseRes.status, 404);
+      assert.strictEqual(parseRes.body.error.code, 'RESUME_FILE_MISSING');
+      assert.strictEqual(parseRes.body.error.message, 'Resume file is unavailable. Please upload the resume again.');
+      // Must NOT leak internal UUID storage keys or filesystem paths
+      assert.ok(!parseRes.body.error.message.includes('key:'));
+    });
+
+    it('should allow candidate to upload a replacement for the missing resume file', async () => {
+      const replaceRes = await request(app)
+        .put(`/api/v1/resumes/${testResumeId}/replace`)
+        .set('Authorization', `Bearer ${tokenA}`)
+        .attach('resume', validPdfBuffer, 'recovered_resume.pdf');
+
+      assert.strictEqual(replaceRes.status, 200);
+      assert.strictEqual(replaceRes.body.data.status, 'UPLOADED');
+      assert.strictEqual(replaceRes.body.data.originalFileName, 'recovered_resume.pdf');
+      assert.ok(replaceRes.body.data.checksum);
+
+      // Verify the replaced file can now be parsed normally
+      const parseRes = await request(app)
+        .post(`/api/v1/resumes/${testResumeId}/parse`)
+        .set('Authorization', `Bearer ${tokenA}`);
+
+      assert.strictEqual(parseRes.status, 200);
+      assert.ok(parseRes.body.data.experience.length > 0);
+    });
+
+    it('should verify storage health status in /health endpoint', async () => {
+      const healthRes = await request(app).get('/api/v1/health');
+      assert.strictEqual(healthRes.status, 200);
+      assert.ok(healthRes.body.data.storage);
+      assert.strictEqual(healthRes.body.data.storage.status, 'READY');
+      assert.ok(healthRes.body.data.storage.provider);
+    });
+  });
 });
+

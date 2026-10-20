@@ -114,6 +114,20 @@ if (!isTestEnv) {
       }
 
 
+      // Check and report resume storage health status on startup
+      import('./storage/index.js')
+        .then(async ({ resumeStorage }) => {
+          if (resumeStorage.checkHealth) {
+            const health = await resumeStorage.checkHealth();
+            if (health.status === 'READY') {
+              logger.info(`Resume storage: READY (${health.provider.toUpperCase()})`);
+            } else {
+              logger.warn(`Resume storage: ${health.status} (${health.provider.toUpperCase()}) - ${health.message}`);
+            }
+          }
+        })
+        .catch(() => {});
+
       app.listen(PORT, () => {
         logger.info(`Pilot Mama backend listening on port ${PORT} [${env.NODE_ENV}]`);
       });
