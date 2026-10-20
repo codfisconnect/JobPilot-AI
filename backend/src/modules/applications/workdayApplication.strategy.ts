@@ -126,10 +126,22 @@ export class WorkdayApplicationStrategy {
 
       // 6. DOCUMENT UPLOAD: Attach selected ResumeVersion
       if (resumeVersion) {
+        let storageStatusText = 'truth-verified resume snapshot';
+        if (resumeVersion.resume?.storageKey) {
+          try {
+            const { resumeStorage } = await import('../../storage/index.js');
+            const fileExists = await resumeStorage.exists(resumeVersion.resume.storageKey);
+            if (fileExists) {
+              storageStatusText = 'verified persistent object storage document';
+            }
+          } catch {
+            // Non-blocking metadata enhancement
+          }
+        }
         addStep(
           'DOCUMENT_UPLOAD',
           'DOCUMENT_UPLOAD',
-          `Attached truth-verified resume snapshot: ${resumeVersion.versionName || resumeVersion.title}`
+          `Attached ${storageStatusText}: ${resumeVersion.versionName || resumeVersion.title}`
         );
       }
 

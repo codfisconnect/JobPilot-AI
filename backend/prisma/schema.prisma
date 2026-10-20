@@ -98,6 +98,8 @@ enum ResumeStatus {
   PARSED
   PARSE_REVIEW_REQUIRED
   FAILED
+  FILE_MISSING
+  STORAGE_FAILED
   ARCHIVED
 }
 
@@ -301,6 +303,7 @@ model Resume {
   fileSize           Int?         @map("file_size")
   storageProvider    String       @default("local") @map("storage_provider")
   storageKey         String?      @map("storage_key")
+  checksum           String?
   status             ResumeStatus @default(UPLOADED)
   source             ResumeSource @default(UPLOADED)
   filePath           String?      @map("file_path")

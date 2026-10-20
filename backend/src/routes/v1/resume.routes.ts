@@ -18,6 +18,8 @@ resumeRouter.use(authenticateJwt);
 resumeRouter.get('/', ResumeControllerV1.listResumes);
 resumeRouter.post('/', upload.single('resume'), ResumeControllerV1.uploadResume);
 resumeRouter.get('/:id', ResumeControllerV1.getResume);
+resumeRouter.get('/:id/download', ResumeControllerV1.downloadResume);
+resumeRouter.put('/:id/replace', upload.single('resume'), ResumeControllerV1.replaceResume);
 resumeRouter.delete('/:id', ResumeControllerV1.deleteResume);
 
 // Parsing & Confirmation pipeline

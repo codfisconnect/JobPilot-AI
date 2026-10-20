@@ -1,9 +1,9 @@
 import { ResumeRepository } from '../repositories/resume.repository.js';
 import { CandidateProfileRepository } from '../repositories/candidateProfile.repository.js';
-import { resumeStorage } from '../storage/localResumeStorage.js';
+import { resumeStorage } from '../storage/index.js';
 import { FileValidationService } from './fileValidation.service.js';
 import { ResumeTextExtractor, ResumeParsingService } from './resumeParsing.service.js';
-import { NotFoundError, ForbiddenError, BadRequestError } from '../utils/errors.js';
+import { NotFoundError, ForbiddenError, BadRequestError, ResumeFileMissingError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import type { StructuredParsedResume } from '../schemas/resumeParser.schema.js';
 
@@ -20,14 +20,21 @@ export class ResumeService {
     // 1. File Validation (magic number, size, extension)
     const validation = FileValidationService.validateUpload(file);
 
-    // 2. Private Storage
+    // 2. Private Storage (Candidate ownership)
     const storageResult = await resumeStorage.upload(
       file!.buffer,
       validation.sanitizedFilename,
-      validation.detectedMimeType
+      validation.detectedMimeType,
+      { candidateId: profile.id }
     );
 
-    // 3. Create Resume record
+    // 3. Confirm object exists in storage before database insert (consistency guarantee)
+    const exists = await resumeStorage.exists(storageResult.storageKey);
+    if (!exists) {
+      throw new Error('Storage verification failed: Object was not confirmed in persistent storage');
+    }
+
+    // 4. Create Resume record
     const resume = await ResumeRepository.createResume({
       candidateProfileId: profile.id,
       title: title || validation.sanitizedFilename,
@@ -36,11 +43,57 @@ export class ResumeService {
       fileSize: storageResult.byteSize,
       storageProvider: storageResult.storageProvider,
       storageKey: storageResult.storageKey,
+      checksum: storageResult.checksum,
       status: 'UPLOADED',
       isMaster: false
     });
 
     return resume;
+  }
+
+  /**
+   * Replace missing/existing resume file without destroying historical database record
+   */
+  public static async replaceResumeFile(userId: string, resumeId: string, file: Express.Multer.File | undefined) {
+    const profile = await CandidateProfileRepository.findByUserId(userId);
+    if (!profile) {
+      throw new NotFoundError('Candidate profile not found');
+    }
+
+    const resume = await ResumeRepository.findById(resumeId);
+    if (!resume || resume.candidateProfileId !== profile.id) {
+      throw new NotFoundError('Resume not found or unauthorized');
+    }
+
+    // 1. Validate replacement file
+    const validation = FileValidationService.validateUpload(file);
+
+    // 2. Upload replacement to persistent storage
+    const storageResult = await resumeStorage.upload(
+      file!.buffer,
+      validation.sanitizedFilename,
+      validation.detectedMimeType,
+      { candidateId: profile.id }
+    );
+
+    // 3. Confirm object exists
+    const exists = await resumeStorage.exists(storageResult.storageKey);
+    if (!exists) {
+      throw new Error('Replacement storage verification failed');
+    }
+
+    // 4. Update Resume metadata
+    const updated = await ResumeRepository.updateResume(resumeId, {
+      originalFileName: validation.sanitizedFilename,
+      mimeType: validation.detectedMimeType,
+      fileSize: storageResult.byteSize,
+      storageProvider: storageResult.storageProvider,
+      storageKey: storageResult.storageKey,
+      checksum: storageResult.checksum,
+      status: 'UPLOADED'
+    });
+
+    return updated;
   }
 
   /**
@@ -58,7 +111,15 @@ export class ResumeService {
     }
 
     if (!resume.storageKey) {
-      throw new BadRequestError('Resume file has no associated storage key');
+      await ResumeRepository.updateResume(resumeId, { status: 'FILE_MISSING' });
+      throw new ResumeFileMissingError();
+    }
+
+    // Check storage availability before parsing
+    const fileExists = await resumeStorage.exists(resume.storageKey);
+    if (!fileExists) {
+      await ResumeRepository.updateResume(resumeId, { status: 'FILE_MISSING' });
+      throw new ResumeFileMissingError();
     }
 
     // Update status to PARSING
@@ -86,6 +147,10 @@ export class ResumeService {
 
       return parsedData;
     } catch (err: any) {
+      if (err instanceof ResumeFileMissingError || err.code === 'RESUME_FILE_MISSING') {
+        await ResumeRepository.updateResume(resumeId, { status: 'FILE_MISSING' });
+        throw err;
+      }
       logger.error('Failed to parse resume:', { resumeId, error: err.message });
       await ResumeRepository.updateResume(resumeId, { status: 'FAILED' });
       throw err;
@@ -253,14 +318,44 @@ export class ResumeService {
   }
 
   /**
-   * List Resumes for Candidate
+   * List Resumes for Candidate with safe, lightweight storage reconciliation
    */
   public static async getResumes(userId: string) {
     const profile = await CandidateProfileRepository.findByUserId(userId);
     if (!profile) {
       throw new NotFoundError('Candidate profile not found');
     }
-    return ResumeRepository.findByCandidateId(profile.id);
+    const resumes = await ResumeRepository.findByCandidateId(profile.id);
+
+    // Reconcile storage existence for active resumes: if DB says UPLOADED/PARSED but file is gone, mark FILE_MISSING
+    const reconciled = await Promise.all(
+      resumes.map(async (resume) => {
+        if (resume.status === 'ARCHIVED') return resume;
+        if (!resume.storageKey) {
+          if (resume.status !== 'FILE_MISSING') {
+            await ResumeRepository.updateResume(resume.id, { status: 'FILE_MISSING' });
+            return { ...resume, status: 'FILE_MISSING' as const };
+          }
+          return resume;
+        }
+
+        const exists = await resumeStorage.exists(resume.storageKey);
+        if (!exists && resume.status !== 'FILE_MISSING') {
+          logger.warn(`Storage reconciliation: Resume file missing for key ${resume.storageKey}. Updating status to FILE_MISSING.`);
+          await ResumeRepository.updateResume(resume.id, { status: 'FILE_MISSING' });
+          return { ...resume, status: 'FILE_MISSING' as const };
+        } else if (exists && resume.status === 'FILE_MISSING') {
+          // If file was recovered or replaced
+          const newStatus = resume.parsedData ? ('PARSED' as const) : ('UPLOADED' as const);
+          await ResumeRepository.updateResume(resume.id, { status: newStatus });
+          return { ...resume, status: newStatus };
+        }
+
+        return resume;
+      })
+    );
+
+    return reconciled;
   }
 
   /**
@@ -277,7 +372,33 @@ export class ResumeService {
       throw new NotFoundError('Resume not found or unauthorized');
     }
 
+    // Verify storage existence
+    if (resume.storageKey) {
+      const exists = await resumeStorage.exists(resume.storageKey);
+      if (!exists && resume.status !== 'FILE_MISSING') {
+        await ResumeRepository.updateResume(resume.id, { status: 'FILE_MISSING' });
+        return { ...resume, status: 'FILE_MISSING' as const };
+      }
+    }
+
     return resume;
+  }
+
+  /**
+   * Download physical resume file buffer (authorized by candidate ownership)
+   */
+  public static async downloadResumeBuffer(userId: string, resumeId: string): Promise<{ buffer: Buffer; filename: string; mimeType: string }> {
+    const resume = await this.getResumeById(userId, resumeId);
+    if (!resume.storageKey) {
+      throw new ResumeFileMissingError();
+    }
+
+    const buffer = await resumeStorage.download(resume.storageKey);
+    return {
+      buffer,
+      filename: resume.originalFileName || `${resume.title}.pdf`,
+      mimeType: resume.mimeType || 'application/pdf'
+    };
   }
 
   /**

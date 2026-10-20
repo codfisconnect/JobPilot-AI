@@ -40,12 +40,14 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
   const [isDragging, setIsDragging] = useState(false);
   const [versionTitle, setVersionTitle] = useState('');
   const [creatingVersionForId, setCreatingVersionForId] = useState<string | null>(null);
+  const [replacingResumeId, setReplacingResumeId] = useState<string | null>(null);
   const [editingExpIndex, setEditingExpIndex] = useState<number | null>(null);
   const [editingProjectIndex, setEditingProjectIndex] = useState<number | null>(null);
   const [editingEducationIndex, setEditingEducationIndex] = useState<number | null>(null);
   const [expandedExpIndex, setExpandedExpIndex] = useState<number | null>(0);
   const [newSkillInput, setNewSkillInput] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const replaceFileInputRef = useRef<HTMLInputElement>(null);
 
   // Load existing resumes on mount
   React.useEffect(() => {
@@ -81,6 +83,24 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
     }
   };
 
+  const handleReplacementUpload = async (file: File) => {
+    if (!file || !replacingResumeId) return;
+    try {
+      setUploading(true);
+      setError(null);
+      await apiClient.replaceResumeFile(replacingResumeId, file);
+      const currentTargetId = replacingResumeId;
+      setReplacingResumeId(null);
+      await loadResumes();
+      // Automatically proceed to parse the fresh replacement
+      await handleParse(currentTargetId);
+    } catch (err: any) {
+      setError(err.message || 'Failed to upload replacement resume');
+    } finally {
+      setUploading(false);
+    }
+  };
+
   const handleParse = async (resumeId: string) => {
     try {
       setParsingId(resumeId);
@@ -89,7 +109,12 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
       setReviewModalData({ resumeId, parsed: parsedResult });
       await loadResumes();
     } catch (err: any) {
-      setError(err.message || 'Failed to parse resume document');
+      if (err.code === 'RESUME_FILE_MISSING' || (err.message && err.message.toLowerCase().includes('storage file not found'))) {
+        setError('Resume file is unavailable. Please upload a replacement below to continue.');
+        await loadResumes();
+      } else {
+        setError(err.message || 'Failed to parse resume document');
+      }
     } finally {
       setParsingId(null);
     }
@@ -292,6 +317,17 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
             }
           }}
         />
+        <input
+          ref={replaceFileInputRef}
+          type="file"
+          accept=".pdf,.docx,.txt"
+          style={{ display: 'none' }}
+          onChange={e => {
+            if (e.target.files && e.target.files[0]) {
+              handleReplacementUpload(e.target.files[0]);
+            }
+          }}
+        />
         {uploading ? (
           <div className="drop-zone-content">
             <Loader2 size={32} className="animate-spin text-primary" />
@@ -309,7 +345,10 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
 
       {/* Resumes List */}
       <div className="resumes-list-section">
-        <h4 className="resumes-list-heading">Uploaded Documents ({resumes.length})</h4>
+        <h4 className="resumes-list-heading">
+          Uploaded Documents ({resumes.filter(r => r.status !== 'FILE_MISSING' && r.status !== 'STORAGE_FAILED').length} available
+          {resumes.some(r => r.status === 'FILE_MISSING' || r.status === 'STORAGE_FAILED') ? `, ${resumes.filter(r => r.status === 'FILE_MISSING' || r.status === 'STORAGE_FAILED').length} needs re-upload` : ''})
+        </h4>
         {resumes.length === 0 ? (
           <p className="resumes-empty-note">No documents uploaded yet. Upload your PDF/DOCX resume above to parse your profile automatically.</p>
         ) : (
@@ -327,12 +366,54 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
                     </div>
                   </div>
                   <Badge
-                    variant={r.status === 'PARSED' ? 'emerald' : r.status === 'PARSE_REVIEW_REQUIRED' ? 'amber' : 'indigo'}
+                    variant={
+                      r.status === 'PARSED'
+                        ? 'emerald'
+                        : r.status === 'PARSE_REVIEW_REQUIRED'
+                        ? 'amber'
+                        : r.status === 'FILE_MISSING' || r.status === 'STORAGE_FAILED'
+                        ? 'rose'
+                        : 'indigo'
+                    }
                     size="sm"
                   >
-                    {r.status}
+                    {r.status === 'FILE_MISSING' ? 'File unavailable' : r.status === 'STORAGE_FAILED' ? 'Storage failed' : r.status}
                   </Badge>
                 </div>
+
+                {/* Storage Recovery Notice if file is missing */}
+                {(r.status === 'FILE_MISSING' || r.status === 'STORAGE_FAILED') && (
+                  <div
+                    style={{
+                      background: 'rgba(239, 68, 68, 0.1)',
+                      border: '1px solid rgba(239, 68, 68, 0.3)',
+                      borderRadius: '8px',
+                      padding: '10px 14px',
+                      margin: '10px 0',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      gap: '12px',
+                      fontSize: '0.875rem'
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <AlertCircle size={16} className="text-red" />
+                      <span>Resume file unavailable. We still have your record, but the original file needs to be uploaded again.</span>
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      icon={<UploadCloud size={14} />}
+                      onClick={() => {
+                        setReplacingResumeId(r.id);
+                        replaceFileInputRef.current?.click();
+                      }}
+                    >
+                      Upload Replacement
+                    </Button>
+                  </div>
+                )}
 
                 {/* Resume Version Badges */}
                 {r.versions && r.versions.length > 0 && (
@@ -347,15 +428,29 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
                 )}
 
                 <div className="resume-item-actions">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    icon={parsingId === r.id ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
-                    disabled={parsingId === r.id}
-                    onClick={() => handleParse(r.id)}
-                  >
-                    {r.status === 'PARSED' ? 'Re-review Parse' : 'Parse & Review'}
-                  </Button>
+                  {r.status === 'FILE_MISSING' || r.status === 'STORAGE_FAILED' ? (
+                    <Button
+                      size="sm"
+                      variant="primary"
+                      icon={<UploadCloud size={14} />}
+                      onClick={() => {
+                        setReplacingResumeId(r.id);
+                        replaceFileInputRef.current?.click();
+                      }}
+                    >
+                      Upload Replacement
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      icon={parsingId === r.id ? <Loader2 size={14} className="animate-spin" /> : <Eye size={14} />}
+                      disabled={parsingId === r.id}
+                      onClick={() => handleParse(r.id)}
+                    >
+                      {r.status === 'PARSED' ? 'Re-review Parse' : 'Parse & Review'}
+                    </Button>
+                  )}
 
                   <Button
                     size="sm"

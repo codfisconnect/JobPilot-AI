@@ -33,6 +33,7 @@ export class ResumeRepository {
     fileSize?: number;
     storageProvider?: string;
     storageKey?: string;
+    checksum?: string;
     status?: ResumeStatus;
     isMaster?: boolean;
     rawText?: string;

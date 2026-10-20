@@ -100,4 +100,29 @@ export class ResumeControllerV1 {
       next(err);
     }
   }
+
+  public static async replaceResume(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const id = String(req.params.id);
+      const updated = await ResumeService.replaceResumeFile(userId, id, req.file);
+      res.json({ success: true, data: updated, message: 'Resume replacement uploaded successfully' });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  public static async downloadResume(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const id = String(req.params.id);
+      const { buffer, filename, mimeType } = await ResumeService.downloadResumeBuffer(userId, id);
+      res.setHeader('Content-Type', mimeType);
+      res.setHeader('Content-Disposition', `attachment; filename="${encodeURIComponent(filename)}"`);
+      res.setHeader('Content-Length', buffer.length);
+      res.send(buffer);
+    } catch (err) {
+      next(err);
+    }
+  }
 }

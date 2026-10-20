@@ -50,3 +50,10 @@ export class ConflictError extends AppError {
     super(message, 409, 'CONFLICT', details);
   }
 }
+
+export class ResumeFileMissingError extends AppError {
+  constructor(message = 'Resume file is unavailable. Please upload the resume again.', details?: unknown) {
+    super(message, 404, 'RESUME_FILE_MISSING', details);
+  }
+}
+

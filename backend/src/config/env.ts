@@ -28,7 +28,14 @@ const envSchema = z.object({
   GOOGLE_CLIENT_SECRET: z.string().optional().default(''),
   LINKEDIN_CLIENT_ID: z.string().optional().default(''),
   LINKEDIN_CLIENT_SECRET: z.string().optional().default(''),
-  APP_BASE_URL: z.string().default('http://localhost:5173')
+  APP_BASE_URL: z.string().default('http://localhost:5173'),
+  // Persistent Object Storage Configuration (S3 / R2 / MinIO)
+  STORAGE_PROVIDER: z.enum(['local', 's3', 'r2']).default('local'),
+  STORAGE_ENDPOINT: z.string().optional().default(''),
+  STORAGE_BUCKET: z.string().optional().default(''),
+  STORAGE_REGION: z.string().optional().default('auto'),
+  STORAGE_ACCESS_KEY: z.string().optional().default(''),
+  STORAGE_SECRET_KEY: z.string().optional().default('')
 });
 
 

@@ -376,6 +376,38 @@ export class ApiClient {
     return json.data;
   }
 
+  async replaceResumeFile(id: string, file: File, isRetry: boolean = false): Promise<any> {
+    const formData = new FormData();
+    formData.append('resume', file);
+
+    const headers = new Headers();
+    if (this.accessToken) {
+      headers.set('Authorization', `Bearer ${this.accessToken}`);
+    }
+
+    const res = await fetch(`${API_V1_BASE}/resumes/${id}/replace`, {
+      method: 'PUT',
+      headers,
+      credentials: 'include',
+      body: formData
+    });
+
+    if (res.status === 401 && !isRetry) {
+      try {
+        await this.refresh();
+        return this.replaceResumeFile(id, file, true);
+      } catch (refreshErr) {
+        // Refresh failed; proceed to throw 401
+      }
+    }
+
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.success === false) {
+      throw json.error || { code: `HTTP_${res.status}`, message: json.message || 'Replacement failed' };
+    }
+    return json.data;
+  }
+
   async parseResume(id: string): Promise<any> {
     return this.request<any>(`/resumes/${id}/parse`, {
       method: 'POST'
