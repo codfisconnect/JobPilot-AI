@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { apiClient } from '../../api/client';
 import {
   Layers,
@@ -16,7 +16,10 @@ import {
   ShieldCheck,
   FileText,
   StopCircle,
-  Check
+  Check,
+  RotateCw,
+  X,
+  Play
 } from 'lucide-react';
 import './AdminPages.css';
 import { normalizeApiError, NormalizedError } from '../../utils/errorUtils';
@@ -29,13 +32,27 @@ interface BulkJobSourcesPageProps {
 export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackToSources, onViewJobs }) => {
   // Input State
   const [inputText, setInputText] = useState('');
+  const [inputRevision, setInputRevision] = useState(0);
   const [concurrency, setConcurrency] = useState(4);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Derived lightweight URL parse (always live, never stale)
+  const parsedUrls = useMemo(() => {
+    return inputText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+  }, [inputText]);
 
   // Validation Preview State
   const [validating, setValidating] = useState(false);
   const [previewResult, setPreviewResult] = useState<any | null>(null);
+  const [previewRevision, setPreviewRevision] = useState<number>(-1);
   const [validationError, setValidationError] = useState<NormalizedError | null>(null);
+
+  // Is the validation result current or stale?
+  const isValidationCurrent = previewResult !== null && previewRevision === inputRevision;
+  const isValidationStale = previewResult !== null && previewRevision !== inputRevision;
 
   // Execution / Active Bulk Job State
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
@@ -43,6 +60,11 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
   const [activeItems, setActiveItems] = useState<any[]>([]);
   const [startingDiscovery, setStartingDiscovery] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
+
+  // Filter / Search for active items
+  const [statusFilter, setStatusFilter] = useState<string>('ALL');
+  const [searchTerm, setSearchTerm] = useState<string>('');
 
   // Detail Modal State
   const [selectedItemDetail, setSelectedItemDetail] = useState<any | null>(null);
@@ -52,52 +74,7 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [activeTab, setActiveTab] = useState<'create' | 'history'>('create');
 
-  // Polling for Active Job
-  useEffect(() => {
-    let timer: ReturnType<typeof setTimeout> | null = null;
-
-    const pollJobStatus = async () => {
-      if (!activeJobId) return;
-
-      try {
-        const [jobRes, itemsRes] = await Promise.all([
-          apiClient.getBulkJobSourceJob(activeJobId),
-          apiClient.getBulkJobSourceItems(activeJobId)
-        ]);
-
-        if (jobRes?.job) {
-          setActiveJob(jobRes.job);
-        }
-        if (itemsRes?.items) {
-          setActiveItems(itemsRes.items);
-        }
-
-        // If job reached terminal state, stop polling
-        if (
-          jobRes?.job?.status === 'COMPLETED' ||
-          jobRes?.job?.status === 'PARTIAL' ||
-          jobRes?.job?.status === 'FAILED' ||
-          jobRes?.job?.status === 'CANCELLED'
-        ) {
-          return;
-        }
-
-        timer = setTimeout(pollJobStatus, 2500);
-      } catch (err: any) {
-        console.error('Error polling bulk job:', err);
-        timer = setTimeout(pollJobStatus, 5000);
-      }
-    };
-
-    if (activeJobId) {
-      pollJobStatus();
-    }
-
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [activeJobId]);
-
+  // Load history on mount or tab change
   const loadHistory = async () => {
     try {
       setLoadingHistory(true);
@@ -112,14 +89,79 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
     }
   };
 
+  useEffect(() => {
+    loadHistory();
+  }, []);
+
+  // Polling for Active Job
+  useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    let isSubscribed = true;
+
+    const pollJobStatus = async () => {
+      if (!activeJobId) return;
+
+      try {
+        const [jobRes, itemsRes] = await Promise.all([
+          apiClient.getBulkJobSourceJob(activeJobId),
+          apiClient.getBulkJobSourceItems(activeJobId)
+        ]);
+
+        if (!isSubscribed) return;
+
+        if (jobRes?.job) {
+          setActiveJob(jobRes.job);
+        }
+        if (itemsRes?.items) {
+          setActiveItems(itemsRes.items);
+        }
+
+        // If job reached terminal state, stop fast polling
+        if (
+          jobRes?.job?.status === 'COMPLETED' ||
+          jobRes?.job?.status === 'PARTIAL' ||
+          jobRes?.job?.status === 'FAILED' ||
+          jobRes?.job?.status === 'CANCELLED'
+        ) {
+          return;
+        }
+
+        timer = setTimeout(pollJobStatus, 2500);
+      } catch (err: any) {
+        console.error('Error polling bulk job:', err);
+        if (isSubscribed) {
+          timer = setTimeout(pollJobStatus, 5000);
+        }
+      }
+    };
+
+    if (activeJobId) {
+      pollJobStatus();
+    }
+
+    return () => {
+      isSubscribed = false;
+      if (timer) clearTimeout(timer);
+    };
+  }, [activeJobId]);
+
+  // Handle Textarea change
+  const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setInputText(e.target.value);
+    setInputRevision(prev => prev + 1);
+    setValidationError(null);
+    setActionError(null);
+    setActionSuccess(null);
+  };
+
+  // Perform validation
   const handleValidate = async () => {
     setValidationError(null);
     setActionError(null);
+    setActionSuccess(null);
 
-    const urls = inputText
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0);
+    const urls = parsedUrls;
+    const currentRev = inputRevision;
 
     if (urls.length === 0) {
       setValidationError({
@@ -132,7 +174,7 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
     if (urls.length > 100) {
       setValidationError({
         code: 'LIMIT_EXCEEDED',
-        message: 'Maximum 100 sources per batch allowed.'
+        message: `Maximum 100 sources per batch allowed. You entered ${urls.length}.`
       });
       return;
     }
@@ -142,6 +184,7 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
       const res = await apiClient.validateBulkJobSources({ urls });
       if (res?.preview) {
         setPreviewResult(res.preview);
+        setPreviewRevision(currentRev);
       }
     } catch (err: any) {
       const norm = normalizeApiError(err, 'Failed to validate URLs');
@@ -151,34 +194,43 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
     }
   };
 
+  // Safe Start Bulk Discovery: Works directly from raw input, validating automatically if needed
   const handleStartBulkDiscovery = async () => {
-    if (!previewResult) {
-      await handleValidate();
-    }
+    setActionError(null);
+    setActionSuccess(null);
 
-    const urls = (previewResult?.items || [])
-      .filter((it: any) => it.isValid && !it.isDuplicateInBatch && !it.isAlreadyConnected)
-      .map((it: any) => it.rawUrl);
+    const urls = parsedUrls;
 
     if (urls.length === 0) {
-      setActionError('No new valid sources available to onboard in this batch.');
+      setActionError('No career URLs entered.');
+      return;
+    }
+
+    if (urls.length > 100) {
+      setActionError(`Maximum 100 sources per batch allowed. ${urls.length} entered.`);
       return;
     }
 
     try {
       setStartingDiscovery(true);
-      setActionError(null);
 
       const res = await apiClient.startBulkJobSources({
-        urls: inputText
-          .split('\n')
-          .map(line => line.trim())
-          .filter(line => line.length > 0),
+        urls,
         maxConcurrency: concurrency
       });
 
       if (res?.bulkJobId) {
         setActiveJobId(res.bulkJobId);
+        // Clear input immediately so admin can paste another batch
+        setInputText('');
+        setInputRevision(prev => prev + 1);
+        setPreviewResult(null);
+        setPreviewRevision(-1);
+        setActionSuccess(`Bulk discovery batch started with ${res.accepted || urls.length} accepted source(s).`);
+        // Refresh history
+        loadHistory();
+      } else {
+        setActionError('Failed to initialize bulk discovery batch.');
       }
     } catch (err: any) {
       const norm = normalizeApiError(err, 'Failed to start bulk discovery');
@@ -198,7 +250,6 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
       let extractedUrls: string[] = [];
 
       if (file.name.endsWith('.csv')) {
-        // Simple CSV parser: first column or header "url"
         const lines = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
         if (lines.length > 0) {
           const headers = lines[0].toLowerCase().split(',').map(h => h.trim());
@@ -211,12 +262,13 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
           }
         }
       } else {
-        // Plain TXT: one URL per line
         extractedUrls = text.split('\n').map(l => l.trim()).filter(l => l.length > 0);
       }
 
       setInputText(extractedUrls.join('\n'));
+      setInputRevision(prev => prev + 1);
       setPreviewResult(null);
+      setPreviewRevision(-1);
       setValidationError(null);
     };
     reader.readAsText(file);
@@ -250,6 +302,23 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
       setActionError(norm.message);
     }
   };
+
+  // Filtered active items
+  const filteredItems = useMemo(() => {
+    return activeItems.filter(item => {
+      if (statusFilter !== 'ALL' && item.status !== statusFilter) {
+        return false;
+      }
+      if (searchTerm.trim()) {
+        const term = searchTerm.toLowerCase();
+        const name = (item.companyName || item.companyHint || '').toLowerCase();
+        const url = (item.sourceUrl || '').toLowerCase();
+        const strat = (item.discoveryStrategy || '').toLowerCase();
+        return name.includes(term) || url.includes(term) || strat.includes(term);
+      }
+      return true;
+    });
+  }, [activeItems, statusFilter, searchTerm]);
 
   return (
     <div className="admin-page-container">
@@ -296,7 +365,7 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
               cursor: 'pointer'
             }}
           >
-            New Batch
+            Console & Active
           </button>
           <button
             onClick={() => {
@@ -314,15 +383,22 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
               cursor: 'pointer'
             }}
           >
-            Batch History
+            Batch History ({historyRuns.length})
           </button>
         </div>
       </div>
 
       {actionError && (
-        <div style={{ padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', color: '#f87171', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <div style={{ padding: '12px 16px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', color: '#f87171', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
           <AlertTriangle size={18} />
           <span>{actionError}</span>
+        </div>
+      )}
+
+      {actionSuccess && (
+        <div style={{ padding: '12px 16px', background: 'rgba(74, 222, 128, 0.1)', border: '1px solid rgba(74, 222, 128, 0.25)', borderRadius: '8px', color: '#4ade80', display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '16px' }}>
+          <CheckCircle2 size={18} />
+          <span>{actionSuccess}</span>
         </div>
       )}
 
@@ -441,7 +517,7 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
 
       {/* VIEW: CREATE / MONITOR ACTIVE RUN */}
       {activeTab === 'create' && (
-        <>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
           {/* Active Job Progress Dashboard */}
           {activeJobId && activeJob && (
             <div
@@ -456,7 +532,7 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
                     <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>
-                      Bulk Discovery Dashboard
+                      Active Bulk Pipeline Dashboard
                     </h2>
                     <span
                       style={{
@@ -486,7 +562,7 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
                     </span>
                   </div>
                   <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem', marginTop: '4px' }}>
-                    Job ID: <code>{activeJob.id}</code> • Started {new Date(activeJob.createdAt).toLocaleTimeString()}
+                    Batch ID: <code>{activeJob.id}</code> • Started {new Date(activeJob.createdAt).toLocaleTimeString()}
                   </p>
                 </div>
 
@@ -516,7 +592,6 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
                       setActiveJobId(null);
                       setActiveJob(null);
                       setActiveItems([]);
-                      setPreviewResult(null);
                     }}
                     style={{
                       background: 'rgba(255, 255, 255, 0.05)',
@@ -529,7 +604,7 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
                       cursor: 'pointer'
                     }}
                   >
-                    Start New Batch
+                    Hide Dashboard
                   </button>
                 </div>
               </div>
@@ -538,7 +613,7 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                  gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))',
                   gap: '12px',
                   marginTop: '16px'
                 }}
@@ -547,25 +622,25 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
                   <div style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Total Sources</div>
                   <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-primary)' }}>{activeJob.totalSources}</div>
                 </div>
-                <div style={{ padding: '14px', background: 'var(--color-success-bg)', borderRadius: '8px', borderLeft: '3px solid var(--text-success)' }}>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-success)' }}>✓ Completed</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-success)' }}>{activeJob.completedSources}</div>
+                <div style={{ padding: '14px', background: 'var(--color-success-bg, rgba(74,222,128,0.1))', borderRadius: '8px', borderLeft: '3px solid #4ade80' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#4ade80' }}>✓ Completed</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#4ade80' }}>{activeJob.completedSources}</div>
                 </div>
-                <div style={{ padding: '14px', background: 'var(--color-warning-bg)', borderRadius: '8px', borderLeft: '3px solid var(--text-warning)' }}>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-warning)' }}>⚡ Partial</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-warning)' }}>{activeJob.partialSources}</div>
+                <div style={{ padding: '14px', background: 'var(--color-warning-bg, rgba(250,204,21,0.1))', borderRadius: '8px', borderLeft: '3px solid #facc15' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#facc15' }}>⚡ Partial</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#facc15' }}>{activeJob.partialSources}</div>
                 </div>
-                <div style={{ padding: '14px', background: 'rgba(99, 102, 241, 0.12)', borderRadius: '8px', borderLeft: '3px solid var(--text-link)' }}>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-link)' }}>→ Running</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-link)' }}>{activeJob.runningSources}</div>
+                <div style={{ padding: '14px', background: 'rgba(99, 102, 241, 0.12)', borderRadius: '8px', borderLeft: '3px solid #818cf8' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#818cf8' }}>→ Running</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#818cf8' }}>{activeJob.runningSources}</div>
                 </div>
-                <div style={{ padding: '14px', background: 'var(--bg-surface-hover)', borderRadius: '8px', borderLeft: '3px solid var(--text-muted)' }}>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>◌ Queued</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-muted)' }}>{activeJob.queuedSources}</div>
+                <div style={{ padding: '14px', background: 'var(--bg-surface-hover)', borderRadius: '8px', borderLeft: '3px solid #94a3b8' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#94a3b8' }}>◌ Queued</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#94a3b8' }}>{activeJob.queuedSources}</div>
                 </div>
-                <div style={{ padding: '14px', background: 'var(--color-danger-bg)', borderRadius: '8px', borderLeft: '3px solid var(--text-danger)' }}>
-                  <div style={{ fontSize: '0.8rem', color: 'var(--text-danger)' }}>✕ Failed</div>
-                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--text-danger)' }}>{activeJob.failedSources}</div>
+                <div style={{ padding: '14px', background: 'var(--color-danger-bg, rgba(239,68,68,0.1))', borderRadius: '8px', borderLeft: '3px solid #f87171' }}>
+                  <div style={{ fontSize: '0.8rem', color: '#f87171' }}>✕ Failed</div>
+                  <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f87171' }}>{activeJob.failedSources}</div>
                 </div>
               </div>
 
@@ -591,11 +666,52 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
                 </div>
               </div>
 
+              {/* Filters & Search */}
+              <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px' }}>
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                  <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>Filter:</span>
+                  {['ALL', 'DISCOVERING', 'QUEUED', 'COMPLETED', 'PARTIAL', 'FAILED'].map(st => (
+                    <button
+                      key={st}
+                      onClick={() => setStatusFilter(st)}
+                      style={{
+                        padding: '4px 10px',
+                        borderRadius: '6px',
+                        fontSize: '0.75rem',
+                        fontWeight: 600,
+                        border: '1px solid var(--border-subtle)',
+                        background: statusFilter === st ? 'var(--accent-primary, #6366f1)' : 'rgba(255,255,255,0.05)',
+                        color: statusFilter === st ? '#fff' : 'var(--text-secondary)',
+                        cursor: 'pointer'
+                      }}
+                    >
+                      {st}
+                    </button>
+                  ))}
+                </div>
+
+                <div style={{ position: 'relative', width: '220px' }}>
+                  <Search size={14} style={{ position: 'absolute', left: '10px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+                  <input
+                    type="text"
+                    placeholder="Search sources..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    style={{
+                      width: '100%',
+                      padding: '6px 10px 6px 30px',
+                      borderRadius: '6px',
+                      background: 'var(--bg-canvas)',
+                      border: '1px solid var(--border-subtle)',
+                      color: 'var(--text-primary)',
+                      fontSize: '0.8rem'
+                    }}
+                  />
+                </div>
+              </div>
+
               {/* Real-time Sources Table */}
-              <div style={{ marginTop: '24px' }}>
-                <h3 style={{ fontSize: '1rem', fontWeight: 700, marginBottom: '12px' }}>
-                  Per-Source Processing Pipeline
-                </h3>
+              <div style={{ marginTop: '16px' }}>
                 <div className="admin-table-container">
                   <table className="admin-table">
                     <thead>
@@ -611,172 +727,180 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
                       </tr>
                     </thead>
                     <tbody>
-                      {activeItems.map(item => (
-                        <tr key={item.id}>
-                          <td>
-                            <strong>{item.companyName || item.companyHint || 'Resolving...'}</strong>
+                      {filteredItems.length === 0 ? (
+                        <tr>
+                          <td colSpan={8} style={{ textAlign: 'center', padding: '24px', color: 'var(--text-muted)' }}>
+                            No sources match the selected filter.
                           </td>
-                          <td style={{ maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            <a
-                              href={item.normalizedUrl || item.sourceUrl}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{ color: 'var(--accent-primary, #818cf8)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                            >
-                              <span>{item.sourceUrl}</span>
-                              <ExternalLink size={12} />
-                            </a>
-                          </td>
-                          <td>
-                            <code style={{ fontSize: '0.75rem', padding: '2px 6px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
-                              {item.discoveryStrategy || '—'}
-                            </code>
-                          </td>
-                          <td>
-                            {item.jobsDiscovered > 0 ? (
-                              <span>
-                                <strong>{item.jobsDiscovered}</strong>
-                                {item.sourceTotal ? ` / ${item.sourceTotal}` : ''}
-                              </span>
-                            ) : (
-                              '0'
-                            )}
-                          </td>
-                          <td>
-                            {item.completeness ? (
+                        </tr>
+                      ) : (
+                        filteredItems.map(item => (
+                          <tr key={item.id}>
+                            <td>
+                              <strong>{item.companyName || item.companyHint || 'Resolving...'}</strong>
+                            </td>
+                            <td style={{ maxWidth: '220px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              <a
+                                href={item.normalizedUrl || item.sourceUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                style={{ color: 'var(--accent-primary, #818cf8)', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                              >
+                                <span>{item.sourceUrl}</span>
+                                <ExternalLink size={12} />
+                              </a>
+                            </td>
+                            <td>
+                              <code style={{ fontSize: '0.75rem', padding: '2px 6px', background: 'rgba(255,255,255,0.05)', borderRadius: '4px' }}>
+                                {item.discoveryStrategy || '—'}
+                              </code>
+                            </td>
+                            <td>
+                              {item.jobsDiscovered > 0 ? (
+                                <span>
+                                  <strong>{item.jobsDiscovered}</strong>
+                                  {item.sourceTotal ? ` / ${item.sourceTotal}` : ''}
+                                </span>
+                              ) : (
+                                '0'
+                              )}
+                            </td>
+                            <td>
+                              {item.completeness ? (
+                                <span
+                                  style={{
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 700,
+                                    background:
+                                      item.completeness === 'COMPLETE'
+                                        ? 'rgba(74, 222, 128, 0.15)'
+                                        : item.completeness === 'PARTIAL'
+                                        ? 'rgba(250, 204, 21, 0.15)'
+                                        : 'rgba(148, 163, 184, 0.15)',
+                                    color:
+                                      item.completeness === 'COMPLETE'
+                                        ? '#4ade80'
+                                        : item.completeness === 'PARTIAL'
+                                        ? '#facc15'
+                                        : '#94a3b8'
+                                  }}
+                                >
+                                  {item.completeness}
+                                </span>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td>
+                              {item.healthStatus ? (
+                                <span
+                                  style={{
+                                    padding: '2px 6px',
+                                    borderRadius: '4px',
+                                    fontSize: '0.75rem',
+                                    fontWeight: 600,
+                                    color: item.healthStatus === 'HEALTHY' ? '#4ade80' : '#facc15'
+                                  }}
+                                >
+                                  {item.healthStatus}
+                                </span>
+                              ) : (
+                                '—'
+                              )}
+                            </td>
+                            <td>
                               <span
                                 style={{
-                                  padding: '2px 6px',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '6px',
+                                  padding: '3px 8px',
                                   borderRadius: '4px',
                                   fontSize: '0.75rem',
                                   fontWeight: 700,
                                   background:
-                                    item.completeness === 'COMPLETE'
+                                    item.status === 'COMPLETED'
                                       ? 'rgba(74, 222, 128, 0.15)'
-                                      : item.completeness === 'PARTIAL'
+                                      : item.status === 'PARTIAL'
                                       ? 'rgba(250, 204, 21, 0.15)'
-                                      : 'rgba(148, 163, 184, 0.15)',
+                                      : item.status === 'DISCOVERING' || item.status === 'PAGINATING'
+                                      ? 'rgba(99, 102, 241, 0.15)'
+                                      : item.status === 'FAILED'
+                                      ? 'rgba(239, 68, 68, 0.15)'
+                                      : 'rgba(148, 163, 184, 0.1)',
                                   color:
-                                    item.completeness === 'COMPLETE'
+                                    item.status === 'COMPLETED'
                                       ? '#4ade80'
-                                      : item.completeness === 'PARTIAL'
+                                      : item.status === 'PARTIAL'
                                       ? '#facc15'
+                                      : item.status === 'DISCOVERING' || item.status === 'PAGINATING'
+                                      ? '#818cf8'
+                                      : item.status === 'FAILED'
+                                      ? '#f87171'
                                       : '#94a3b8'
                                 }}
                               >
-                                {item.completeness}
+                                {(item.status === 'DISCOVERING' || item.status === 'PAGINATING') && (
+                                  <Loader2 size={12} className="animate-spin" />
+                                )}
+                                {item.status}
                               </span>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                          <td>
-                            {item.healthStatus ? (
-                              <span
-                                style={{
-                                  padding: '2px 6px',
-                                  borderRadius: '4px',
-                                  fontSize: '0.75rem',
-                                  fontWeight: 600,
-                                  color: item.healthStatus === 'HEALTHY' ? '#4ade80' : '#facc15'
-                                }}
-                              >
-                                {item.healthStatus}
-                              </span>
-                            ) : (
-                              '—'
-                            )}
-                          </td>
-                          <td>
-                            <span
-                              style={{
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '6px',
-                                padding: '3px 8px',
-                                borderRadius: '4px',
-                                fontSize: '0.75rem',
-                                fontWeight: 700,
-                                background:
-                                  item.status === 'COMPLETED'
-                                    ? 'rgba(74, 222, 128, 0.15)'
-                                    : item.status === 'PARTIAL'
-                                    ? 'rgba(250, 204, 21, 0.15)'
-                                    : item.status === 'DISCOVERING' || item.status === 'PAGINATING'
-                                    ? 'rgba(99, 102, 241, 0.15)'
-                                    : item.status === 'FAILED'
-                                    ? 'rgba(239, 68, 68, 0.15)'
-                                    : 'rgba(148, 163, 184, 0.1)',
-                                color:
-                                  item.status === 'COMPLETED'
-                                    ? '#4ade80'
-                                    : item.status === 'PARTIAL'
-                                    ? '#facc15'
-                                    : item.status === 'DISCOVERING' || item.status === 'PAGINATING'
-                                    ? '#818cf8'
-                                    : item.status === 'FAILED'
-                                    ? '#f87171'
-                                    : '#94a3b8'
-                              }}
-                            >
-                              {(item.status === 'DISCOVERING' || item.status === 'PAGINATING') && (
-                                <Loader2 size={12} className="animate-spin" />
-                              )}
-                              {item.status}
-                            </span>
-                          </td>
-                          <td>
-                            <div style={{ display: 'flex', gap: '6px' }}>
-                              <button
-                                onClick={() => setSelectedItemDetail(item)}
-                                style={{
-                                  background: 'rgba(255,255,255,0.06)',
-                                  border: '1px solid var(--border-subtle)',
-                                  color: 'var(--text-primary)',
-                                  padding: '3px 8px',
-                                  borderRadius: '4px',
-                                  fontSize: '0.75rem',
-                                  cursor: 'pointer'
-                                }}
-                              >
-                                Details
-                              </button>
-                              {(item.status === 'FAILED' || item.status === 'PARTIAL') && (
+                            </td>
+                            <td>
+                              <div style={{ display: 'flex', gap: '6px' }}>
                                 <button
-                                  onClick={() => handleRetryItem(item.id)}
+                                  onClick={() => setSelectedItemDetail(item)}
                                   style={{
-                                    background: 'rgba(99, 102, 241, 0.15)',
-                                    border: '1px solid rgba(99, 102, 241, 0.3)',
-                                    color: '#818cf8',
+                                    background: 'rgba(255,255,255,0.06)',
+                                    border: '1px solid var(--border-subtle)',
+                                    color: 'var(--text-primary)',
                                     padding: '3px 8px',
                                     borderRadius: '4px',
                                     fontSize: '0.75rem',
                                     cursor: 'pointer'
                                   }}
                                 >
-                                  Retry
+                                  Details
                                 </button>
-                              )}
-                              {item.jobsDiscovered > 0 && onViewJobs && (
-                                <button
-                                  onClick={() => onViewJobs(item.companyName)}
-                                  style={{
-                                    background: 'rgba(74, 222, 128, 0.15)',
-                                    border: '1px solid rgba(74, 222, 128, 0.3)',
-                                    color: '#4ade80',
-                                    padding: '3px 8px',
-                                    borderRadius: '4px',
-                                    fontSize: '0.75rem',
-                                    cursor: 'pointer'
-                                  }}
-                                >
-                                  View Jobs
-                                </button>
-                              )}
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
+                                {(item.status === 'FAILED' || item.status === 'PARTIAL') && (
+                                  <button
+                                    onClick={() => handleRetryItem(item.id)}
+                                    style={{
+                                      background: 'rgba(99, 102, 241, 0.15)',
+                                      border: '1px solid rgba(99, 102, 241, 0.3)',
+                                      color: '#818cf8',
+                                      padding: '3px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.75rem',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    Retry
+                                  </button>
+                                )}
+                                {item.jobsDiscovered > 0 && onViewJobs && (
+                                  <button
+                                    onClick={() => onViewJobs(item.companyName)}
+                                    style={{
+                                      background: 'rgba(74, 222, 128, 0.15)',
+                                      border: '1px solid rgba(74, 222, 128, 0.3)',
+                                      color: '#4ade80',
+                                      padding: '3px 8px',
+                                      borderRadius: '4px',
+                                      fontSize: '0.75rem',
+                                      cursor: 'pointer'
+                                    }}
+                                  >
+                                    View Jobs
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -784,173 +908,193 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
             </div>
           )}
 
-          {/* Form Card: Paste or Upload URLs */}
-          {!activeJobId && (
-            <div className="admin-metric-card" style={{ padding: '24px', background: 'var(--bg-surface, #1e293b)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                  <Layers size={22} style={{ color: 'var(--accent-primary, #6366f1)' }} />
-                  <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>Add Multiple Career URLs</h2>
-                </div>
-
-                <div style={{ display: 'flex', gap: '8px' }}>
-                  <input
-                    type="file"
-                    ref={fileInputRef}
-                    accept=".txt,.csv"
-                    style={{ display: 'none' }}
-                    onChange={handleFileUpload}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    style={{
-                      background: 'rgba(255,255,255,0.06)',
-                      border: '1px solid var(--border-subtle, #334155)',
-                      color: 'var(--text-primary)',
-                      padding: '8px 14px',
-                      borderRadius: '8px',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '6px',
-                      cursor: 'pointer',
-                      fontWeight: 600,
-                      fontSize: '0.85rem'
-                    }}
-                  >
-                    <Upload size={16} /> Upload TXT / CSV
-                  </button>
-                </div>
+          {/* Form Card: ALWAYS ACTIVE & NON-BLOCKING FOR NEW INPUT */}
+          <div className="admin-metric-card" style={{ padding: '24px', background: 'var(--bg-surface, #1e293b)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '12px', marginBottom: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                <Layers size={22} style={{ color: 'var(--accent-primary, #6366f1)' }} />
+                <h2 style={{ fontSize: '1.2rem', fontWeight: 700, margin: 0 }}>
+                  Add Multiple Career URLs
+                </h2>
+                {parsedUrls.length > 0 && (
+                  <span style={{ fontSize: '0.8rem', padding: '2px 8px', background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', borderRadius: '12px', fontWeight: 600 }}>
+                    {parsedUrls.length} {parsedUrls.length === 1 ? 'URL' : 'URLs'} entered
+                  </span>
+                )}
               </div>
 
-              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary, #94a3b8)', marginBottom: '16px' }}>
-                Paste one career or jobs page URL per line. Blank lines are ignored and whitespace is trimmed automatically.
-                SPA hash fragments and functional query parameters (e.g. Hexaware, SAP SuccessFactors) are safely retained.
-              </p>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".txt,.csv"
+                  style={{ display: 'none' }}
+                  onChange={handleFileUpload}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={{
+                    background: 'rgba(255,255,255,0.06)',
+                    border: '1px solid var(--border-subtle, #334155)',
+                    color: 'var(--text-primary)',
+                    padding: '8px 14px',
+                    borderRadius: '8px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    cursor: 'pointer',
+                    fontWeight: 600,
+                    fontSize: '0.85rem'
+                  }}
+                >
+                  <Upload size={16} /> Upload TXT / CSV
+                </button>
+              </div>
+            </div>
 
-              <textarea
-                rows={8}
-                placeholder={`https://careers.caterpillar.com/en/jobs/
+            <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary, #94a3b8)', marginBottom: '16px' }}>
+              Paste one career or jobs page URL per line. Blank lines are ignored and whitespace is trimmed automatically.
+              SPA hash fragments and functional query parameters (e.g. Hexaware, SAP SuccessFactors) are safely retained.
+            </p>
+
+            <textarea
+              rows={8}
+              placeholder={`https://careers.caterpillar.com/en/jobs/
 https://jobs.hexaware.com/#en/sites/CX_1/jobs
 https://raintechsoftware.com/careers#openings
 https://career44.sapsf.com/career?company=mavericsys&career_ns=job_listing_summary&navBarLevel=JOB_SEARCH
 https://www.virtusa.com/careers/job-search/global/en`}
-                value={inputText}
-                onChange={e => {
-                  setInputText(e.target.value);
-                  setPreviewResult(null);
-                }}
-                style={{
-                  width: '100%',
-                  padding: '14px',
-                  borderRadius: '8px',
-                  border: '1px solid var(--border-subtle)',
-                  background: 'var(--bg-canvas)',
-                  color: 'var(--text-primary)',
-                  fontFamily: 'monospace',
-                  fontSize: '0.9rem',
-                  lineHeight: 1.5,
-                  resize: 'vertical'
-                }}
-              />
+              value={inputText}
+              onChange={handleTextChange}
+              style={{
+                width: '100%',
+                padding: '14px',
+                borderRadius: '8px',
+                border: isValidationStale ? '1px dashed #facc15' : '1px solid var(--border-subtle)',
+                background: 'var(--bg-canvas)',
+                color: 'var(--text-primary)',
+                fontFamily: 'monospace',
+                fontSize: '0.9rem',
+                lineHeight: 1.5,
+                resize: 'vertical'
+              }}
+            />
 
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', flexWrap: 'wrap', gap: '12px' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
-                  <span>Worker Concurrency:</span>
-                  <select
-                    value={concurrency}
-                    onChange={e => setConcurrency(parseInt(e.target.value, 10))}
-                    style={{
-                      padding: '6px 12px',
-                      borderRadius: '6px',
-                      background: 'var(--bg-canvas)',
-                      color: 'var(--text-primary)',
-                      border: '1px solid var(--border-subtle)'
-                    }}
-                  >
-                    <option value={2}>2 concurrent</option>
-                    <option value={4}>4 concurrent (Recommended)</option>
-                    <option value={6}>6 concurrent</option>
-                    <option value={8}>8 concurrent</option>
-                  </select>
-                </div>
+            {/* Stale Validation Warning */}
+            {isValidationStale && (
+              <div style={{ marginTop: '8px', fontSize: '0.8rem', color: '#facc15', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <AlertTriangle size={14} />
+                <span>Input changed since last validation preview. Starting discovery will automatically validate the current input.</span>
+              </div>
+            )}
 
-                <div style={{ display: 'flex', gap: '10px' }}>
-                  <button
-                    type="button"
-                    onClick={handleValidate}
-                    disabled={validating || !inputText.trim()}
-                    style={{
-                      padding: '10px 20px',
-                      borderRadius: '8px',
-                      background: 'rgba(255, 255, 255, 0.08)',
-                      color: 'var(--text-primary)',
-                      border: '1px solid var(--border-subtle)',
-                      fontWeight: 600,
-                      cursor: validating || !inputText.trim() ? 'not-allowed' : 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px'
-                    }}
-                  >
-                    {validating ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
-                    <span>Validate URLs</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={handleStartBulkDiscovery}
-                    disabled={startingDiscovery || validating || !inputText.trim()}
-                    style={{
-                      padding: '10px 24px',
-                      borderRadius: '8px',
-                      background: 'var(--accent-primary, #6366f1)',
-                      color: '#fff',
-                      border: 'none',
-                      fontWeight: 600,
-                      cursor: startingDiscovery || !inputText.trim() ? 'not-allowed' : 'pointer',
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      opacity: startingDiscovery || !inputText.trim() ? 0.7 : 1
-                    }}
-                  >
-                    {startingDiscovery ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
-                    <span>Start Bulk Discovery</span>
-                  </button>
-                </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '16px', flexWrap: 'wrap', gap: '12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                <span>Worker Concurrency:</span>
+                <select
+                  value={concurrency}
+                  onChange={e => setConcurrency(parseInt(e.target.value, 10))}
+                  style={{
+                    padding: '6px 12px',
+                    borderRadius: '6px',
+                    background: 'var(--bg-canvas)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border-subtle)'
+                  }}
+                >
+                  <option value={2}>2 concurrent</option>
+                  <option value={4}>4 concurrent (Recommended)</option>
+                  <option value={6}>6 concurrent</option>
+                  <option value={8}>8 concurrent</option>
+                </select>
               </div>
 
-              {validationError && (
-                <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', color: '#f87171', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                  <AlertTriangle size={18} />
-                  <span>{validationError.message}</span>
-                </div>
-              )}
-            </div>
-          )}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={handleValidate}
+                  disabled={validating || parsedUrls.length === 0}
+                  style={{
+                    padding: '10px 20px',
+                    borderRadius: '8px',
+                    background: 'rgba(255, 255, 255, 0.08)',
+                    color: 'var(--text-primary)',
+                    border: '1px solid var(--border-subtle)',
+                    fontWeight: 600,
+                    cursor: validating || parsedUrls.length === 0 ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    opacity: parsedUrls.length === 0 ? 0.6 : 1
+                  }}
+                >
+                  {validating ? <Loader2 size={16} className="animate-spin" /> : <ShieldCheck size={16} />}
+                  <span>Validate URLs</span>
+                </button>
 
-          {/* Validation Preview Card */}
-          {previewResult && !activeJobId && (
+                <button
+                  type="button"
+                  onClick={handleStartBulkDiscovery}
+                  disabled={startingDiscovery || parsedUrls.length === 0}
+                  style={{
+                    padding: '10px 24px',
+                    borderRadius: '8px',
+                    background: 'var(--accent-primary, #6366f1)',
+                    color: '#fff',
+                    border: 'none',
+                    fontWeight: 600,
+                    cursor: startingDiscovery || parsedUrls.length === 0 ? 'not-allowed' : 'pointer',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    opacity: startingDiscovery || parsedUrls.length === 0 ? 0.6 : 1
+                  }}
+                >
+                  {startingDiscovery ? <Loader2 size={16} className="animate-spin" /> : <Search size={16} />}
+                  <span>
+                    {isValidationCurrent && previewResult?.newSourcesCount > 0
+                      ? `Start ${previewResult.newSourcesCount} Sources`
+                      : parsedUrls.length > 0
+                      ? `Start Bulk Discovery (${parsedUrls.length})`
+                      : 'Start Bulk Discovery'}
+                  </span>
+                </button>
+              </div>
+            </div>
+
+            {validationError && (
+              <div style={{ marginTop: '16px', padding: '12px', background: 'rgba(239, 68, 68, 0.1)', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: '8px', color: '#f87171', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                <AlertTriangle size={18} />
+                <span>{validationError.message}</span>
+              </div>
+            )}
+          </div>
+
+          {/* Validation Preview Card (Only shown if validation matches current revision) */}
+          {isValidationCurrent && (
             <div className="admin-metric-card" style={{ padding: '24px', background: 'var(--bg-surface, #1e293b)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>Validation Preview</h3>
-                <div style={{ display: 'flex', gap: '8px', fontSize: '0.85rem' }}>
-                  <span style={{ padding: '4px 8px', background: 'rgba(255,255,255,0.06)', borderRadius: '4px' }}>
-                    Total: <strong>{previewResult.totalInput}</strong>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', flexWrap: 'wrap', gap: '12px' }}>
+                <h3 style={{ fontSize: '1.1rem', fontWeight: 700, margin: 0 }}>
+                  Validation Preview ({previewResult.totalInput} total)
+                </h3>
+                <div style={{ display: 'flex', gap: '8px', fontSize: '0.85rem', flexWrap: 'wrap' }}>
+                  <span style={{ padding: '4px 8px', background: 'rgba(74, 222, 128, 0.15)', color: '#4ade80', borderRadius: '4px', fontWeight: 600 }}>
+                    ✓ {previewResult.newSourcesCount} new valid
                   </span>
-                  <span style={{ padding: '4px 8px', background: 'rgba(74, 222, 128, 0.15)', color: '#4ade80', borderRadius: '4px' }}>
-                    New Sources: <strong>{previewResult.newSourcesCount}</strong>
-                  </span>
-                  <span style={{ padding: '4px 8px', background: 'rgba(250, 204, 21, 0.15)', color: '#facc15', borderRadius: '4px' }}>
-                    Duplicates: <strong>{previewResult.duplicateCount}</strong>
-                  </span>
-                  <span style={{ padding: '4px 8px', background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', borderRadius: '4px' }}>
-                    Already Connected: <strong>{previewResult.alreadyConnectedCount}</strong>
-                  </span>
+                  {previewResult.alreadyConnectedCount > 0 && (
+                    <span style={{ padding: '4px 8px', background: 'rgba(99, 102, 241, 0.15)', color: '#818cf8', borderRadius: '4px', fontWeight: 600 }}>
+                      ↻ {previewResult.alreadyConnectedCount} already connected
+                    </span>
+                  )}
+                  {previewResult.duplicateCount > 0 && (
+                    <span style={{ padding: '4px 8px', background: 'rgba(250, 204, 21, 0.15)', color: '#facc15', borderRadius: '4px', fontWeight: 600 }}>
+                      ⚠ {previewResult.duplicateCount} duplicate
+                    </span>
+                  )}
                   {previewResult.invalidCount > 0 && (
-                    <span style={{ padding: '4px 8px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', borderRadius: '4px' }}>
-                      Invalid: <strong>{previewResult.invalidCount}</strong>
+                    <span style={{ padding: '4px 8px', background: 'rgba(239, 68, 68, 0.15)', color: '#f87171', borderRadius: '4px', fontWeight: 600 }}>
+                      ✕ {previewResult.invalidCount} invalid
                     </span>
                   )}
                 </div>
@@ -1022,7 +1166,7 @@ https://www.virtusa.com/careers/job-search/global/en`}
                     cursor: 'pointer'
                   }}
                 >
-                  Cancel
+                  Dismiss Preview
                 </button>
                 <button
                   type="button"
@@ -1035,7 +1179,8 @@ https://www.virtusa.com/careers/job-search/global/en`}
                     color: '#fff',
                     border: 'none',
                     fontWeight: 600,
-                    cursor: startingDiscovery || previewResult.newSourcesCount === 0 ? 'not-allowed' : 'pointer'
+                    cursor: startingDiscovery || previewResult.newSourcesCount === 0 ? 'not-allowed' : 'pointer',
+                    opacity: startingDiscovery || previewResult.newSourcesCount === 0 ? 0.6 : 1
                   }}
                 >
                   Start Discovery ({previewResult.newSourcesCount} Sources)
@@ -1043,12 +1188,12 @@ https://www.virtusa.com/careers/job-search/global/en`}
               </div>
             </div>
           )}
-        </>
+        </div>
       )}
 
       {/* Item Details Modal */}
       {selectedItemDetail && (
-        <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-overlay)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
+        <div style={{ position: 'fixed', inset: 0, background: 'var(--bg-overlay, rgba(0,0,0,0.7))', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: 'var(--bg-surface)', border: '1px solid var(--border-subtle)', borderRadius: '12px', padding: '24px', maxWidth: '640px', width: '100%', maxHeight: '90vh', overflowY: 'auto', boxShadow: 'var(--shadow-lg)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
               <h3 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0, color: 'var(--text-primary)' }}>
