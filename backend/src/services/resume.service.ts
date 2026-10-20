@@ -171,23 +171,29 @@ export class ResumeService {
       throw new NotFoundError('Resume not found or unauthorized');
     }
 
-    // 1. Update personal details if provided
+    // 1. Update personal details and summary if provided
+    const updateData: any = {};
     if (confirmedData.personalInfo) {
-      await CandidateProfileRepository.updateProfile(profile.id, {
-        fullName: confirmedData.personalInfo.fullName || profile.fullName,
-        headline: confirmedData.personalInfo.headline || profile.headline,
-        phone: confirmedData.personalInfo.phone || profile.phone,
-        email: confirmedData.personalInfo.email || profile.email,
-        location: confirmedData.personalInfo.location || profile.location,
-        country: confirmedData.personalInfo.country || profile.country,
-        city: confirmedData.personalInfo.city || profile.city,
-        stateProvince: confirmedData.personalInfo.stateProvince || profile.stateProvince,
-        postalCode: confirmedData.personalInfo.postalCode || profile.postalCode,
-        summary: confirmedData.summary || profile.summary,
-        linkedinUrl: confirmedData.personalInfo.linkedinUrl || profile.linkedinUrl,
-        githubUrl: confirmedData.personalInfo.githubUrl || profile.githubUrl,
-        portfolioUrl: confirmedData.personalInfo.portfolioUrl || profile.portfolioUrl
-      });
+      if (confirmedData.personalInfo.fullName) updateData.fullName = confirmedData.personalInfo.fullName;
+      if (confirmedData.personalInfo.headline) updateData.headline = confirmedData.personalInfo.headline;
+      if (confirmedData.personalInfo.phone) updateData.phone = confirmedData.personalInfo.phone;
+      if (confirmedData.personalInfo.email) updateData.email = confirmedData.personalInfo.email;
+      if (confirmedData.personalInfo.location) updateData.location = confirmedData.personalInfo.location;
+      if (confirmedData.personalInfo.country) updateData.country = confirmedData.personalInfo.country;
+      if (confirmedData.personalInfo.city) updateData.city = confirmedData.personalInfo.city;
+      if (confirmedData.personalInfo.stateProvince) updateData.stateProvince = confirmedData.personalInfo.stateProvince;
+      if (confirmedData.personalInfo.postalCode) updateData.postalCode = confirmedData.personalInfo.postalCode;
+      if (confirmedData.personalInfo.linkedinUrl) updateData.linkedinUrl = confirmedData.personalInfo.linkedinUrl;
+      if (confirmedData.personalInfo.githubUrl) updateData.githubUrl = confirmedData.personalInfo.githubUrl;
+      if (confirmedData.personalInfo.portfolioUrl) updateData.portfolioUrl = confirmedData.personalInfo.portfolioUrl;
+    }
+
+    if (confirmedData.summary !== undefined && confirmedData.summary !== null && confirmedData.summary.trim()) {
+      updateData.summary = confirmedData.summary.trim();
+    }
+
+    if (Object.keys(updateData).length > 0) {
+      await CandidateProfileRepository.updateProfile(profile.id, updateData);
     }
 
     // 2. Save experiences (with intelligent deduplication)
@@ -205,18 +211,33 @@ export class ResumeService {
         );
         if (duplicate) continue;
 
-        const startDate = exp.startDate ? new Date(exp.startDate) : new Date('2020-01-01');
+        let parsedStart: Date | null = exp.startDate ? new Date(exp.startDate) : null;
+        if (!parsedStart || isNaN(parsedStart.getTime())) {
+          // If duration is specified (e.g. "6 years"), estimate realistic startDate from current year
+          const durMatch = (exp.duration || '').match(/(\d+(?:\.\d+)?)\s*(?:years|yrs)/i);
+          if (durMatch) {
+            const yrs = parseFloat(durMatch[1]);
+            const startYear = Math.max(1990, new Date().getFullYear() - Math.round(yrs));
+            parsedStart = new Date(`${startYear}-01-01`);
+          } else {
+            parsedStart = new Date('2020-01-01');
+          }
+        }
+
         const endDate = exp.isCurrent || !exp.endDate ? null : new Date(exp.endDate);
+
+        // Store duration in description if present and description is empty
+        const description = exp.description || (exp.duration ? `Duration: ${exp.duration}` : null);
 
         await CandidateProfileRepository.createExperience(profile.id, {
           company: exp.company,
           jobTitle: exp.jobTitle,
           location: exp.location,
           employmentType: exp.employmentType || 'Full-time',
-          startDate: isNaN(startDate.getTime()) ? new Date('2020-01-01') : startDate,
+          startDate: parsedStart,
           endDate: endDate && !isNaN(endDate.getTime()) ? endDate : null,
           isCurrent: Boolean(exp.isCurrent),
-          description: exp.description,
+          description,
           responsibilities: exp.responsibilities || [],
           achievements: exp.achievements || [],
           technologies: exp.technologies || [],

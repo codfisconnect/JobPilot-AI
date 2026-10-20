@@ -415,6 +415,7 @@ export class ApiClient {
   }
 
   async confirmParsedResume(id: string, confirmedData: any): Promise<any> {
+    this.memoryCache.delete('candidate_profile_me');
     return this.request<any>(`/resumes/${id}/confirm`, {
       method: 'POST',
       body: JSON.stringify(confirmedData)

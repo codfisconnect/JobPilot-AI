@@ -80,14 +80,29 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const v1Profile = await apiClient.getCandidateProfile();
         if (v1Profile) {
+          // Calculate realistic yearsOfExperience from experience records if available
+          let computedYears = 0;
+          if (Array.isArray(v1Profile.experiences) && v1Profile.experiences.length > 0) {
+            for (const exp of v1Profile.experiences) {
+              const start = exp.startDate ? new Date(exp.startDate) : null;
+              const end = exp.endDate ? new Date(exp.endDate) : new Date();
+              if (start && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
+                const diffYears = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+                computedYears += diffYears;
+              }
+            }
+          }
+          const finalYears = computedYears > 0 ? Math.round(computedYears * 10) / 10 : 5;
+
           const adapted: CandidateProfile = {
             id: v1Profile.id,
             name: v1Profile.fullName || 'Candidate',
+            headline: v1Profile.headline || '',
             email: v1Profile.email || '',
             phone: v1Profile.phone || '',
             location: v1Profile.location || '',
             targetRoles: v1Profile.preferences?.targetRoles || ['Software Engineer'],
-            yearsOfExperience: 5,
+            yearsOfExperience: finalYears,
             preferredLocations: v1Profile.preferences?.preferredLocations || ['Remote'],
             expectedSalary: '$140,000',
             noticePeriod: v1Profile.preferences?.noticePeriod || 'Immediate',
@@ -95,31 +110,46 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
             primarySkills: (v1Profile.skills || []).map((s: any) => s.skill?.name || s.name || s),
             secondarySkills: [],
             technologies: [],
-            companies: [],
-            education: (v1Profile.educations || []).map((e: any) => ({
-              degree: e.degree,
-              field: e.fieldOfStudy || '',
-              institution: e.institution,
-              year: e.endYear ? String(e.endYear) : ''
-            })),
-            certifications: (v1Profile.certifications || []).map((c: any) => ({
-              name: c.name,
-              issuer: c.issuer,
-              year: c.issueDate ? String(c.issueDate).substring(0, 4) : ''
-            })),
+            companies: (v1Profile.experiences || []).map((exp: any) => exp.company).filter(Boolean),
+            education: (v1Profile.educations || []).map((e: any) => {
+              let yearStr = '';
+              if (e.endDate) {
+                yearStr = new Date(e.endDate).getFullYear().toString();
+              } else if (e.startDate) {
+                yearStr = new Date(e.startDate).getFullYear().toString();
+              } else if (e.endYear) {
+                yearStr = String(e.endYear);
+              }
+              return {
+                id: e.id,
+                degree: e.degree,
+                field: e.fieldOfStudy || '',
+                institution: e.institution,
+                year: yearStr
+              };
+            }),
+            certifications: (v1Profile.certifications || []).map((c: any) => c.name || c),
             projects: (v1Profile.projects || []).map((p: any) => ({
-              name: p.title,
+              id: p.id,
+              name: p.name || p.title || 'Technical Project',
               description: p.description || '',
               technologies: p.technologies || []
             })),
             summary: v1Profile.summary || '',
             experiences: (v1Profile.experiences || []).map((exp: any) => ({
-              role: exp.title,
+              id: exp.id,
               company: exp.company,
+              title: exp.jobTitle || exp.title || exp.role || 'Software Professional',
+              role: exp.jobTitle || exp.title || exp.role || 'Software Professional',
               location: exp.location || '',
               startDate: exp.startDate ? String(exp.startDate).substring(0, 7) : '',
-              endDate: exp.isCurrent ? 'Present' : (exp.endDate ? String(exp.endDate).substring(0, 7) : ''),
-              highlights: exp.description ? [exp.description] : []
+              endDate: exp.isCurrent ? 'Present' : (exp.endDate ? String(exp.endDate).substring(0, 7) : 'Present'),
+              isCurrent: Boolean(exp.isCurrent),
+              duration: exp.description && exp.description.startsWith('Duration:') ? exp.description.replace('Duration:', '').trim() : '',
+              description: exp.description || '',
+              responsibilities: exp.responsibilities || [],
+              highlights: (exp.responsibilities && exp.responsibilities.length > 0) ? exp.responsibilities : (exp.description ? [exp.description] : []),
+              technologies: exp.technologies || []
             })),
             isDemo: false,
             createdAt: v1Profile.createdAt || new Date().toISOString(),
