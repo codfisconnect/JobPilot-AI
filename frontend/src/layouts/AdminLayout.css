@@ -1,14 +1,14 @@
 .admin-layout {
   display: flex;
   min-height: 100vh;
-  background-color: var(--bg-canvas, #0f172a);
-  color: var(--text-primary, #f8fafc);
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
 }
 
 .admin-sidebar {
   width: 260px;
-  background-color: var(--bg-surface, #1e293b);
-  border-right: 1px solid var(--border-subtle, #334155);
+  background-color: var(--bg-surface);
+  border-right: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   position: fixed;
@@ -24,15 +24,15 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid var(--border-subtle, #334155);
+  border-bottom: 1px solid var(--border-subtle);
 }
 
 .admin-badge-indicator {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  background: rgba(239, 68, 68, 0.15);
-  color: #f87171;
+  background: var(--color-danger-bg);
+  color: var(--text-danger);
   border: 1px solid rgba(239, 68, 68, 0.3);
   padding: 4px 8px;
   border-radius: 6px;
@@ -57,7 +57,7 @@
   gap: 12px;
   padding: 10px 14px;
   border-radius: 8px;
-  color: var(--text-secondary, #94a3b8);
+  color: var(--text-secondary);
   font-size: 0.875rem;
   font-weight: 500;
   text-decoration: none;
@@ -70,24 +70,24 @@
 }
 
 .admin-nav-item:hover {
-  color: var(--text-primary, #f8fafc);
-  background-color: var(--bg-surface-hover, rgba(255, 255, 255, 0.05));
+  color: var(--text-primary);
+  background-color: var(--bg-surface-hover);
 }
 
 .admin-nav-item.active {
-  color: #fff;
-  background: linear-gradient(135deg, rgba(99, 102, 241, 0.2) 0%, rgba(99, 102, 241, 0.1) 100%);
-  border: 1px solid rgba(99, 102, 241, 0.3);
+  color: var(--text-primary);
+  background: var(--bg-surface-hover);
+  border: 1px solid var(--accent-primary);
   font-weight: 600;
 }
 
 .admin-nav-item.active svg {
-  color: #818cf8;
+  color: var(--accent-primary);
 }
 
 .admin-sidebar-footer {
   padding: 16px;
-  border-top: 1px solid var(--border-subtle, #334155);
+  border-top: 1px solid var(--border-subtle);
   display: flex;
   flex-direction: column;
   gap: 12px;
