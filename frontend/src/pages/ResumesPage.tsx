@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { ResumeUploadManager } from '../components/profile/ResumeUploadManager';
 import { Card } from '../components/common/Card';
 import { FileText, ShieldCheck, Layers } from 'lucide-react';
+import { useApp } from '../context/AppContext';
+import { apiClient } from '../api/client';
 import './ResumeStudioPage.css';
 
 interface ResumesPageProps {
@@ -9,6 +11,13 @@ interface ResumesPageProps {
 }
 
 export const ResumesPage: React.FC<ResumesPageProps> = ({ onNavigate }) => {
+  const { refreshCandidates } = useApp();
+
+  const handleProfileUpdated = () => {
+    apiClient.getCandidateProfile(true).catch(() => {});
+    refreshCandidates();
+  };
+
   return (
     <div className="resumes-page" style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
       {/* Header */}
@@ -57,7 +66,7 @@ export const ResumesPage: React.FC<ResumesPageProps> = ({ onNavigate }) => {
       </div>
 
       {/* Production Resume Upload & Vault Manager */}
-      <ResumeUploadManager />
+      <ResumeUploadManager onProfileUpdated={handleProfileUpdated} />
     </div>
   );
 };

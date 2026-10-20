@@ -371,8 +371,24 @@ B.S Abdur Rahman University, Chennai
       assert.strictEqual(res.status, 200);
       assert.strictEqual(res.body.data.fullName, 'John Confirmed Doe');
       assert.strictEqual(res.body.data.headline, 'VP of Platform Engineering');
+      assert.strictEqual(res.body.data.summary, 'Candidate approved executive summary.');
       assert.strictEqual(res.body.data.experiences.length, 1);
       assert.strictEqual(res.body.data.experiences[0].company, 'Acme Cloud Platform');
+      assert.strictEqual(res.body.data.educations.length, 1);
+      assert.strictEqual(res.body.data.certifications.length, 1);
+      assert.ok(res.body.data.skills.length >= 2);
+
+      // Verify GET /api/v1/candidates/me immediately returns all relations
+      const profileGetRes = await request(app)
+        .get('/api/v1/candidates/me')
+        .set('Authorization', `Bearer ${tokenA}`);
+
+      assert.strictEqual(profileGetRes.status, 200);
+      assert.strictEqual(profileGetRes.body.data.summary, 'Candidate approved executive summary.');
+      assert.strictEqual(profileGetRes.body.data.experiences.length, 1);
+      assert.strictEqual(profileGetRes.body.data.educations.length, 1);
+      assert.strictEqual(profileGetRes.body.data.certifications.length, 1);
+      assert.ok(profileGetRes.body.data.skills.length >= 2);
     });
   });
 

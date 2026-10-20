@@ -47,6 +47,20 @@ export const ProfilePage: React.FC = () => {
       setError(null);
       const v1Data = await apiClient.getCandidateProfile(forceRefresh);
       if (v1Data) {
+        // Calculate realistic yearsOfExperience from experience records if available
+        let computedYears = 0;
+        if (Array.isArray(v1Data.experiences) && v1Data.experiences.length > 0) {
+          for (const exp of v1Data.experiences) {
+            const start = exp.startDate ? new Date(exp.startDate) : null;
+            const end = exp.endDate ? new Date(exp.endDate) : new Date();
+            if (start && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
+              const diffYears = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
+              computedYears += diffYears;
+            }
+          }
+        }
+        const finalYears = computedYears > 0 ? Math.round(computedYears * 10) / 10 : (activeCandidate?.yearsOfExperience || 5);
+
         // Adapt v1 fields to component format
         setProfile({
           id: v1Data.id,
@@ -55,36 +69,64 @@ export const ProfilePage: React.FC = () => {
           email: v1Data.email || activeCandidate?.email || '',
           phone: v1Data.phone || activeCandidate?.phone || '',
           location: v1Data.location || activeCandidate?.location || '',
-          yearsOfExperience: activeCandidate?.yearsOfExperience || 5,
+          yearsOfExperience: finalYears,
           targetRoles: activeCandidate?.targetRoles || ['Software Engineer'],
           currentRole: v1Data.headline || activeCandidate?.headline || '',
           expectedSalary: activeCandidate?.expectedSalary || '$140,000',
           noticePeriod: activeCandidate?.noticePeriod || 'Immediate',
           workPreference: activeCandidate?.workPreference || 'Remote',
           summary: v1Data.summary || activeCandidate?.summary || '',
-          primarySkills: v1Data.skills ? v1Data.skills.map((s: any) => s.skill?.name || s.name) : (activeCandidate?.primarySkills || []),
+          primarySkills: (v1Data.skills && v1Data.skills.length > 0)
+            ? v1Data.skills.map((s: any) => s.skill?.name || s.name || s)
+            : (activeCandidate?.primarySkills || []),
           secondarySkills: activeCandidate?.secondarySkills || [],
           technologies: activeCandidate?.technologies || [],
-          experiences: v1Data.experiences ? v1Data.experiences.map((exp: any) => ({
-            id: exp.id,
-            title: exp.jobTitle,
-            company: exp.company,
-            startDate: exp.startDate ? new Date(exp.startDate).getFullYear().toString() : '2020',
-            endDate: exp.isCurrent ? 'Present' : (exp.endDate ? new Date(exp.endDate).getFullYear().toString() : 'Present'),
-            duration: '',
-            responsibilities: exp.responsibilities || [],
-            highlights: exp.achievements || exp.responsibilities || []
-          })) : (activeCandidate?.experiences || []),
-          education: v1Data.educations ? v1Data.educations.map((edu: any) => ({
-            id: edu.id,
-            degree: edu.degree,
-            institution: edu.institution,
-            year: edu.startDate ? new Date(edu.startDate).getFullYear().toString() : '2019'
-          })) : (activeCandidate?.education || []),
-          certifications: v1Data.certifications ? v1Data.certifications.map((c: any) => c.name) : (activeCandidate?.certifications || []),
-          projects: v1Data.projects ? v1Data.projects.map((p: any) => ({
+          experiences: (v1Data.experiences && v1Data.experiences.length > 0) ? v1Data.experiences.map((exp: any) => {
+            let startYear = '';
+            if (exp.startDate) {
+              const d = new Date(exp.startDate);
+              startYear = !isNaN(d.getTime()) ? d.getFullYear().toString() : '2020';
+            }
+            let endYear = 'Present';
+            if (!exp.isCurrent && exp.endDate) {
+              const d = new Date(exp.endDate);
+              endYear = !isNaN(d.getTime()) ? d.getFullYear().toString() : 'Present';
+            }
+            const durationStr = exp.description && exp.description.startsWith('Duration:')
+              ? exp.description.replace('Duration:', '').trim()
+              : (exp.duration || '');
+
+            return {
+              id: exp.id,
+              title: exp.jobTitle || exp.title || 'Software Professional',
+              company: exp.company,
+              startDate: startYear,
+              endDate: endYear,
+              duration: durationStr,
+              responsibilities: (exp.responsibilities && exp.responsibilities.length > 0) ? exp.responsibilities : (exp.description ? [exp.description] : []),
+              highlights: (exp.achievements && exp.achievements.length > 0) ? exp.achievements : (exp.responsibilities || [])
+            };
+          }) : (activeCandidate?.experiences || []),
+          education: (v1Data.educations && v1Data.educations.length > 0) ? v1Data.educations.map((edu: any) => {
+            let yearStr = '';
+            if (edu.endDate) {
+              yearStr = new Date(edu.endDate).getFullYear().toString();
+            } else if (edu.startDate) {
+              yearStr = new Date(edu.startDate).getFullYear().toString();
+            }
+            return {
+              id: edu.id,
+              degree: edu.degree,
+              institution: edu.institution,
+              year: yearStr
+            };
+          }) : (activeCandidate?.education || []),
+          certifications: (v1Data.certifications && v1Data.certifications.length > 0)
+            ? v1Data.certifications.map((c: any) => c.name || c)
+            : (activeCandidate?.certifications || []),
+          projects: (v1Data.projects && v1Data.projects.length > 0) ? v1Data.projects.map((p: any) => ({
             id: p.id,
-            name: p.name,
+            name: p.name || p.title || 'Technical Project',
             description: p.description,
             technologies: p.technologies || []
           })) : (activeCandidate?.projects || []),
@@ -351,7 +393,10 @@ export const ProfilePage: React.FC = () => {
       </div>
 
       {/* Production Resume Vault & Parser Area */}
-      <ResumeUploadManager onProfileUpdated={refreshCandidates} />
+      <ResumeUploadManager onProfileUpdated={() => {
+        loadV1Profile(true);
+        refreshCandidates();
+      }} />
 
       {/* Profile Sections Grid */}
       <div className="profile-grid">
