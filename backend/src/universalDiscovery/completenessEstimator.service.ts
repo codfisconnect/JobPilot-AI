@@ -81,4 +81,31 @@ export class CompletenessEstimatorService {
 
     return null;
   }
+
+  /**
+   * Extracts reported job total count from HTML content (e.g. "Displaying 1 to 20 of 83 matching jobs",
+   * "Showing 1-20 of 83 jobs", "83 matching jobs", "Open Positions (4)")
+   */
+  public static extractReportedTotalFromHtml(html: string): number | null {
+    if (!html || typeof html !== 'string') return null;
+
+    // Pattern 1: "Displaying 1 to 20 of 83 matching jobs" or "Showing 1 - 20 of 83 jobs"
+    const rangeMatch = html.match(/(?:displaying|showing)\s+\d+\s*(?:to|-)\s*\d+\s+of\s+([0-9,]+)(?:\s+(?:matching\s+)?jobs)?/i);
+    if (rangeMatch && rangeMatch[1]) {
+      const parsed = parseInt(rangeMatch[1].replace(/,/g, ''), 10);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+
+    // Pattern 2: "83 matching jobs" or "Found 83 jobs" or "83 Open Positions"
+    const matchingJobsMatch = html.match(/([0-9,]+)\s+matching\s+jobs/i) ||
+                              html.match(/(?:found|showing|available)\s+([0-9,]+)\s+(?:open\s+)?(?:positions|jobs|openings|vacancies)/i) ||
+                              html.match(/([0-9,]+)\s+(?:active\s+)?openings/i);
+    if (matchingJobsMatch && matchingJobsMatch[1]) {
+      const parsed = parseInt(matchingJobsMatch[1].replace(/,/g, ''), 10);
+      if (!isNaN(parsed) && parsed > 0) return parsed;
+    }
+
+    return null;
+  }
 }
+

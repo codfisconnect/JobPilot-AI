@@ -3,6 +3,7 @@ import { safeFetchUrl } from '../../utils/safeFetch.js';
 import { CompletenessEstimatorService } from '../completenessEstimator.service.js';
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
+import { JobSourceDiscoveryService } from '../../services/jobSourceDiscovery.service.js';
 import * as cheerio from 'cheerio';
 
 export class PhenomAdapter implements IJobSourceStrategy {
@@ -31,21 +32,7 @@ export class PhenomAdapter implements IJobSourceStrategy {
     const { normalizedUrl, initialHtml } = context;
     if (!initialHtml) return { matched: false } as any;
 
-    let companyName = normalizedUrl.domain.split('.')[0];
-    if (companyName === 'www') {
-      const parts = normalizedUrl.domain.split('.');
-      companyName = parts[1] || companyName;
-    }
-    companyName = companyName.charAt(0).toUpperCase() + companyName.slice(1);
-
-    const $ = cheerio.load(initialHtml);
-    const titleText = $('title').text();
-    if (titleText && titleText.includes('|')) {
-      const parts = titleText.split('|');
-      if (parts[parts.length - 1]?.trim()) {
-        companyName = parts[parts.length - 1].trim();
-      }
-    }
+    const { companyName, domain } = JobSourceDiscoveryService.extractCompanyMetadata(normalizedUrl.normalizedUrl, initialHtml);
 
     // Determine Phenom search-results endpoint URL
     // Standard Phenom URLs:
@@ -76,6 +63,10 @@ export class PhenomAdapter implements IJobSourceStrategy {
           allJobs.push(parsed);
         }
       }
+    }
+
+    if (totalHits === null) {
+      totalHits = CompletenessEstimatorService.extractReportedTotalFromHtml(initialHtml);
     }
 
     logger.info(`[PhenomAdapter] Initial page yielded ${allJobs.length} jobs, reported total: ${totalHits}`);
