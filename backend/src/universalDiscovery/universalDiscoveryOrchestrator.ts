@@ -60,17 +60,19 @@ export class UniversalDiscoveryOrchestrator {
 
         logger.info(`[UniversalDiscoveryOrchestrator] Executing strategy: ${strat.name} (Priority: ${strat.priority})`);
         const result = await strat.execute(context);
-        if (result && result.matched && result.jobs.length > 0) {
-          logger.info(`[UniversalDiscoveryOrchestrator] Strategy ${strat.name} succeeded with ${result.jobs.length} jobs`);
-          bestResult = result;
-          break; // Stop at first successful high-confidence strategy
+        if (result && result.matched) {
+          if (result.jobs.length > 0 || result.sourceType === 'SAP_SUCCESSFACTORS' || result.sourceType === 'ORACLE_RECRUITING') {
+            logger.info(`[UniversalDiscoveryOrchestrator] Strategy ${strat.name} succeeded with ${result.jobs.length} jobs`);
+            bestResult = result;
+            break; // Stop at first successful high-confidence strategy
+          }
         }
       } catch (stratErr: any) {
         logger.warn(`[UniversalDiscoveryOrchestrator] Strategy ${strat.name} encountered error: ${stratErr.message}`);
       }
     }
 
-    if (!bestResult || bestResult.jobs.length === 0) {
+    if (!bestResult) {
       // Diagnostic message based on fingerprint and content presence
       if (fingerprint.atsVendor) {
         throw new Error(`${fingerprint.atsVendor} careers portal detected, but its public job data endpoint could not be resolved.`);

@@ -24,7 +24,9 @@ export class UrlNormalizationService {
     'jobvite.com': 'JOBVITE',
     'taleo.net': 'TALEO',
     'oraclecloud.com': 'ORACLE_RECRUITING',
+    'ocs.oraclecloud.com': 'ORACLE_RECRUITING',
     'successfactors.com': 'SUCCESSFACTORS',
+    'sapsf.com': 'SUCCESSFACTORS',
     'avature.net': 'AVATURE',
     'phenompeople.com': 'PHENOM',
     'workable.com': 'WORKABLE',
@@ -102,6 +104,13 @@ export class UrlNormalizationService {
     // Canonical source URL without hash fragments
     const canonicalObj = new URL(urlObj.toString());
     canonicalObj.hash = '';
+
+    // Strip tracking parameters but retain meaningful functional query parameters (e.g. company, site, reqId)
+    const trackingKeys = ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term', 'gclid', 'fbclid', '_s.crb'];
+    for (const tk of trackingKeys) {
+      canonicalObj.searchParams.delete(tk);
+    }
+
     // Normalize trailing slash for root paths e.g. https://domain.com/careers/ -> https://domain.com/careers
     let canonicalSourceUrl = canonicalObj.toString();
     if (canonicalObj.pathname.length > 1 && canonicalSourceUrl.endsWith('/')) {

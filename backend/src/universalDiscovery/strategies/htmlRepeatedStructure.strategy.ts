@@ -43,7 +43,8 @@ export class HtmlRepeatedStructureStrategy implements IJobSourceStrategy {
           rawPayload: j
         }));
 
-        const completeness = CompletenessEstimatorService.evaluate(rawJobs.length, null);
+        const reportedTotal = CompletenessEstimatorService.extractReportedTotalFromHtml(initialHtml);
+        const completeness = CompletenessEstimatorService.evaluate(rawJobs.length, reportedTotal);
 
         return {
           matched: true,
@@ -54,9 +55,9 @@ export class HtmlRepeatedStructureStrategy implements IJobSourceStrategy {
           companyName,
           officialDomain: domain,
           jobs: rawJobs,
-          expectedJobCount: null,
+          expectedJobCount: reportedTotal,
           completeness: completeness.completeness,
-          paginationSupported: false,
+          paginationSupported: reportedTotal !== null && reportedTotal > rawJobs.length,
           mappingConfig: {
             titleField: 'title',
             locationField: 'location',

@@ -122,6 +122,31 @@ export class SourceFingerprintService {
         signals.push('HTML references Phenom careers platform');
       }
 
+      // Check Oracle Cloud HCM / Candidate Experience patterns
+      if (
+        lowerHtml.includes('oraclecloud.com') ||
+        lowerHtml.includes('candidateexperience') ||
+        lowerHtml.includes('ora-irc-vanity-domain') ||
+        lowerHtml.includes('recruitingcejobrequisitions')
+      ) {
+        atsVendor = 'ORACLE_RECRUITING';
+        confidence = 95;
+        signals.push('HTML references Oracle Cloud Recruiting / Candidate Experience');
+      }
+
+      // Check SAP SuccessFactors patterns
+      if (
+        normalized.domain.includes('sapsf.com') ||
+        normalized.domain.includes('successfactors.com') ||
+        lowerHtml.includes('career_job_req_id') ||
+        lowerHtml.includes('careerform') ||
+        lowerHtml.includes('rcmcareer')
+      ) {
+        atsVendor = 'SUCCESSFACTORS';
+        confidence = 95;
+        signals.push('HTML references SAP SuccessFactors career system');
+      }
+
       // Check SPA frameworks
       if (
         lowerHtml.includes('__next_data__') ||

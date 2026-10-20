@@ -7,6 +7,8 @@ import { LeverAdapter } from './adapters/lever.adapter.js';
 import { AshbyAdapter } from './adapters/ashby.adapter.js';
 import { SmartRecruitersAdapter } from './adapters/smartrecruiters.adapter.js';
 import { PhenomAdapter } from './adapters/phenom.adapter.js';
+import { OracleRecruitingAdapter } from './adapters/oracleRecruiting.adapter.js';
+import { SuccessFactorsAdapter } from './adapters/successfactors.adapter.js';
 import { InfosysAdapter } from './adapters/infosys.adapter.js';
 import { DirectJsonStrategy } from './strategies/directJson.strategy.js';
 import { JsonLdStrategy } from './strategies/jsonLd.strategy.js';
@@ -21,6 +23,8 @@ export class AdapterRegistry {
     // Specialized ATS Accelerators (priorities 10 - 19)
     new RippleHireAdapter(),
     new WorkdayAdapter(),
+    new OracleRecruitingAdapter(),
+    new SuccessFactorsAdapter(),
     new IcimsAdapter(),
     new GreenhouseAdapter(),
     new LeverAdapter(),
