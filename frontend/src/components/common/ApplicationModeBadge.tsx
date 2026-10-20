@@ -2,14 +2,14 @@ import React from 'react';
 import './ApplicationModeBadge.css';
 
 export interface ApplicationModeBadgeProps {
-  mode?: 'demo' | 'external' | string;
+  mode?: 'demo' | 'external' | 'agent' | 'assisted' | string;
   isCodewalla?: boolean;
   className?: string;
   size?: 'sm' | 'md' | 'lg';
 }
 
 export const ApplicationModeBadge: React.FC<ApplicationModeBadgeProps> = ({
-  mode = 'demo',
+  mode = 'agent',
   isCodewalla = false,
   className = '',
   size = 'md'
@@ -25,10 +25,21 @@ export const ApplicationModeBadge: React.FC<ApplicationModeBadgeProps> = ({
     );
   }
 
+  const normalizedMode = mode?.toLowerCase();
+  if (normalizedMode === 'agent' || normalizedMode === 'assisted' || normalizedMode === 'internal_automation' || normalizedMode === 'external') {
+    return (
+      <span className={`app-mode-badge app-mode-agent size-${size} ${className}`} title="Managed candidate workflow orchestrated by Pilot Mama Application Agent.">
+        <span className="mode-dot dot-agent" />
+        <span className="mode-text">APPLICATION AGENT</span>
+      </span>
+    );
+  }
+
   return (
     <span className={`app-mode-badge app-mode-external size-${size} ${className}`} title="Direct career portal link. Submissions happen on the external portal.">
       <span className="mode-dot dot-external" />
-      <span className="mode-text">EXTERNAL APPLICATION</span>
+      <span className="mode-text">EXTERNAL PORTAL</span>
     </span>
   );
 };
+

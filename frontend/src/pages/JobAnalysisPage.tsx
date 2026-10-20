@@ -28,6 +28,7 @@ import {
   Layers
 } from 'lucide-react';
 import { ApplicationModeBadge } from "../components/common/ApplicationModeBadge";
+import { normalizeApiError } from '../utils/errorUtils';
 import { ApplicationModal } from "../components/applications/ApplicationModal";
 import { ErrorBoundary } from "../components/common/ErrorBoundary";
 import './JobAnalysisPage.css';
@@ -220,8 +221,9 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
         setTailoredResume(res);
         showToast(`Tailored resume generated: ${res.versionName}!`);
       }
-    } catch (err: any) {
-      alert(`Tailoring failed: ${err.message}`);
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Resume tailoring failed. Please try again.');
+      showToast(normalized.message);
     } finally {
       setIsTailoring(false);
     }

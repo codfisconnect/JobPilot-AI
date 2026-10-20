@@ -60,6 +60,23 @@
   box-shadow: 0 0 6px #10b981;
 }
 
+/* Agent Styling: Premium Violet / Indigo Accent */
+.app-mode-agent {
+  background: rgba(99, 102, 241, 0.12);
+  color: #818cf8;
+  border: 1px solid rgba(99, 102, 241, 0.35);
+  box-shadow: 0 0 10px rgba(99, 102, 241, 0.1);
+}
+
+.app-mode-agent .dot-agent {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #6366f1;
+  box-shadow: 0 0 6px #6366f1;
+  animation: pulse-demo 2s infinite ease-in-out;
+}
+
 @keyframes pulse-demo {
   0%, 100% {
     opacity: 1;

@@ -80,7 +80,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       try {
         const v1Profile = await apiClient.getCandidateProfile();
         if (v1Profile) {
-          // Calculate realistic yearsOfExperience from experience records if available
+          // Calculate realistic yearsOfExperience from experience records or explicit duration notes
           let computedYears = 0;
           if (Array.isArray(v1Profile.experiences) && v1Profile.experiences.length > 0) {
             for (const exp of v1Profile.experiences) {
@@ -89,14 +89,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
               if (start && !isNaN(start.getTime()) && !isNaN(end.getTime())) {
                 const diffYears = Math.max(0, (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24 * 365.25));
                 computedYears += diffYears;
+              } else if (exp.description) {
+                const durMatch = exp.description.match(/(\d+(?:\.\d+)?)\s*(?:years|yrs)/i);
+                if (durMatch) {
+                  computedYears += parseFloat(durMatch[1]);
+                }
               }
             }
           }
-          const finalYears = computedYears > 0 ? Math.round(computedYears * 10) / 10 : 5;
+          // If profile explicitly has a duration noted in summary or preference
+          if (computedYears === 0 && v1Profile.summary) {
+            const sumMatch = v1Profile.summary.match(/(\d+(?:\.\d+)?)\s*(?:years|yrs)/i);
+            if (sumMatch) {
+              computedYears = parseFloat(sumMatch[1]);
+            }
+          }
+          const finalYears = computedYears > 0 ? Math.round(computedYears * 10) / 10 : 0;
 
           const adapted: CandidateProfile = {
             id: v1Profile.id,
-            name: v1Profile.fullName || 'Candidate',
+            name: v1Profile.fullName || '',
             headline: v1Profile.headline || '',
             email: v1Profile.email || '',
             phone: v1Profile.phone || '',

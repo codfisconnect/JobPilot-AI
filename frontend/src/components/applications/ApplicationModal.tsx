@@ -12,6 +12,8 @@ import {
   JobMatchAnalysis,
   ApplicationRecord
 } from '../../types/index';
+import { normalizeApiError } from '../../utils/errorUtils';
+import { getCanonicalCompanyName } from '../../utils/companyUtils';
 import {
   CheckCircle,
   AlertTriangle,
@@ -28,7 +30,9 @@ import {
   Clock,
   MapPin,
   Check,
-  RotateCcw
+  RotateCcw,
+  FileText,
+  X
 } from 'lucide-react';
 import './ApplicationModal.css';
 
@@ -68,6 +72,10 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   const [submittedApp, setSubmittedApp] = useState<ApplicationRecord | null>(null);
   const [duplicateWarning, setDuplicateWarning] = useState<ApplicationRecord | null>(null);
   const [externalConfirmed, setExternalConfirmed] = useState(false);
+  const [errorBanner, setErrorBanner] = useState<string | null>(null);
+
+  // Canonical company name sanitization
+  const canonicalCompany = getCanonicalCompanyName(job?.company, job?.sourceUrl, job?.applicationUrl);
 
   // Form Fields for Application Preview / Edit
   const [formFields, setFormFields] = useState({
@@ -75,15 +83,33 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
     email: candidate?.email || '',
     phone: candidate?.phone || '',
     location: candidate?.location || '',
-    experienceYears: candidate?.yearsOfExperience?.toString() || '4',
-    currentRole: candidate?.headline || '',
+    experienceYears: candidate?.yearsOfExperience ? candidate.yearsOfExperience.toString() : '0',
+    currentRole: candidate?.headline || candidate?.experiences?.[0]?.title || '',
     linkedInUrl: candidate?.linkedInUrl || '',
     portfolioUrl: candidate?.gitHubUrl || '',
-    coverLetter: `Dear Hiring Team,\n\nI am excited to submit my application for the ${job?.role} role at ${job?.company}. With ${candidate?.yearsOfExperience || 4}+ years of demonstrated experience in ${job?.careerTrack || 'Software Engineering'} and core expertise in ${(candidate?.primarySkills || []).slice(0, 4).join(', ')}, I look forward to contributing high-impact value to your engineering team.\n\nBest regards,\n${candidate?.name || ''}`
+    coverLetter: `Dear Hiring Team,\n\nI am excited to submit my application for the ${job?.role || 'open'} role at ${canonicalCompany}. With ${candidate?.yearsOfExperience || 'relevant'} years of demonstrated experience in ${job?.careerTrack || 'the discipline'} and core expertise in ${(candidate?.primarySkills || []).slice(0, 4).join(', ')}, I look forward to contributing high-impact value to your team.\n\nBest regards,\n${candidate?.name || ''}`
   });
 
-  const isCodewalla = (job?.company && job.company.toLowerCase().includes('codewalla')) || (job?.source && job.source.toLowerCase().includes('codewalla'));
-  const effectiveMode = isCodewalla ? 'demo' : (job?.applicationMode || 'demo');
+  // Re-sync form fields whenever candidate or job changes
+  useEffect(() => {
+    if (candidate) {
+      setFormFields(prev => ({
+        ...prev,
+        fullName: candidate.name || '',
+        email: candidate.email || '',
+        phone: candidate.phone || '',
+        location: candidate.location || '',
+        experienceYears: candidate.yearsOfExperience ? candidate.yearsOfExperience.toString() : prev.experienceYears,
+        currentRole: candidate.headline || candidate.experiences?.[0]?.title || prev.currentRole,
+        linkedInUrl: candidate.linkedInUrl || prev.linkedInUrl,
+        portfolioUrl: candidate.gitHubUrl || prev.portfolioUrl,
+        coverLetter: `Dear Hiring Team,\n\nI am excited to submit my application for the ${job?.role || 'open'} role at ${canonicalCompany}. With ${candidate.yearsOfExperience || 'relevant'} years of demonstrated experience in ${job?.careerTrack || 'the discipline'} and core expertise in ${(candidate.primarySkills || []).slice(0, 4).join(', ')}, I look forward to contributing high-impact value to your team.\n\nBest regards,\n${candidate.name || ''}`
+      }));
+    }
+  }, [candidate, job?.role, canonicalCompany]);
+
+  const isCodewalla = (canonicalCompany && canonicalCompany.toLowerCase().includes('codewalla')) || (job?.source && job.source.toLowerCase().includes('codewalla'));
+  const effectiveMode = isCodewalla ? 'demo' : (job?.applicationMode || 'agent');
 
   useEffect(() => {
     if (initialTailoredResume) {
@@ -103,6 +129,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       setSubmittedApp(null);
       setDuplicateWarning(null);
       setExternalConfirmed(false);
+      setErrorBanner(null);
       checkExistingApplication();
     }
   }, [isOpen, job?.id, candidate?.id]);
@@ -116,7 +143,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
         setDuplicateWarning(dup);
       }
     } catch (err) {
-      console.error('Error checking duplicate application:', err);
+      console.warn('Notice checking duplicate application:', err);
     }
   };
 
@@ -135,17 +162,66 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   const currentAtsScore = tailoredResume ? Math.min(98, originalAts + 8) : originalAts;
   const skillGaps = matchAnalysis?.atsAnalysis?.keywords?.red || [];
 
+  // Mandatory ATS Gate: Automatic application requires at least 80%
+  const isAtsPassed = currentAtsScore >= 80;
+
+  // Experience conflict detection
+  const resumeYears = candidate?.experiences?.length ? Math.round(candidate.experiences.length * 1.5) : candidate?.yearsOfExperience || 0;
+  const hasExperienceConflict = candidate?.yearsOfExperience !== undefined && resumeYears > 0 && Math.abs(candidate.yearsOfExperience - resumeYears) >= 2;
+
   const handleRunAtsCheck = async () => {
     if (!candidate?.id || !job?.id) {
-      alert('Unable to run ATS check: Candidate profile or job data is incomplete.');
+      setErrorBanner('Unable to run ATS check: Candidate profile or job data is incomplete.');
       return;
     }
     try {
       setIsCheckingAts(true);
+      setErrorBanner(null);
+      // Prefer V1 production matching endpoint if available
+      try {
+        const v1Match = await apiClient.getJobMatch(job.id);
+        if (v1Match) {
+          setMatchAnalysis({
+            id: v1Match.id,
+            candidateId: candidate.id,
+            jobId: job.id,
+            scores: v1Match.breakdown ? {
+              overallScore: v1Match.overallScore,
+              skillScore: v1Match.breakdown.skillScore,
+              experienceScore: v1Match.breakdown.experienceScore,
+              roleScore: v1Match.breakdown.roleScore,
+              locationScore: v1Match.breakdown.locationScore,
+              seniorityScore: v1Match.breakdown.seniorityScore
+            } : { overallScore: 80, skillScore: 80, experienceScore: 80, roleScore: 80, locationScore: 80, seniorityScore: 80 },
+            recommendation: {
+              category: v1Match.category === 'STRONG_MATCH' ? 'STRONG_MATCH' : 'MODERATE_MATCH',
+              title: v1Match.category === 'STRONG_MATCH' ? 'Strong Match' : 'Good Match',
+              description: `Evaluation confirmed ${v1Match.overallScore}% fit.`,
+              color: 'blue'
+            },
+            careerTrack: v1Match.careerTrack || { candidateTrack: 'Engineering', jobTrack: 'Engineering', isSameTrack: true, transitionPossible: true },
+            truthCheck: v1Match.truthCheck || { passed: true, greenCount: 0, yellowCount: 0, redCount: 0, items: [], summary: 'Truth check passed' },
+            atsAnalysis: v1Match.atsAnalysis || { estimatedScore: v1Match.overallScore, disclaimer: 'Estimated ATS Match', breakdown: { keywordMatch: 80, roleAlignment: 80, experienceAlignment: 80, skillsAlignment: 80, formatting: 90, readability: 90 }, keywords: { green: [], yellow: [], red: [] } },
+            whyMatch: {
+              matchingStrengths: [],
+              relevantExperienceHighlights: [],
+              locationAlignment: 'Matched',
+              seniorityAlignment: 'Aligned',
+              missingOrWeakAreas: [],
+              potentialConcerns: []
+            }
+          } as unknown as JobMatchAnalysis);
+          return;
+        }
+      } catch {
+        // Fallback to proto API
+      }
+
       const res = await api.analyzeMatch(candidate.id, job.id);
       setMatchAnalysis(res);
-    } catch (err: any) {
-      alert(`ATS Check failed: ${err.message}`);
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'ATS compatibility check could not be completed. Please try again.');
+      setErrorBanner(normalized.message);
     } finally {
       setIsCheckingAts(false);
     }
@@ -161,6 +237,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   const handleSubmitDemoApplication = async () => {
     try {
       setIsSubmitting(true);
+      setErrorBanner(null);
       const now = new Date().toISOString();
       const resumeVerId = selectedResumeType === 'tailored' ? (tailoredResume?.id || '') : '';
       const resumeVerName = selectedResumeType === 'tailored' ? (tailoredResume?.versionName || 'Tailored_Resume_v1') : 'Master_Profile';
@@ -168,7 +245,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       const appData: Partial<ApplicationRecord> = {
         candidateId: candidate.id,
         jobId: job.id,
-        company: job.company,
+        company: canonicalCompany,
         role: job.role,
         location: job.location,
         applicationMode: 'demo',
@@ -196,16 +273,24 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       setSubmittedApp(res);
       onSuccess(res);
       setCurrentStep('success');
-    } catch (err: any) {
-      alert(`Submission failed: ${err.message}`);
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Submission could not be completed.');
+      setErrorBanner(normalized.message);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleStartExternalApplication = async () => {
+    // Gate check: Must not proceed if ATS threshold has not been met
+    if (!isAtsPassed) {
+      setErrorBanner('Application blocked: ATS Compatibility score is below the required 80% threshold. Improve resume in Resume Studio before applying.');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
+      setErrorBanner(null);
       const now = new Date().toISOString();
       const resumeVerId = selectedResumeType === 'tailored' ? (tailoredResume?.id || '') : '';
       const resumeVerName = selectedResumeType === 'tailored' ? (tailoredResume?.versionName || 'Tailored_Resume_v1') : 'Master_Profile';
@@ -219,14 +304,15 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
           autoApply: false
         });
         autoResult = rawRes?.data || rawRes;
-      } catch (autoErr: any) {
-        console.warn('Backend automation endpoint notice:', autoErr.message);
+      } catch (autoErr: unknown) {
+        const norm = normalizeApiError(autoErr, 'Application Agent service notice');
+        console.warn('Backend automation notice:', norm.message);
       }
 
       const appData: Partial<ApplicationRecord> = {
         candidateId: candidate?.id || 'candidate_me',
         jobId: job.id,
-        company: job.company,
+        company: canonicalCompany,
         role: job.role,
         location: job.location,
         applicationMode: 'external',
@@ -238,7 +324,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
         resumeVersionName: resumeVerName,
         status: (autoResult?.currentState === 'APPLIED' ? 'APPLIED' : 'APPLICATION_STARTED') as any,
         appliedAt: now,
-        notes: `Application Agent initialized for ${job.company} (${autoResult?.job?.platform || 'Workday'}). Current state: ${autoResult?.currentState || 'PREPARED'}.`,
+        notes: `Application Agent initialized for ${canonicalCompany} (${autoResult?.job?.platform || 'Direct ATS'}). Current state: ${autoResult?.currentState || 'PREPARED'}.`,
         skillGaps,
         coverLetter: formFields.coverLetter,
         timeline: autoResult?.timeline?.length
@@ -257,8 +343,9 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       onSuccess(res);
 
       setCurrentStep('success');
-    } catch (err: any) {
-      alert(`Application flow error: ${err.message}`);
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Application could not be started.');
+      setErrorBanner(normalized.message);
     } finally {
       setIsSubmitting(false);
     }
@@ -280,8 +367,9 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       setSubmittedApp(updated);
       setExternalConfirmed(true);
       onSuccess(updated);
-    } catch (err: any) {
-      alert(`Error updating confirmation: ${err.message}`);
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Error updating submission confirmation');
+      setErrorBanner(normalized.message);
     }
   };
 
@@ -292,13 +380,36 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
         <div className="app-modal-header">
           <div className="modal-title-wrap">
             <span className="modal-eyebrow">Candidate Application Workflow</span>
-            <h2 className="modal-title">{job?.role} — {job?.company}</h2>
+            <h2 className="modal-title">{job?.role} — {canonicalCompany}</h2>
           </div>
           <div className="modal-header-actions">
             <ApplicationModeBadge mode={effectiveMode} isCodewalla={isCodewalla} size="md" />
             <button className="modal-close-btn" onClick={onClose} aria-label="Close modal">×</button>
           </div>
         </div>
+
+        {/* Global Error Banner (No [object Object]) */}
+        {errorBanner && (
+          <div className="modal-error-banner">
+            <div className="modal-error-content">
+              <AlertTriangle size={18} />
+              <span>{errorBanner}</span>
+            </div>
+            <button className="modal-error-dismiss" onClick={() => setErrorBanner(null)} aria-label="Dismiss error">×</button>
+          </div>
+        )}
+
+        {/* Experience Conflict Banner if Candidate Profile vs Resume totals diverge */}
+        {hasExperienceConflict && (
+          <div className="modal-error-banner" style={{ background: 'rgba(234, 179, 8, 0.15)', borderColor: 'rgba(234, 179, 8, 0.4)', color: '#fde047' }}>
+            <div className="modal-error-content">
+              <AlertTriangle size={18} />
+              <span>
+                <strong>Profile & Resume Experience Discrepancy:</strong> Your profile lists {candidate?.yearsOfExperience} years while work history reflects ~{resumeYears} years. Review your experience details before submitting.
+              </span>
+            </div>
+          </div>
+        )}
 
         {/* Step Indicator */}
         <div className="flow-step-bar">
@@ -347,115 +458,180 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
 
         {/* Body Content by Step */}
         <div className="app-modal-body">
-          {/* STEP 1: READINESS CHECK */}
-          {currentStep === 'readiness' && (
-            <div className="readiness-step-content">
-              {/* Mandatory Codewalla Banner */}
-              {isCodewalla && (
-                <div className="codewalla-demo-banner">
-                  <ShieldAlert size={20} className="banner-icon" />
-                  <div>
-                    <h4 className="banner-title">DEMO APPLICATION — SIMULATION ONLY</h4>
-                    <p className="banner-desc">
-                      This application is simulated for Pilot Mama testing. <strong>Nothing will be submitted to Codewalla.</strong> Zero requests will be transmitted to codewalla.com.
-                    </p>
+          {/* Missing Candidate Safety Guard */}
+          {(!candidate || !candidate.email) ? (
+            <div className="candidate-unavailable-card">
+              <ShieldAlert size={40} className="text-amber" style={{ margin: '0 auto 12px auto' }} />
+              <h3 className="candidate-unavailable-title">Your verified profile information is unavailable.</h3>
+              <p className="candidate-unavailable-desc">
+                Pilot Mama requires an authenticated candidate with a confirmed profile to initiate an application. Complete your verified profile before applying.
+              </p>
+              <Button variant="secondary" onClick={onClose}>
+                Close
+              </Button>
+            </div>
+          ) : (
+            <>
+              {/* STEP 1: READINESS CHECK */}
+              {currentStep === 'readiness' && (
+                <div className="readiness-step-content">
+                  {/* Mandatory Codewalla Banner */}
+                  {isCodewalla && (
+                    <div className="codewalla-demo-banner">
+                      <ShieldAlert size={20} className="banner-icon" />
+                      <div>
+                        <h4 className="banner-title">DEMO APPLICATION — SIMULATION ONLY</h4>
+                        <p className="banner-desc">
+                          This application is simulated for Pilot Mama testing. <strong>Nothing will be submitted to Codewalla.</strong> Zero requests will be transmitted to codewalla.com.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Job & Match Summary Pod */}
+                  <div className="readiness-metrics-grid">
+                    <Card className="metric-pod">
+                      <span className="pod-label">Match Score</span>
+                      <div className="pod-value text-indigo">{matchScore}%</div>
+                      <span className="pod-sub">14-point deterministic fit</span>
+                    </Card>
+
+                    <Card className="metric-pod">
+                      <span className="pod-label">ATS Simulation Score</span>
+                      <div className={`pod-value ${isAtsPassed ? 'text-emerald' : 'text-red'}`}>{currentAtsScore}%</div>
+                      <span className="pod-sub">{tailoredResume ? 'Tailored Resume (v1)' : 'Master Profile ATS'}</span>
+                    </Card>
+
+                    <Card className="metric-pod">
+                      <span className="pod-label">Application Mode</span>
+                      <div className="pod-value">
+                        <ApplicationModeBadge mode={effectiveMode} isCodewalla={isCodewalla} size="sm" />
+                      </div>
+                      <span className="pod-sub">{effectiveMode === 'demo' ? 'Local Pilot Mama Sandbox' : 'Application Agent Service'}</span>
+                    </Card>
+                  </div>
+
+                  {/* Mandatory ATS Gate Block when ATS < 80% */}
+                  {!isAtsPassed && (
+                    <div className="ats-gate-warning-card">
+                      <div className="ats-gate-header">
+                        <AlertTriangle size={20} className="text-red" />
+                        <h4 className="ats-gate-title">ATS Compatibility Gate Failed (Required: 80%)</h4>
+                      </div>
+                      <div className="ats-gate-metrics">
+                        <div className="ats-gate-metric-item">
+                          <span className="ats-gate-metric-lbl">ATS Compatibility</span>
+                          <span className="ats-gate-metric-val failed">{currentAtsScore}%</span>
+                        </div>
+                        <div className="ats-gate-metric-item">
+                          <span className="ats-gate-metric-lbl">Minimum Required</span>
+                          <span className="ats-gate-metric-val required">80%</span>
+                        </div>
+                        <div className="ats-gate-metric-item">
+                          <span className="ats-gate-metric-lbl">Gate Status</span>
+                          <span className="ats-gate-metric-val failed status">❌ Below required threshold</span>
+                        </div>
+                      </div>
+                      <p className="ats-gate-desc">
+                        Automatic application submission is blocked because your ATS score is below the mandatory 80% threshold. Tailor your resume in Resume Studio or address the missing keywords to proceed.
+                      </p>
+                      <div className="ats-gate-actions">
+                        {onNavigateToResumes && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            icon={<FileText size={14} />}
+                            onClick={() => {
+                              onClose();
+                              onNavigateToResumes();
+                            }}
+                          >
+                            Improve Resume in Studio
+                          </Button>
+                        )}
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          icon={<RotateCcw size={14} />}
+                          loading={isCheckingAts}
+                          onClick={handleRunAtsCheck}
+                        >
+                          Re-run ATS Check
+                        </Button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Application Details Summary */}
+                  <Card className="readiness-summary-card">
+                    <h4 className="section-title">Application Readiness Verification</h4>
+                    <div className="summary-fields-list">
+                      <div className="summary-row">
+                        <span className="row-key">Target Company:</span>
+                        <span className="row-val font-bold">{canonicalCompany}</span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="row-key">Role Title:</span>
+                        <span className="row-val">{job?.role}</span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="row-key">Location:</span>
+                        <span className="row-val"><MapPin size={13} style={{ display: 'inline', marginRight: '4px' }} />{job?.location}</span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="row-key">Experience Requirement:</span>
+                        <span className="row-val">{job?.experienceRequired || 'Not specified'} (Candidate: {candidate?.yearsOfExperience || 0} yrs)</span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="row-key">Selected Resume:</span>
+                        <span className="row-val text-emerald font-bold">
+                          {tailoredResume ? `${tailoredResume.versionName} (Tailored)` : 'Master Profile Resume'}
+                        </span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="row-key">Identified Skill Gaps:</span>
+                        <span className="row-val">
+                          {skillGaps.length > 0 ? skillGaps.slice(0, 3).join(', ') : 'None detected'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {readinessErrors.length > 0 && (
+                      <div className="readiness-errors-box">
+                        <AlertTriangle size={16} />
+                        <div>
+                          <strong>Cannot continue yet:</strong> Please update profile with required fields: {readinessErrors.join(', ')}
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+
+                  {/* Action Hierarchy */}
+                  <div className="modal-actions-bar">
+                    <Button variant="secondary" onClick={onClose}>
+                      Cancel
+                    </Button>
+                    <div className="action-right-group">
+                      <Button
+                        variant="outline"
+                        icon={<RotateCcw size={14} />}
+                        loading={isCheckingAts}
+                        onClick={handleRunAtsCheck}
+                      >
+                        Run ATS Check
+                      </Button>
+                      <Button
+                        variant="primary"
+                        icon={<ArrowRight size={16} />}
+                        disabled={readinessErrors.length > 0 || !isAtsPassed}
+                        onClick={() => setCurrentStep('selection')}
+                      >
+                        Continue to Resume Selection
+                      </Button>
+                    </div>
                   </div>
                 </div>
               )}
-
-              {/* Job & Match Summary Pod */}
-              <div className="readiness-metrics-grid">
-                <Card className="metric-pod">
-                  <span className="pod-label">Match Score</span>
-                  <div className="pod-value text-indigo">{matchScore}%</div>
-                  <span className="pod-sub">14-point deterministic fit</span>
-                </Card>
-
-                <Card className="metric-pod">
-                  <span className="pod-label">ATS Simulation Score</span>
-                  <div className="pod-value text-emerald">{currentAtsScore}%</div>
-                  <span className="pod-sub">{tailoredResume ? 'Tailored Resume (v1)' : 'Master Profile ATS'}</span>
-                </Card>
-
-                <Card className="metric-pod">
-                  <span className="pod-label">Application Mode</span>
-                  <div className="pod-value">
-                    <ApplicationModeBadge mode={effectiveMode} isCodewalla={isCodewalla} size="sm" />
-                  </div>
-                  <span className="pod-sub">{effectiveMode === 'demo' ? 'Local Pilot Mama Sandbox' : 'External Career Portal'}</span>
-                </Card>
-              </div>
-
-              {/* Application Details Summary */}
-              <Card className="readiness-summary-card">
-                <h4 className="section-title">Application Readiness Verification</h4>
-                <div className="summary-fields-list">
-                  <div className="summary-row">
-                    <span className="row-key">Target Company:</span>
-                    <span className="row-val font-bold">{job?.company}</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="row-key">Role Title:</span>
-                    <span className="row-val">{job?.role}</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="row-key">Location:</span>
-                    <span className="row-val"><MapPin size={13} style={{ display: 'inline', marginRight: '4px' }} />{job?.location}</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="row-key">Experience Requirement:</span>
-                    <span className="row-val">{job?.experienceRequired} (Candidate: {candidate?.yearsOfExperience} yrs)</span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="row-key">Selected Resume:</span>
-                    <span className="row-val text-emerald font-bold">
-                      {tailoredResume ? `${tailoredResume.versionName} (Tailored)` : 'Master Profile Resume'}
-                    </span>
-                  </div>
-                  <div className="summary-row">
-                    <span className="row-key">Identified Skill Gaps:</span>
-                    <span className="row-val">
-                      {skillGaps.length > 0 ? skillGaps.slice(0, 3).join(', ') : 'None detected'}
-                    </span>
-                  </div>
-                </div>
-
-                {readinessErrors.length > 0 && (
-                  <div className="readiness-errors-box">
-                    <AlertTriangle size={16} />
-                    <div>
-                      <strong>Cannot continue yet:</strong> Please update profile with required fields: {readinessErrors.join(', ')}
-                    </div>
-                  </div>
-                )}
-              </Card>
-
-              {/* Action Hierarchy */}
-              <div className="modal-actions-bar">
-                <Button variant="secondary" onClick={onClose}>
-                  Cancel
-                </Button>
-                <div className="action-right-group">
-                  <Button
-                    variant="outline"
-                    icon={<RotateCcw size={14} />}
-                    loading={isCheckingAts}
-                    onClick={handleRunAtsCheck}
-                  >
-                    Run ATS Check
-                  </Button>
-                  <Button
-                    variant="primary"
-                    icon={<ArrowRight size={16} />}
-                    disabled={readinessErrors.length > 0}
-                    onClick={() => setCurrentStep('selection')}
-                  >
-                    Continue to Resume Selection
-                  </Button>
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* STEP 2: RESUME SELECTION */}
           {currentStep === 'selection' && (
@@ -538,7 +714,12 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                 <Button variant="secondary" icon={<ArrowLeft size={14} />} onClick={() => setCurrentStep('readiness')}>
                   Back
                 </Button>
-                <Button variant="primary" icon={<ArrowRight size={14} />} onClick={() => setCurrentStep('preview')}>
+                <Button
+                  variant="primary"
+                  icon={<ArrowRight size={14} />}
+                  disabled={!isAtsPassed}
+                  onClick={() => setCurrentStep('preview')}
+                >
                   Continue to Application Form
                 </Button>
               </div>
@@ -663,6 +844,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                     variant="primary"
                     icon={<Send size={16} />}
                     loading={isSubmitting}
+                    disabled={!isAtsPassed}
                     onClick={handleSubmitDemoApplication}
                   >
                     Submit Demo Application
@@ -672,6 +854,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                     variant="primary"
                     icon={<Send size={16} />}
                     loading={isSubmitting}
+                    disabled={!isAtsPassed}
                     onClick={handleStartExternalApplication}
                   >
                     Start Application
@@ -814,6 +997,8 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                 )}
               </div>
             </div>
+          )}
+          </>
           )}
         </div>
       </div>
