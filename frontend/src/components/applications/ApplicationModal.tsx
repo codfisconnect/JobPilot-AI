@@ -4,6 +4,7 @@ import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
 import { ApplicationModeBadge } from '../common/ApplicationModeBadge';
 import { api } from '../../api/index';
+import { apiClient } from '../../api/client';
 import {
   JobDescription,
   CandidateProfile,
@@ -204,6 +205,18 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       const resumeVerId = selectedResumeType === 'tailored' ? (tailoredResume?.id || '') : '';
       const resumeVerName = selectedResumeType === 'tailored' ? (tailoredResume?.versionName || 'Tailored_Resume_v1') : 'Master_Profile';
 
+      // Call canonical backend Application Agent start API
+      let autoResult: any = null;
+      try {
+        autoResult = await apiClient.startApplication({
+          jobId: job.id,
+          resumeVersionId: resumeVerId || undefined,
+          autoApply: false
+        });
+      } catch (autoErr: any) {
+        console.warn('Backend automation endpoint notice:', autoErr.message);
+      }
+
       const appData: Partial<ApplicationRecord> = {
         candidateId: candidate.id,
         jobId: job.id,
@@ -213,18 +226,24 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
         applicationMode: 'external',
         jobUrl: job.sourceUrl || '',
         applicationUrl: job.applicationUrl || job.sourceUrl || '',
-        matchScore,
-        atsScore: currentAtsScore,
+        matchScore: autoResult?.jobMatchScore || matchScore,
+        atsScore: autoResult?.atsCompatibilityScore || currentAtsScore,
         resumeVersionId: resumeVerId,
         resumeVersionName: resumeVerName,
-        status: 'APPLICATION_STARTED',
+        status: (autoResult?.currentState === 'APPLIED' ? 'APPLIED' : 'APPLICATION_STARTED') as any,
         appliedAt: now,
-        notes: `External career portal opened at ${job.applicationUrl || job.sourceUrl}. Application in progress.`,
+        notes: `Application Agent initialized for ${job.company} (${autoResult?.job?.platform || 'Workday'}). Current state: ${autoResult?.currentState || 'PREPARED'}.`,
         skillGaps,
         coverLetter: formFields.coverLetter,
-        timeline: [
-          { timestamp: now, stage: 'External Application Started', description: `Redirected to configured career portal URL.` }
-        ]
+        timeline: autoResult?.timeline?.length
+          ? autoResult.timeline.map((t: any) => ({
+              timestamp: t.timestamp,
+              stage: t.step,
+              description: t.message
+            }))
+          : [
+              { timestamp: now, stage: 'Application Agent Started', description: `Automated preparation orchestrated within Pilot Mama.` }
+            ]
       };
 
       const res = await api.saveApplication(appData);
@@ -233,7 +252,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
 
       setCurrentStep('success');
     } catch (err: any) {
-      alert(`External navigation failed: ${err.message}`);
+      alert(`Application flow error: ${err.message}`);
     } finally {
       setIsSubmitting(false);
     }

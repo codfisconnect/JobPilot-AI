@@ -567,6 +567,17 @@ export class ApiClient {
     return this.request<any>('/applications/stats');
   }
 
+  async startApplication(params: { jobId: string; resumeVersionId?: string; autoApply?: boolean }): Promise<any> {
+    return this.request<any>('/applications/start', {
+      method: 'POST',
+      body: JSON.stringify(params)
+    });
+  }
+
+  async getApplicationTaskStatus(taskId: string): Promise<any> {
+    return this.request<any>(`/applications/tasks/${taskId}`);
+  }
+
   async listSavedJobs(): Promise<any[]> {
     return this.request<any[]>('/saved-jobs');
   }

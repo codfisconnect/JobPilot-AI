@@ -272,4 +272,42 @@ export class ApplicationController {
       next(err);
     }
   }
+
+  // POST /api/v1/applications/start
+  public static async startApplication(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const { jobId, resumeVersionId, autoApply } = req.body;
+      if (!jobId) {
+        res.status(400).json({ success: false, message: 'jobId is required to start application automation' });
+        return;
+      }
+      const { ApplicationAgentService } = await import('./applicationAgent.service.js');
+      const result = await ApplicationAgentService.startApplicationFlow(userId, {
+        jobId,
+        resumeVersionId,
+        autoApply
+      });
+      res.json(result);
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // GET /api/v1/applications/tasks/:taskId
+  public static async getTaskStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const taskId = Array.isArray(req.params.taskId) ? req.params.taskId[0] : req.params.taskId;
+      const { ApplicationAgentService } = await import('./applicationAgent.service.js');
+      const task = ApplicationAgentService.getTaskStatus(taskId);
+      if (!task) {
+        res.status(404).json({ success: false, message: 'Application automation task not found' });
+        return;
+      }
+      res.json({ success: true, data: task });
+    } catch (err) {
+      next(err);
+    }
+  }
 }
+
