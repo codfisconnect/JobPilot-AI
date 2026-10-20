@@ -108,9 +108,10 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   }, [isOpen, job?.id, candidate?.id]);
 
   const checkExistingApplication = async () => {
+    if (!candidate?.id || !job?.id) return;
     try {
       const existing = await api.getApplications(candidate.id);
-      const dup = existing.find(a => a.jobId === job.id);
+      const dup = (existing || []).find(a => a && a.jobId === job.id);
       if (dup) {
         setDuplicateWarning(dup);
       }
@@ -135,6 +136,10 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   const skillGaps = matchAnalysis?.atsAnalysis?.keywords?.red || [];
 
   const handleRunAtsCheck = async () => {
+    if (!candidate?.id || !job?.id) {
+      alert('Unable to run ATS check: Candidate profile or job data is incomplete.');
+      return;
+    }
     try {
       setIsCheckingAts(true);
       const res = await api.analyzeMatch(candidate.id, job.id);
@@ -208,17 +213,18 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       // Call canonical backend Application Agent start API
       let autoResult: any = null;
       try {
-        autoResult = await apiClient.startApplication({
+        const rawRes = await apiClient.startApplication({
           jobId: job.id,
           resumeVersionId: resumeVerId || undefined,
           autoApply: false
         });
+        autoResult = rawRes?.data || rawRes;
       } catch (autoErr: any) {
         console.warn('Backend automation endpoint notice:', autoErr.message);
       }
 
       const appData: Partial<ApplicationRecord> = {
-        candidateId: candidate.id,
+        candidateId: candidate?.id || 'candidate_me',
         jobId: job.id,
         company: job.company,
         role: job.role,
