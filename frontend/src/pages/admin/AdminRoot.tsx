@@ -89,10 +89,11 @@ export const AdminRoot: React.FC<AdminRootProps> = ({ onExitAdmin, initialSectio
       {activeSection === 'dashboard' && (
         <AdminDashboardOverview onNavigateSection={sec => navigateToSection(sec)} />
       )}
-      {(activeSection === 'job-sources' || activeSection === 'job_sources') && (
+      {(activeSection === 'job-sources' || activeSection === 'job_sources' || activeSection === 'job-sources-bulk') && (
         <AdminJobSources
           onViewJobs={compName => navigateToSection('jobs', { company: compName })}
           preselectedSourceId={selectedSourceId}
+          initialShowBulk={activeSection === 'job-sources-bulk'}
         />
       )}
       {activeSection === 'candidates' && <AdminCandidates />}

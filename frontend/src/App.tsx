@@ -180,7 +180,9 @@ export const App: React.FC = () => {
     // Extract section from /admin/:section if present
     const path = window.location.pathname.toLowerCase().replace(/\/$/, '');
     let initialSection = 'dashboard';
-    if (path.startsWith('/admin/')) {
+    if (path === '/admin/job-sources/bulk' || path === '/admin/job_sources/bulk') {
+      initialSection = 'job-sources-bulk';
+    } else if (path.startsWith('/admin/')) {
       const sub = path.replace('/admin/', '');
       if (['job-sources', 'job_sources', 'candidates', 'jobs', 'applications', 'employers', 'payments', 'system', 'health'].includes(sub)) {
         initialSection = sub === 'system' ? 'health' : (sub === 'job_sources' ? 'job-sources' : sub);

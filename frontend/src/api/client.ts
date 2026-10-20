@@ -982,6 +982,46 @@ export class ApiClient {
   async getAdminJobDetail(id: string): Promise<any> {
     return this.request<any>(`/admin/jobs/${id}`);
   }
+
+  // Bulk Job Sources Management
+  async validateBulkJobSources(data: { urls: string[]; companyHints?: Record<string, string> }): Promise<any> {
+    return this.request<any>('/admin/job-sources/bulk/validate', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async startBulkJobSources(data: { urls: string[]; companyHints?: Record<string, string>; maxConcurrency?: number }): Promise<any> {
+    return this.request<any>('/admin/job-sources/bulk', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async getBulkJobSourcesHistory(page: number = 1, limit: number = 20): Promise<any> {
+    return this.request<any>(`/admin/job-sources/bulk?page=${page}&limit=${limit}`);
+  }
+
+  async getBulkJobSourceJob(id: string): Promise<any> {
+    return this.request<any>(`/admin/job-sources/bulk/${id}`);
+  }
+
+  async getBulkJobSourceItems(id: string, status?: string): Promise<any> {
+    const query = status ? `?status=${encodeURIComponent(status)}` : '';
+    return this.request<any>(`/admin/job-sources/bulk/${id}/items${query}`);
+  }
+
+  async cancelBulkJobSourceJob(id: string): Promise<any> {
+    return this.request<any>(`/admin/job-sources/bulk/${id}/cancel`, {
+      method: 'POST'
+    });
+  }
+
+  async retryBulkJobSourceItem(jobId: string, itemId: string): Promise<any> {
+    return this.request<any>(`/admin/job-sources/bulk/${jobId}/items/${itemId}/retry`, {
+      method: 'POST'
+    });
+  }
 }
 
 export const apiClient = new ApiClient();

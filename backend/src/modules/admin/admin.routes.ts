@@ -4,6 +4,7 @@ import { authenticateJwt, requireRole } from '../../middleware/auth.middleware.j
 import { UserRole } from '@prisma/client';
 
 import { AdminJobSourcesController } from '../../controllers/v1/adminJobSources.controller.js';
+import { AdminBulkJobSourcesController } from '../../controllers/v1/adminBulkJobSources.controller.js';
 
 export const adminRouter = Router();
 
@@ -19,6 +20,15 @@ adminRouter.get('/job-sources/:id', AdminJobSourcesController.getSourceById);
 adminRouter.post('/job-sources/:id/sync', AdminJobSourcesController.syncSource);
 adminRouter.patch('/job-sources/:id', AdminJobSourcesController.updateSource);
 adminRouter.delete('/job-sources/:id', AdminJobSourcesController.deleteSource);
+
+// Bulk Job Sources Endpoints
+adminRouter.post('/job-sources/bulk/validate', AdminBulkJobSourcesController.validateBatch);
+adminRouter.post('/job-sources/bulk', AdminBulkJobSourcesController.startBulkImport);
+adminRouter.get('/job-sources/bulk', AdminBulkJobSourcesController.listBulkImports);
+adminRouter.get('/job-sources/bulk/:id', AdminBulkJobSourcesController.getBulkImportById);
+adminRouter.get('/job-sources/bulk/:id/items', AdminBulkJobSourcesController.getBulkImportItems);
+adminRouter.post('/job-sources/bulk/:id/cancel', AdminBulkJobSourcesController.cancelBulkImport);
+adminRouter.post('/job-sources/bulk/:id/items/:itemId/retry', AdminBulkJobSourcesController.retrySourceItem);
 
 // 3. Admin API Endpoints
 adminRouter.get('/dashboard', (req, res, next) => adminController.getDashboard(req, res, next));
