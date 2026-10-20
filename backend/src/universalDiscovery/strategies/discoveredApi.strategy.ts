@@ -6,6 +6,7 @@ import { CompletenessEstimatorService } from '../completenessEstimator.service.j
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
 import { JobSourceDiscoveryService } from '../../services/jobSourceDiscovery.service.js';
+import { safeParseJson } from '../../utils/safeJson.js';
 
 export class DiscoveredApiStrategy implements IJobSourceStrategy {
   public readonly name = 'DISCOVERED_API_STRATEGY';
@@ -90,7 +91,9 @@ export class DiscoveredApiStrategy implements IJobSourceStrategy {
         try {
           const res = await safeFetchUrl(targetProbeUrl, { timeoutMs: 12000 });
           if (res.status === 200 && res.text.trim()) {
-            const payload = JSON.parse(res.text);
+            const jsonResult = safeParseJson(res.text, res.contentType || res.headers?.['content-type']);
+            if (!jsonResult.success || !jsonResult.data) continue;
+            const payload = jsonResult.data;
             const { jobs, rootPath } = FieldMapperService.extractJobsArray(payload);
             const scoreCheck = JobRecordScoringService.scoreCandidateArray(jobs);
 
@@ -115,8 +118,9 @@ export class DiscoveredApiStrategy implements IJobSourceStrategy {
                     paginatedUrlObj.searchParams.set('start', String(currentStart));
                     const nextRes = await safeFetchUrl(paginatedUrlObj.toString(), { timeoutMs: 10000 });
                     if (nextRes.status !== 200 || !nextRes.text.trim()) break;
-                    const nextPayload = JSON.parse(nextRes.text);
-                    const { jobs: nextJobs } = FieldMapperService.extractJobsArray(nextPayload);
+                    const nextJsonResult = safeParseJson(nextRes.text, nextRes.contentType || nextRes.headers?.['content-type']);
+                    if (!nextJsonResult.success || !nextJsonResult.data) break;
+                    const { jobs: nextJobs } = FieldMapperService.extractJobsArray(nextJsonResult.data);
                     if (!nextJobs || nextJobs.length === 0) break;
                     allDiscoveredDocs.push(...nextJobs);
                     currentStart += nextJobs.length;

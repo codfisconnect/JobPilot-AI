@@ -3,6 +3,7 @@ import { safeFetchUrl } from '../../utils/safeFetch.js';
 import { CompletenessEstimatorService } from '../completenessEstimator.service.js';
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
+import { safeParseJson } from '../../utils/safeJson.js';
 
 export class LeverAdapter implements IJobSourceStrategy {
   public readonly name = 'LEVER_ADAPTER';
@@ -36,8 +37,13 @@ export class LeverAdapter implements IJobSourceStrategy {
 
     try {
       const res = await safeFetchUrl(endpoint, { timeoutMs: 10000 });
-      if (res.status === 200) {
-        const rawJobs = JSON.parse(res.text);
+      if (res.status === 200 && res.text) {
+        const jsonResult = safeParseJson(res.text, res.contentType || res.headers?.['content-type']);
+        if (!jsonResult.success || !jsonResult.data) {
+          logger.warn(`[LeverAdapter] Non-JSON payload received`);
+          return { matched: false } as any;
+        }
+        const rawJobs = jsonResult.data;
         if (Array.isArray(rawJobs)) {
           expectedCount = rawJobs.length;
           for (const item of rawJobs) {

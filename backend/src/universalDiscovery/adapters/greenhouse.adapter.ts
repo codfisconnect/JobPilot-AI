@@ -3,6 +3,7 @@ import { safeFetchUrl } from '../../utils/safeFetch.js';
 import { CompletenessEstimatorService } from '../completenessEstimator.service.js';
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
+import { safeParseJson } from '../../utils/safeJson.js';
 import * as cheerio from 'cheerio';
 
 export class GreenhouseAdapter implements IJobSourceStrategy {
@@ -82,8 +83,13 @@ export class GreenhouseAdapter implements IJobSourceStrategy {
 
     try {
       const res = await safeFetchUrl(endpoint, { timeoutMs: 10000 });
-      if (res.status === 200) {
-        const payload = JSON.parse(res.text);
+      if (res.status === 200 && res.text) {
+        const jsonResult = safeParseJson(res.text, res.contentType || res.headers?.['content-type']);
+        if (!jsonResult.success || !jsonResult.data) {
+          logger.warn(`[GreenhouseAdapter] Non-JSON response received`);
+          return { matched: false } as any;
+        }
+        const payload = jsonResult.data;
         const rawJobs = payload.jobs || [];
         expectedCount = rawJobs.length;
 

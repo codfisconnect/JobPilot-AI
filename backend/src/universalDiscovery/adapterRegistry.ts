@@ -17,6 +17,7 @@ import { DiscoveredApiStrategy } from './strategies/discoveredApi.strategy.js';
 import { CommonRestEndpointsStrategy } from './strategies/commonRestEndpoints.strategy.js';
 import { XmlFeedStrategy } from './strategies/xmlFeed.strategy.js';
 import { HtmlRepeatedStructureStrategy } from './strategies/htmlRepeatedStructure.strategy.js';
+import { BrowserRenderedStrategy } from './strategies/browserRendered.strategy.js';
 
 export class AdapterRegistry {
   private static strategies: IJobSourceStrategy[] = [
@@ -42,7 +43,10 @@ export class AdapterRegistry {
     new XmlFeedStrategy(),
 
     // Generic HTML Strategies (priorities 40+)
-    new HtmlRepeatedStructureStrategy()
+    new HtmlRepeatedStructureStrategy(),
+
+    // Generic Browser Rendered Fallback (priorities 45+)
+    new BrowserRenderedStrategy()
   ];
 
   /**

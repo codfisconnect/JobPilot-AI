@@ -3,6 +3,7 @@ import { safeFetchUrl } from '../../utils/safeFetch.js';
 import { CompletenessEstimatorService } from '../completenessEstimator.service.js';
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
+import { safeParseJson } from '../../utils/safeJson.js';
 
 export class InfosysAdapter implements IJobSourceStrategy {
   public readonly name = 'INFOSYS_ADAPTER';
@@ -47,7 +48,12 @@ export class InfosysAdapter implements IJobSourceStrategy {
       });
 
       if (res.status === 200 && res.text.trim()) {
-        const rawJobs = JSON.parse(res.text);
+        const jsonResult = safeParseJson(res.text, res.contentType || res.headers?.['content-type']);
+        if (!jsonResult.success || !jsonResult.data) {
+          logger.warn(`[InfosysAdapter] Non-JSON payload received`);
+          return { matched: false } as any;
+        }
+        const rawJobs = jsonResult.data;
         if (Array.isArray(rawJobs)) {
           expectedCount = rawJobs.length;
           logger.info(`[InfosysAdapter] Ingesting ${rawJobs.length} global positions from Infosys gateway`);

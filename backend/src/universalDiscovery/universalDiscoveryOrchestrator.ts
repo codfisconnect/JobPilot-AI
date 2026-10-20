@@ -61,10 +61,13 @@ export class UniversalDiscoveryOrchestrator {
         logger.info(`[UniversalDiscoveryOrchestrator] Executing strategy: ${strat.name} (Priority: ${strat.priority})`);
         const result = await strat.execute(context);
         if (result && result.matched) {
-          if (result.jobs.length > 0 || result.sourceType === 'SAP_SUCCESSFACTORS' || result.sourceType === 'ORACLE_RECRUITING') {
+          if (result.jobs.length > 0) {
             logger.info(`[UniversalDiscoveryOrchestrator] Strategy ${strat.name} succeeded with ${result.jobs.length} jobs`);
             bestResult = result;
-            break; // Stop at first successful high-confidence strategy
+            break; // Stop at first strategy that discovered jobs
+          } else if (!bestResult) {
+            // Keep as fallback candidate if no other strategy discovers jobs
+            bestResult = result;
           }
         }
       } catch (stratErr: any) {

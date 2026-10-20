@@ -3,6 +3,7 @@ import { safeFetchUrl } from '../../utils/safeFetch.js';
 import { CompletenessEstimatorService } from '../completenessEstimator.service.js';
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
+import { safeParseJson } from '../../utils/safeJson.js';
 import * as cheerio from 'cheerio';
 
 export class WorkdayAdapter implements IJobSourceStrategy {
@@ -61,8 +62,13 @@ export class WorkdayAdapter implements IJobSourceStrategy {
         timeoutMs: 8000
       });
 
-      if (res.status === 200) {
-        const payload = JSON.parse(res.text);
+      if (res.status === 200 && res.text) {
+        const jsonResult = safeParseJson(res.text, res.contentType || res.headers?.['content-type']);
+        if (!jsonResult.success || !jsonResult.data) {
+          logger.warn(`[WorkdayAdapter] Non-JSON payload received`);
+          return { matched: false } as any;
+        }
+        const payload = jsonResult.data;
         expectedCount = payload.total !== undefined ? payload.total : null;
         const postings = payload.jobPostings || [];
         paginationSupported = true;

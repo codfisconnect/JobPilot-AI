@@ -6,6 +6,7 @@ import { JobRecordScoringService } from '../jobRecordScoring.service.js';
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
 import { JobSourceDiscoveryService } from '../../services/jobSourceDiscovery.service.js';
+import { safeParseJson } from '../../utils/safeJson.js';
 
 export class DirectJsonStrategy implements IJobSourceStrategy {
   public readonly name = 'DIRECT_JSON_STRATEGY';
@@ -22,12 +23,11 @@ export class DirectJsonStrategy implements IJobSourceStrategy {
 
   public async execute(context: StrategyContext): Promise<StrategyExecutionResult> {
     const { normalizedUrl, initialHtml } = context;
-    let payload: any;
-    try {
-      payload = JSON.parse(initialHtml || '{}');
-    } catch {
+    const jsonResult = safeParseJson(initialHtml, context.initialResponseHeaders?.['content-type']);
+    if (!jsonResult.success || !jsonResult.data) {
       return { matched: false } as any;
     }
+    const payload = jsonResult.data;
 
     const { jobs, rootPath } = FieldMapperService.extractJobsArray(payload);
     const scoreCheck = JobRecordScoringService.scoreCandidateArray(jobs);
