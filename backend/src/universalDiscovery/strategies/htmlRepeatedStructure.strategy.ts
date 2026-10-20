@@ -37,6 +37,7 @@ export class HtmlRepeatedStructureStrategy implements IJobSourceStrategy {
           responsibilities: j.responsibilities,
           requirements: j.requirements,
           skills: j.skills,
+          openingCount: j.openingCount,
           applicationUrl: j.applicationUrl || j.detailUrl,
           postedAt: j.postedAt ? new Date(j.postedAt) : undefined,
           rawPayload: j

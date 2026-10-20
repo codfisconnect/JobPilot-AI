@@ -71,12 +71,15 @@ export class UniversalDiscoveryOrchestrator {
     }
 
     if (!bestResult || bestResult.jobs.length === 0) {
-      // Diagnostic message based on fingerprint
+      // Diagnostic message based on fingerprint and content presence
       if (fingerprint.atsVendor) {
         throw new Error(`${fingerprint.atsVendor} careers portal detected, but its public job data endpoint could not be resolved.`);
       }
       if (fingerprint.isSinglePageApp) {
         throw new Error('Jobs are rendered dynamically, but public network discovery did not expose a readable job source.');
+      }
+      if (initialHtml && initialHtml.length > 500) {
+        throw new Error('Page content detected, but no reliable job records or application links could be identified.');
       }
       throw new Error('No public job source was discoverable from this page.');
     }
@@ -96,7 +99,7 @@ export class UniversalDiscoveryOrchestrator {
       sourceType: bestResult.sourceType,
       atsType: bestResult.atsType,
       strategy: bestResult.strategyName,
-      sourceUrl: normalized.normalizedUrl,
+      sourceUrl: normalized.canonicalSourceUrl,
       jobsEndpoint: bestResult.jobsEndpoint,
       httpMethod: bestResult.httpMethod,
       companyName: bestResult.companyName,

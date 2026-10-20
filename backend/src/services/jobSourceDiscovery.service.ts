@@ -99,8 +99,13 @@ export class JobSourceDiscoveryService {
 
         // 3. Document <title>
         const titleText = $('title').text().trim();
-        if (titleText && (!companyName || companyName === domain.split('.')[0])) {
-          companyName = this.cleanCompanyCandidate(titleText, companyName);
+        if (titleText) {
+          const cleanedFromTitle = this.cleanCompanyCandidate(titleText, companyName);
+          if (cleanedFromTitle && cleanedFromTitle !== titleText) {
+            companyName = cleanedFromTitle;
+          } else if (!ogSiteName && (!companyName || companyName === domain.split('.')[0])) {
+            companyName = cleanedFromTitle || companyName;
+          }
         }
       } catch (err: any) {
         logger.warn(`[JobSourceDiscoveryService] HTML metadata extraction error: ${err.message}`);
@@ -141,6 +146,15 @@ export class JobSourceDiscoveryService {
         continue;
       }
       if (part.length >= 2 && part.length <= 40) {
+        // If part contains underscores or hyphens with no spaces (e.g. "raintech_software" or "acme-solutions")
+        // clean into Title Case words: "Raintech Software"
+        if ((part.includes('_') || part.includes('-')) && !part.includes(' ')) {
+          return part
+            .split(/[-_]/)
+            .filter(Boolean)
+            .map(w => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+            .join(' ');
+        }
         return part;
       }
     }
@@ -486,31 +500,66 @@ export class JobSourceDiscoveryService {
         sourceType: discovery.detectedType
       });
 
-      // 3. Persist JobSourceConfiguration
-      const config = await prisma.jobSourceConfiguration.create({
-        data: {
+      // 3. Persist or Update JobSourceConfiguration
+      let config = await prisma.jobSourceConfiguration.findFirst({
+        where: {
           companyId: company.id,
-          sourceUrl: discovery.sourceUrl,
-          jobsEndpoint: discovery.jobsEndpoint,
-          sourceType: discovery.detectedType,
-          parserType: 'AUTO',
-          httpMethod: 'GET',
-          mappingConfig: discovery.mappingConfig as any,
-          discoveryMetadata: {
-            discoveredAt: new Date().toISOString(),
-            jobCount: discovery.jobCount,
-            expectedJobCount: discovery.expectedJobCount ?? null,
-            completeness: discovery.completeness ?? 'UNKNOWN',
-            detectedType: discovery.detectedType,
-            atsType: discovery.atsType ?? null,
-            strategy: discovery.strategy ?? null,
-            paginationSupported: discovery.paginationSupported ?? false,
-            paginationConfig: discovery.paginationConfig ?? null
-          },
-          lastDiscoveryAt: new Date(),
-          healthStatus: discovery.completeness === 'PARTIAL' ? SourceHealth.DEGRADED : SourceHealth.HEALTHY
+          OR: [
+            { sourceUrl: discovery.sourceUrl },
+            { jobsEndpoint: discovery.jobsEndpoint }
+          ]
         }
       });
+
+      if (config) {
+        config = await prisma.jobSourceConfiguration.update({
+          where: { id: config.id },
+          data: {
+            sourceUrl: discovery.sourceUrl,
+            jobsEndpoint: discovery.jobsEndpoint,
+            sourceType: discovery.detectedType,
+            mappingConfig: discovery.mappingConfig as any,
+            discoveryMetadata: {
+              discoveredAt: new Date().toISOString(),
+              jobCount: discovery.jobCount,
+              expectedJobCount: discovery.expectedJobCount ?? null,
+              completeness: discovery.completeness ?? 'UNKNOWN',
+              detectedType: discovery.detectedType,
+              atsType: discovery.atsType ?? null,
+              strategy: discovery.strategy ?? null,
+              paginationSupported: discovery.paginationSupported ?? false,
+              paginationConfig: discovery.paginationConfig ?? null
+            },
+            lastDiscoveryAt: new Date(),
+            healthStatus: discovery.completeness === 'PARTIAL' ? SourceHealth.DEGRADED : SourceHealth.HEALTHY
+          }
+        });
+      } else {
+        config = await prisma.jobSourceConfiguration.create({
+          data: {
+            companyId: company.id,
+            sourceUrl: discovery.sourceUrl,
+            jobsEndpoint: discovery.jobsEndpoint,
+            sourceType: discovery.detectedType,
+            parserType: 'AUTO',
+            httpMethod: 'GET',
+            mappingConfig: discovery.mappingConfig as any,
+            discoveryMetadata: {
+              discoveredAt: new Date().toISOString(),
+              jobCount: discovery.jobCount,
+              expectedJobCount: discovery.expectedJobCount ?? null,
+              completeness: discovery.completeness ?? 'UNKNOWN',
+              detectedType: discovery.detectedType,
+              atsType: discovery.atsType ?? null,
+              strategy: discovery.strategy ?? null,
+              paginationSupported: discovery.paginationSupported ?? false,
+              paginationConfig: discovery.paginationConfig ?? null
+            },
+            lastDiscoveryAt: new Date(),
+            healthStatus: discovery.completeness === 'PARTIAL' ? SourceHealth.DEGRADED : SourceHealth.HEALTHY
+          }
+        });
+      }
 
       // 4. Run immediate first sync
       const syncOutcome = await this.syncDiscoveredSource(config.id, discovery);
