@@ -941,6 +941,46 @@ export class ApiClient {
     return json;
   }
 
+  async getDiscoveryTasks(): Promise<{ current: any | null; queued: any[]; recent: any[] }> {
+    return this.request<{ current: any | null; queued: any[]; recent: any[] }>('/admin/job-sources/discovery-tasks');
+  }
+
+  async cancelDiscoveryTask(taskId: string): Promise<any> {
+    const headers = new Headers();
+    headers.set('Content-Type', 'application/json');
+    if (this.accessToken) {
+      headers.set('Authorization', `Bearer ${this.accessToken}`);
+    }
+    const res = await fetch(`${API_V1_BASE}/admin/job-sources/discovery-tasks/${taskId}/cancel`, {
+      method: 'POST',
+      headers,
+      credentials: 'include'
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.success === false) {
+      throw new Error(json.error || json.message || 'Failed to cancel discovery task');
+    }
+    return json;
+  }
+
+  async retryDiscoveryTask(taskId: string): Promise<any> {
+    const headers = new Headers();
+    headers.set('Content-Type', 'application/json');
+    if (this.accessToken) {
+      headers.set('Authorization', `Bearer ${this.accessToken}`);
+    }
+    const res = await fetch(`${API_V1_BASE}/admin/job-sources/discovery-tasks/${taskId}/retry`, {
+      method: 'POST',
+      headers,
+      credentials: 'include'
+    });
+    const json = await res.json().catch(() => ({}));
+    if (!res.ok || json.success === false) {
+      throw new Error(json.error || json.message || 'Failed to retry discovery task');
+    }
+    return json;
+  }
+
   async getAdminJobSources(): Promise<any[]> {
     return this.request<any[]>('/admin/job-sources');
   }
