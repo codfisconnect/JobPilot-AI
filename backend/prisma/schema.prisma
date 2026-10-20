@@ -1293,3 +1293,87 @@ model AgentAction {
   @@map("agent_actions")
 }
 
+enum BulkImportStatus {
+  QUEUED
+  RUNNING
+  COMPLETED
+  PARTIAL
+  FAILED
+  CANCELLED
+}
+
+enum BulkSourceItemStatus {
+  QUEUED
+  VALIDATING
+  DISCOVERING
+  PAGINATING
+  NORMALIZING
+  PERSISTING
+  COMPLETED
+  PARTIAL
+  FAILED
+  ALREADY_CONNECTED
+  SKIPPED
+  CANCELLED
+}
+
+model BulkSourceImport {
+  id                   String            @id @default(uuid())
+  createdBy            String?           @map("created_by")
+  status               BulkImportStatus  @default(QUEUED)
+  totalSources         Int               @default(0) @map("total_sources")
+  queuedSources        Int               @default(0) @map("queued_sources")
+  runningSources       Int               @default(0) @map("running_sources")
+  completedSources     Int               @default(0) @map("completed_sources")
+  partialSources       Int               @default(0) @map("partial_sources")
+  failedSources        Int               @default(0) @map("failed_sources")
+  alreadyConnectedSources Int            @default(0) @map("already_connected_sources")
+  skippedSources       Int               @default(0) @map("skipped_sources")
+  totalJobsDiscovered  Int               @default(0) @map("total_jobs_discovered")
+  totalJobsCreated     Int               @default(0) @map("total_jobs_created")
+  totalJobsUpdated     Int               @default(0) @map("total_jobs_updated")
+  createdAt            DateTime          @default(now()) @map("created_at")
+  updatedAt            DateTime          @updatedAt @map("updated_at")
+  completedAt          DateTime?         @map("completed_at")
+
+  items                BulkSourceItem[]
+
+  @@map("bulk_source_imports")
+}
+
+model BulkSourceItem {
+  id                    String                @id @default(uuid())
+  bulkJobId             String                @map("bulk_job_id")
+  sourceUrl             String                @map("source_url")
+  normalizedUrl         String?               @map("normalized_url")
+  companyName           String?               @map("company_name")
+  companyHint           String?               @map("company_hint")
+  status                BulkSourceItemStatus  @default(QUEUED)
+  sourceConfigurationId String?               @map("source_configuration_id")
+  discoveryStrategy     String?               @map("discovery_strategy")
+  sourceType            String?               @map("source_type")
+  jobsDiscovered        Int                   @default(0) @map("jobs_discovered")
+  jobsCreated           Int                   @default(0) @map("jobs_created")
+  jobsUpdated           Int                   @default(0) @map("jobs_updated")
+  jobsExpired           Int                   @default(0) @map("jobs_expired")
+  sourceTotal           Int?                  @map("source_total")
+  pagesFetched          Int                   @default(0) @map("pages_fetched")
+  pagesFailed           Int                   @default(0) @map("pages_failed")
+  completeness          String?               @map("completeness")
+  healthStatus          String?               @map("health_status")
+  errorCode             String?               @map("error_code")
+  errorMessage          String?               @map("error_message")
+  startedAt             DateTime?             @map("started_at")
+  completedAt           DateTime?             @map("completed_at")
+  createdAt             DateTime              @default(now()) @map("created_at")
+  updatedAt             DateTime              @updatedAt @map("updated_at")
+
+  bulkImport            BulkSourceImport      @relation(fields: [bulkJobId], references: [id], onDelete: Cascade)
+
+  @@index([bulkJobId])
+  @@index([sourceUrl])
+  @@index([status])
+  @@map("bulk_source_items")
+}
+
+

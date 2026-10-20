@@ -18,20 +18,24 @@ import {
   Check,
   Eye,
   X,
-  Code
+  Code,
+  Layers
 } from 'lucide-react';
 import './AdminPages.css';
 
 import { normalizeApiError, NormalizedError } from '../../utils/errorUtils';
+import { BulkJobSourcesPage } from './BulkJobSourcesPage';
 
 interface AdminJobSourcesProps {
   onViewJobs?: (companyName?: string) => void;
   preselectedSourceId?: string;
+  initialShowBulk?: boolean;
 }
 
-export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, preselectedSourceId }) => {
+export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, preselectedSourceId, initialShowBulk = false }) => {
   const [sources, setSources] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showBulkView, setShowBulkView] = useState(initialShowBulk);
 
   // Discovery Form State
   const [urlInput, setUrlInput] = useState('');
@@ -191,6 +195,18 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
     return `${days}d ago`;
   };
 
+  if (showBulkView) {
+    return (
+      <BulkJobSourcesPage
+        onBackToSources={() => {
+          setShowBulkView(false);
+          loadSources();
+        }}
+        onViewJobs={onViewJobs}
+      />
+    );
+  }
+
   return (
     <div className="admin-page-container">
       <div className="admin-page-header">
@@ -199,6 +215,28 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
           <p className="admin-page-desc">
             Autonomous job source onboarding. Provide any careers page URL, and Pilot Mama discovers APIs, maps fields, and ingests canonical jobs.
           </p>
+        </div>
+        <div>
+          <button
+            onClick={() => setShowBulkView(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 18px',
+              borderRadius: '8px',
+              background: 'var(--accent-primary, #6366f1)',
+              color: '#fff',
+              border: 'none',
+              fontWeight: 600,
+              fontSize: '0.9rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 6px -1px rgba(99, 102, 241, 0.2)'
+            }}
+          >
+            <Layers size={18} />
+            <span>+ Bulk Add Sources</span>
+          </button>
         </div>
       </div>
 
@@ -240,9 +278,30 @@ export const AdminJobSources: React.FC<AdminJobSourcesProps> = ({ onViewJobs, pr
 
       {/* A. Add Job Source Card */}
       <div className="admin-metric-card" style={{ padding: '24px', background: 'var(--bg-surface, #1e293b)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
-          <Radio size={20} style={{ color: 'var(--accent-primary, #6366f1)' }} />
-          <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0 }}>Add Job Source</h2>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Radio size={20} style={{ color: 'var(--accent-primary, #6366f1)' }} />
+            <h2 style={{ fontSize: '1.15rem', fontWeight: 700, margin: 0 }}>Add Job Source</h2>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowBulkView(true)}
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '6px 12px',
+              borderRadius: '6px',
+              background: 'rgba(255,255,255,0.06)',
+              border: '1px solid var(--border-subtle, #334155)',
+              color: 'var(--text-primary)',
+              fontSize: '0.85rem',
+              fontWeight: 600,
+              cursor: 'pointer'
+            }}
+          >
+            <Layers size={14} /> + Bulk Add Sources
+          </button>
         </div>
         <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary, #94a3b8)', marginBottom: '16px' }}>
           Enter any company careers or jobs URL. Pilot Mama automatically detects APIs, ATS platforms, embedded job data, HTML listings, and other public job-source structures.

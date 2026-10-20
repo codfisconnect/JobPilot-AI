@@ -24,6 +24,7 @@ async function fullE2ETest() {
     },
     include: { candidateProfile: true }
   });
+  if (!user.candidateProfile) throw new Error('candidateProfile missing');
   console.log('1. Created test candidate:', user.candidateProfile.id, user.candidateProfile.fullName);
   const token = signAccessToken({ userId: user.id, email: user.email, role: 'CANDIDATE' });
 
