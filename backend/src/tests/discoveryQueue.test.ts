@@ -4,14 +4,14 @@ import supertest from 'supertest';
 import { app } from '../server.js';
 import { prisma } from '../database/prisma.js';
 import { DiscoveryQueueService, MANUAL_DISCOVERY_BATCH_ID } from '../services/discoveryQueue.service.js';
-import { BulkSourceItemStatus } from '@prisma/client';
+import { BulkSourceItemStatus, UserRole } from '@prisma/client';
 import { signAccessToken } from '../utils/jwt.js';
 
 describe('Discovery Queue & Non-Blocking API Test Suite', () => {
   const adminPayload = {
     userId: 'admin-queue-test-id',
     email: 'admin.queue@pilotmama.com',
-    role: 'ADMIN'
+    role: UserRole.ADMIN
   };
   const adminToken = signAccessToken(adminPayload);
 

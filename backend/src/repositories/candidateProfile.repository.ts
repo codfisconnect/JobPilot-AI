@@ -11,7 +11,7 @@ import type {
 
 export class CandidateProfileRepository {
   public static async findByUserId(userId: string) {
-    return prisma.candidateProfile.findUnique({
+    let profile = await prisma.candidateProfile.findUnique({
       where: { userId },
       include: {
         preferences: true,
@@ -28,6 +28,45 @@ export class CandidateProfileRepository {
           orderBy: { uploadedAt: 'desc' },
           include: { versions: { orderBy: { versionNumber: 'desc' } } }
         }
+      }
+    });
+
+    if (!profile) {
+      const user = await prisma.user.findUnique({ where: { id: userId } });
+      if (user && user.role !== 'EMPLOYER') {
+        await this.createProfileForUser(userId);
+        profile = await prisma.candidateProfile.findUnique({
+          where: { userId },
+          include: {
+            preferences: true,
+            experiences: { orderBy: { displayOrder: 'asc' } },
+            educations: { orderBy: { startDate: 'desc' } },
+            certifications: { orderBy: { issueDate: 'desc' } },
+            projects: { orderBy: { displayOrder: 'asc' } },
+            skills: {
+              include: { skill: true },
+              orderBy: { displayOrder: 'asc' }
+            },
+            resumes: {
+              where: { status: { not: 'ARCHIVED' } },
+              orderBy: { uploadedAt: 'desc' },
+              include: { versions: { orderBy: { versionNumber: 'desc' } } }
+            }
+          }
+        });
+      }
+    }
+
+    return profile;
+  }
+
+  public static async createProfileForUser(userId: string) {
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const fullName = user?.email ? user.email.split('@')[0] : 'Candidate';
+    return prisma.candidateProfile.create({
+      data: {
+        userId,
+        fullName
       }
     });
   }

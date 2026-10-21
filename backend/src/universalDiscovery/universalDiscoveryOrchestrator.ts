@@ -117,7 +117,14 @@ export class UniversalDiscoveryOrchestrator {
       mappingConfig: bestResult.mappingConfig,
       sampleJobs: normalizedJobs.slice(0, 3),
       allDiscoveredJobs: normalizedJobs,
-      durationMs
+      durationMs,
+      rawRecords: bestResult.paginationConfig?.rawRecords || bestResult.jobs.length,
+      uniqueRecords: normalizedJobs.length,
+      duplicatesRemoved: (bestResult.paginationConfig?.duplicatesRemoved || 0) + (bestResult.jobs.length - normalizedJobs.length),
+      pagesFetched: bestResult.paginationConfig?.pagesFetched || 1,
+      pagesFailed: bestResult.paginationConfig?.pagesFailed || 0,
+      lastPageReached: bestResult.paginationConfig?.lastPageReached ?? (bestResult.expectedJobCount !== null ? normalizedJobs.length >= bestResult.expectedJobCount : false),
+      warnings: bestResult.paginationConfig?.warnings || []
     };
   }
 }
