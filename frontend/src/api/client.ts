@@ -65,7 +65,12 @@ export class ApiClient {
     if (res.status === 401 && !isRetry && endpoint !== '/auth/refresh' && endpoint !== '/auth/login') {
       try {
         await this.refresh();
-        return this.request<T>(endpoint, options, true);
+        const retryHeaders = new Headers(options.headers || {});
+        retryHeaders.set('Content-Type', 'application/json');
+        if (this.accessToken) {
+          retryHeaders.set('Authorization', `Bearer ${this.accessToken}`);
+        }
+        return this.request<T>(endpoint, { ...options, headers: retryHeaders }, true);
       } catch (refreshErr) {
         // Refresh failed; proceed to parse and throw original 401 error
       }
@@ -101,7 +106,12 @@ export class ApiClient {
     if (res.status === 401 && !isRetry) {
       try {
         await this.refresh();
-        return this.requestPaginated<T>(endpoint, options, true);
+        const retryHeaders = new Headers(options.headers || {});
+        retryHeaders.set('Content-Type', 'application/json');
+        if (this.accessToken) {
+          retryHeaders.set('Authorization', `Bearer ${this.accessToken}`);
+        }
+        return this.requestPaginated<T>(endpoint, { ...options, headers: retryHeaders }, true);
       } catch (refreshErr) {
         // Refresh failed; proceed to throw 401
       }
