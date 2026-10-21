@@ -46,6 +46,13 @@ export interface UniversalDiscoveryResult {
   sampleJobs: DiscoveredJobRaw[];
   allDiscoveredJobs: DiscoveredJobRaw[];
   durationMs: number;
+  rawRecords?: number;
+  uniqueRecords?: number;
+  duplicatesRemoved?: number;
+  pagesFetched?: number;
+  pagesFailed?: number;
+  lastPageReached?: boolean;
+  warnings?: string[];
 }
 
 export interface UniversalSyncOutcome {

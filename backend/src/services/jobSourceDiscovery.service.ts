@@ -33,6 +33,13 @@ export interface DiscoveryResult {
   mappingConfig: DiscoveredFieldMapping;
   sampleJobs: any[];
   allDiscoveredJobs?: any[];
+  rawRecords?: number;
+  uniqueRecords?: number;
+  duplicatesRemoved?: number;
+  pagesFetched?: number;
+  pagesFailed?: number;
+  lastPageReached?: boolean;
+  warnings?: string[];
 }
 
 export interface SyncOutcome {
@@ -240,7 +247,14 @@ export class JobSourceDiscoveryService {
       paginationConfig: universal.paginationConfig,
       mappingConfig: universal.mappingConfig,
       sampleJobs: universal.sampleJobs,
-      allDiscoveredJobs: universal.allDiscoveredJobs
+      allDiscoveredJobs: universal.allDiscoveredJobs,
+      rawRecords: universal.rawRecords,
+      uniqueRecords: universal.uniqueRecords,
+      duplicatesRemoved: universal.duplicatesRemoved,
+      pagesFetched: universal.pagesFetched,
+      pagesFailed: universal.pagesFailed,
+      lastPageReached: universal.lastPageReached,
+      warnings: universal.warnings
     };
   }
 

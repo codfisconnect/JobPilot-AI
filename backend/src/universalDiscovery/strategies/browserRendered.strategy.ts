@@ -41,15 +41,12 @@ export class BrowserRenderedStrategy implements IJobSourceStrategy {
 
     const result = await GenericBrowserDiscoveryService.discoverRenderedJobs(
       normalizedUrl.normalizedUrl,
-      companyName,
-      { maxPages: 5 }
+      companyName
     );
 
     if (result.jobs.length === 0) {
       return { matched: false } as any;
     }
-
-    const completeness = CompletenessEstimatorService.evaluate(result.jobs.length, result.sourceTotal);
 
     return {
       matched: true,
@@ -61,12 +58,18 @@ export class BrowserRenderedStrategy implements IJobSourceStrategy {
       officialDomain: domain,
       jobs: result.jobs,
       expectedJobCount: result.sourceTotal,
-      completeness: completeness.completeness,
+      completeness: result.completeness,
       paginationSupported: result.sourceTotal !== null && result.sourceTotal > result.jobs.length,
       paginationConfig: {
         pagesFetched: result.pagesFetched,
         pageSize: result.pageSize,
-        sourceTotal: result.sourceTotal
+        sourceTotal: result.sourceTotal,
+        rawRecords: result.rawRecords,
+        uniqueRecords: result.uniqueRecords,
+        duplicatesRemoved: result.duplicatesRemoved,
+        pagesFailed: result.pagesFailed,
+        lastPageReached: result.lastPageReached,
+        warnings: result.warnings
       },
       mappingConfig: {
         titleField: 'title',
