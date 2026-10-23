@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { apiClient } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 import { ApplicationItem, ApplicationStatus, ApplicationStats } from '../types/applications';
 import { ApplicationCard } from '../components/applications/ApplicationCard';
 import { ApplicationFilters } from '../components/applications/ApplicationFilters';
@@ -25,6 +26,7 @@ export const ApplicationsPage: React.FC<ApplicationsPageProps> = ({
   onNavigate,
   preselectedAppId
 }) => {
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [applications, setApplications] = useState<ApplicationItem[]>([]);
   const [stats, setStats] = useState<ApplicationStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -41,6 +43,7 @@ export const ApplicationsPage: React.FC<ApplicationsPageProps> = ({
   const [modalApp, setModalApp] = useState<ApplicationItem | null>(null);
 
   const fetchApplicationsData = async () => {
+    if (isAuthLoading) return;
     try {
       setLoading(true);
       setError(null);
@@ -63,8 +66,10 @@ export const ApplicationsPage: React.FC<ApplicationsPageProps> = ({
   };
 
   useEffect(() => {
-    fetchApplicationsData();
-  }, [statusFilter, search]);
+    if (!isAuthLoading) {
+      fetchApplicationsData();
+    }
+  }, [statusFilter, search, isAuthLoading]);
 
   useEffect(() => {
     if (preselectedAppId) {
