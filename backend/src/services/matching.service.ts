@@ -119,6 +119,7 @@ export class ProductionMatchingService {
       'react': ['vue', 'angular', 'javascript', 'typescript'],
       'typescript': ['javascript'],
       'docker': ['kubernetes', 'jenkins', 'ci/cd'],
+      'ci/cd': ['docker', 'jenkins', 'kubernetes', 'aws', 'git'],
       'power bi': ['tableau', 'excel', 'sql'],
       'tableau': ['power bi', 'excel', 'sql']
     };

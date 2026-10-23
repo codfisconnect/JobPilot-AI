@@ -57,7 +57,19 @@ export class MatchingEngine {
       ].map(s => s.toLowerCase().trim())
     );
 
-    const allJobSkills = Array.from(new Set([...job.mustHaveSkills, ...job.niceToHaveSkills]));
+    let allJobSkills = Array.from(new Set([...job.mustHaveSkills, ...job.niceToHaveSkills]));
+    if (allJobSkills.length === 0) {
+      const textToScan = `${job.role} ${(job as any).title || ''} ${job.rawText || ''}`.toLowerCase();
+      const commonTechKeywords = [
+        'ci/cd', 'jenkins', 'gitlab', 'github actions', 'docker', 'kubernetes',
+        'ansible', 'terraform', 'aws', 'azure', 'linux', 'python', 'bash', 'shell',
+        'java', 'spring boot', 'selenium', 'playwright', 'sql', 'postgresql', 'react', 'node.js'
+      ];
+      const detected = commonTechKeywords.filter(k => textToScan.includes(k));
+      if (detected.length > 0) {
+        allJobSkills = detected;
+      }
+    }
     const items: TruthCheckItem[] = [];
 
     let greenCount = 0;
@@ -124,6 +136,7 @@ export class MatchingEngine {
       'react': ['vue', 'angular', 'javascript', 'typescript'],
       'typescript': ['javascript'],
       'docker': ['kubernetes', 'jenkins', 'ci/cd'],
+      'ci/cd': ['docker', 'jenkins', 'kubernetes', 'aws', 'git'],
       'power bi': ['tableau', 'excel', 'sql'],
       'tableau': ['power bi', 'excel', 'sql']
     };
@@ -149,8 +162,13 @@ export class MatchingEngine {
       if (/backend|java|spring/i.test(t)) return 'Backend Engineering';
       if (/full\s*stack/i.test(t)) return 'Full Stack Development';
       if (/data|analyst|analytics|bi/i.test(t)) return 'Data Analytics';
-      if (/devops|cloud|sre/i.test(t)) return 'DevOps / Cloud';
-      return 'Software Engineering';
+      if (/devops|cloud|sre|ci\/?cd|pipeline|sysadmin|infrastructure/i.test(t)) return 'DevOps / Cloud';
+      if (/design|ui\/ux|ux|graphic|illustrat/i.test(t)) return 'Design & Creative';
+      if (/sales|account\s*exec|business\s*dev/i.test(t)) return 'Sales & Business Development';
+      if (/hr|human\s*resource|talent|recruit/i.test(t)) return 'Human Resources & Talent';
+      if (/finance|accounting|accountant/i.test(t)) return 'Finance & Accounting';
+      if (/software|engineer|developer|architect/i.test(t)) return 'Software Engineering';
+      return 'General Non-Technical';
     };
 
     const candNormalized = normalize(candTrack);
@@ -192,13 +210,10 @@ export class MatchingEngine {
     isSameTrack: boolean
   ): MatchScores {
     // 1. Skill Score based on Truth Check: Green = 100%, Yellow = 60%, Red = 0%
-    const totalSkills = Math.max(1, truthCheck.items.length);
-    const skillScore = Math.min(
-      100,
-      Math.round(
-        ((truthCheck.greenCount * 1.0 + truthCheck.yellowCount * 0.6) / totalSkills) * 100
-      )
-    );
+    const totalSkills = truthCheck.items.length;
+    const skillScore = totalSkills > 0
+      ? Math.min(100, Math.round(((truthCheck.greenCount * 1.0 + truthCheck.yellowCount * 0.6) / totalSkills) * 100))
+      : 100;
 
     // 2. Experience Score
     const reqYearsMatch = job.experienceRequired.match(/(\d+)/);
