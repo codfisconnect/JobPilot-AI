@@ -40,3 +40,20 @@ test('BulkJobSourceService: validateBatchPreview flags duplicates, invalid URLs,
   assert.strictEqual(preview.duplicateCount, 1);
   assert.strictEqual(preview.validCount + preview.alreadyConnectedCount, 2);
 });
+
+test('AdminRouter: /job-sources/bulk route precedence ensures bulk history does not route to getSourceById', () => {
+  const { adminRouter } = require('../modules/admin/admin.routes.js');
+  // Inspect registered layer paths
+  const layers = adminRouter.stack.map((l: any) => ({
+    path: l.route?.path,
+    methods: l.route?.methods
+  })).filter((l: any) => l.path);
+
+  const bulkIndex = layers.findIndex((l: any) => l.path === '/job-sources/bulk' && l.methods?.get);
+  const idIndex = layers.findIndex((l: any) => l.path === '/job-sources/:id' && l.methods?.get);
+
+  assert.ok(bulkIndex !== -1, 'GET /job-sources/bulk must be registered');
+  assert.ok(idIndex !== -1, 'GET /job-sources/:id must be registered');
+  assert.ok(bulkIndex < idIndex, 'GET /job-sources/bulk MUST precede GET /job-sources/:id in router stack');
+});
+
