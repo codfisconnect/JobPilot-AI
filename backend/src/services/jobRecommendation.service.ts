@@ -95,14 +95,78 @@ export class JobRecommendationService {
       };
     }
 
-    // Extract normalized candidate features
-    const candidateSkills = (profile.skills || []).map((s: any) => s.skill?.name || s.name).filter(Boolean);
+    // Extract normalized candidate features from profile skills and uploaded resume data
+    const candidateSkillsList: string[] = (profile.skills || []).map((s: any) => s.skill?.name || s.name).filter(Boolean);
+
+    // Also extract skills from uploaded/parsed resumes so resume-first candidates receive accurate recommendations
+    if (Array.isArray(profile.resumes)) {
+      for (const resume of profile.resumes) {
+        if (resume.parsedData && Array.isArray((resume.parsedData as any).skills)) {
+          for (const s of (resume.parsedData as any).skills) {
+            const skillName = typeof s === 'string' ? s : s.name;
+            if (skillName && !candidateSkillsList.includes(skillName)) {
+              candidateSkillsList.push(skillName);
+            }
+          }
+        }
+        if (Array.isArray(resume.versions)) {
+          for (const v of resume.versions) {
+            const sc = v.structuredContent as any;
+            if (sc && Array.isArray(sc.skills)) {
+              for (const s of sc.skills) {
+                const skillName = typeof s === 'string' ? s : s.name;
+                if (skillName && !candidateSkillsList.includes(skillName)) {
+                  candidateSkillsList.push(skillName);
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+
+    const candidateSkills = candidateSkillsList;
     const candidateSkillsLower = new Set(candidateSkills.map((s: string) => s.toLowerCase().trim()));
 
-    // Target roles: primary role, secondary roles, and headline
-    const targetRoles = profile.preferences?.targetRoles || [];
-    const primaryRole = targetRoles[0] || profile.headline || 'Software Engineer';
-    const secondaryRoles = targetRoles.slice(1);
+    // Target roles: decompose composite titles (e.g. "Senior Test Engineer / Business Analyst")
+    const rawTargetRoles: string[] = profile.preferences?.targetRoles || [];
+    const candidateRoleCandidates: string[] = [];
+
+    // Helper to decompose composite strings
+    const splitRoles = (str?: string | null) => {
+      if (!str || !str.trim()) return [];
+      return str.split(/[/|,;]|(?:\s+or\s+)/i).map(r => r.trim()).filter(Boolean);
+    };
+
+    if (rawTargetRoles.length > 0) {
+      for (const tr of rawTargetRoles) {
+        candidateRoleCandidates.push(...splitRoles(tr));
+      }
+    }
+
+    if (profile.headline) {
+      candidateRoleCandidates.push(...splitRoles(profile.headline));
+    }
+
+    // Include recent experience job titles as signals
+    if (Array.isArray(profile.experiences)) {
+      for (const exp of profile.experiences) {
+        if (exp.jobTitle) {
+          candidateRoleCandidates.push(...splitRoles(exp.jobTitle));
+        }
+      }
+    }
+
+    // Deduplicate roles while preserving order
+    const dedupedRoles: string[] = [];
+    for (const r of candidateRoleCandidates) {
+      if (!dedupedRoles.some(d => d.toLowerCase() === r.toLowerCase())) {
+        dedupedRoles.push(r);
+      }
+    }
+
+    const primaryRole = dedupedRoles[0] || 'Software Engineer';
+    const secondaryRoles = dedupedRoles.slice(1);
     const candidateLocation = profile.location || profile.city || '';
     const preferredLocations = (profile.preferences?.preferredLocations || []).map((l: string) => l.toLowerCase());
     const remotePref = profile.preferences?.remotePreference || 'ANY';

@@ -252,4 +252,82 @@ describe('Personalized Candidate Job Discovery & Recommendation Suite', () => {
     assert.notStrictEqual(scoreA, 75, 'Score A must not be a hardcoded 75');
     assert.notStrictEqual(scoreB, 75, 'Score B must not be a hardcoded 75');
   });
+
+  it('TEST 9: Candidate with composite headline "Senior Test Engineer / Business Analyst" scores well on both QA and Business Analyst jobs', () => {
+    const qaCandidateSkills = new Set(['selenium', 'automation testing', 'jira', 'sql', 'agile', 'test planning']);
+
+    const qaJob: any = {
+      id: 'job-qa-automation',
+      title: 'Senior QA Automation Engineer',
+      location: 'Bengaluru, India',
+      remoteType: 'HYBRID',
+      experienceMin: 5,
+      skills: [
+        { skill: { name: 'Selenium' }, skillType: 'REQUIRED' },
+        { skill: { name: 'Automation Testing' }, skillType: 'REQUIRED' },
+        { skill: { name: 'Test Planning' }, skillType: 'REQUIRED' }
+      ]
+    };
+
+    const baJob: any = {
+      id: 'job-business-analyst',
+      title: 'Senior Business Analyst',
+      location: 'Bengaluru, India',
+      remoteType: 'HYBRID',
+      experienceMin: 5,
+      skills: [
+        { skill: { name: 'Jira' }, skillType: 'REQUIRED' },
+        { skill: { name: 'Agile' }, skillType: 'REQUIRED' },
+        { skill: { name: 'SQL' }, skillType: 'REQUIRED' }
+      ]
+    };
+
+    // Candidate has primaryRole = "Senior Test Engineer" and secondaryRoles = ["Business Analyst"]
+    const context = {
+      primaryRole: 'Senior Test Engineer',
+      secondaryRoles: ['Business Analyst'],
+      candidateSkillsLower: qaCandidateSkills,
+      candidateExpYears: 6,
+      candidateLocation: 'Bengaluru, India',
+      preferredLocations: ['bengaluru'],
+      remotePref: 'HYBRID'
+    };
+
+    const qaEval = JobRecommendationService.evaluateJobRecommendation(qaJob, context);
+    const baEval = JobRecommendationService.evaluateJobRecommendation(baJob, context);
+    const designerEval = JobRecommendationService.evaluateJobRecommendation(jobGraphicDesigner, context);
+
+    assert.ok(qaEval.score >= 45, `QA job should score >= 45 (got ${qaEval.score})`);
+    assert.ok(baEval.score >= 45, `Business Analyst job should score >= 45 (got ${baEval.score})`);
+    assert.ok(designerEval.score < 45, `Unrelated designer job should score < 45 (got ${designerEval.score})`);
+  });
+
+  it('TEST 10: Candidate with parsed resume gets recommendations without manual profile skills', () => {
+    const resumeSkills = new Set(['playwright', 'cypress', 'javascript', 'api testing']);
+    const testContext = {
+      primaryRole: 'QA Test Engineer',
+      secondaryRoles: [],
+      candidateSkillsLower: resumeSkills,
+      candidateExpYears: 4,
+      candidateLocation: 'Bengaluru, India',
+      preferredLocations: ['bengaluru'],
+      remotePref: 'HYBRID'
+    };
+
+    const qaJob: any = {
+      id: 'job-qa-playwright',
+      title: 'QA Engineer',
+      location: 'Bengaluru, India',
+      remoteType: 'HYBRID',
+      experienceMin: 3,
+      skills: [
+        { skill: { name: 'Playwright' }, skillType: 'REQUIRED' },
+        { skill: { name: 'JavaScript' }, skillType: 'REQUIRED' }
+      ]
+    };
+
+    const evalResult = JobRecommendationService.evaluateJobRecommendation(qaJob, testContext);
+    assert.ok(evalResult.score >= 50, `Candidate with resume skills should score >= 50, got ${evalResult.score}`);
+    assert.ok(evalResult.reasons.length > 0);
+  });
 });

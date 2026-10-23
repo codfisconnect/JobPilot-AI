@@ -284,6 +284,7 @@ export const App: React.FC = () => {
           <JobsPage
             onSelectJobForAnalysis={jobId => handleNavigate('analysis', jobId)}
             preselectedJobId={contextId}
+            onNavigate={handleNavigate}
           />
         )}
 

@@ -58,10 +58,11 @@ export class ProductionMatchingService {
 
     const normalize = (t: string) => {
       if (/project\s*manager|delivery|program\s*manager|scrum\s*master|agile/i.test(t)) return 'Project & Delivery Management';
+      if (/business\s*analyst|systems?\s*analyst|product\s*analyst|functional\s*consultant/i.test(t)) return 'Business & Systems Analysis';
       if (/qa|automation|test|sdet/i.test(t)) return 'QA Automation';
       if (/backend|java|spring/i.test(t)) return 'Backend Engineering';
       if (/full\s*stack/i.test(t)) return 'Full Stack Development';
-      if (/data|analyst|analytics|bi/i.test(t)) return 'Data Analytics';
+      if (/data|analytics|bi\b|data\s*analyst/i.test(t)) return 'Data Analytics';
       if (/devops|cloud|sre|ci\/?cd|pipeline|sysadmin|infrastructure/i.test(t)) return 'DevOps / Cloud';
       if (/design|ui\/ux|ux|graphic|illustrat/i.test(t)) return 'Design & Creative';
       if (/sales|account\s*exec|business\s*dev/i.test(t)) return 'Sales & Business Development';
@@ -92,6 +93,12 @@ export class ProductionMatchingService {
     } else if (candNormalized === 'Backend Engineering' && jobNormalized === 'Full Stack Development') {
       transitionPossible = true;
       transitionGapExplanation = 'Strong backend architecture competency; frontend reactive UI frameworks gap.';
+    } else if (candNormalized === 'QA Automation' && jobNormalized === 'Business & Systems Analysis') {
+      transitionPossible = true;
+      transitionGapExplanation = 'QA test execution and domain knowledge align with requirements verification in Business Analysis.';
+    } else if (candNormalized === 'Business & Systems Analysis' && jobNormalized === 'QA Automation') {
+      transitionPossible = true;
+      transitionGapExplanation = 'Requirements domain expertise aligns well with QA test strategy and verification.';
     }
 
     return {
