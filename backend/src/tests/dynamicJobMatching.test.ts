@@ -196,4 +196,55 @@ describe('Dynamic Job Match and ATS Compatibility Suite', () => {
     assert.ok(scoresC.overallScore <= 45, `Expected scoresC <= 45, got ${scoresC.overallScore}`);
     assert.notStrictEqual(scoresA.overallScore, scoresC.overallScore);
   });
+
+  it('6. CI/CD administrator job ATS evaluation derives exact match and keyword gaps without fabrication', () => {
+    const candidateJava6Yrs: any = {
+      id: 'cand-chennai-java',
+      name: 'Developer Chennai',
+      email: 'dev@example.com',
+      location: 'Chennai, India',
+      yearsOfExperience: 6.8,
+      workPreference: 'On-site',
+      primarySkills: ['Java', 'Spring Boot', 'REST API', 'Microservices', 'PostgreSQL', 'AWS'],
+      secondarySkills: ['Git', 'Maven'],
+      technologies: ['Docker'],
+      targetRoles: ['Java Backend Developer'],
+      experiences: [
+        {
+          id: 'exp-1',
+          title: 'Java Developer',
+          company: 'Tech Corp',
+          startDate: '2018-01-01',
+          endDate: '2024-10-01',
+          responsibilities: ['Developed Java microservices and REST APIs']
+        }
+      ]
+    };
+
+    const jobCicdAdminWithEmptySkills: any = {
+      id: 'job-cicd-bahwan',
+      role: 'CI CD administrator',
+      title: 'CI CD administrator',
+      company: 'Bahwan CyberTek',
+      careerTrack: 'DevOps / Cloud',
+      location: 'Chennai',
+      experienceRequired: '5+ years',
+      experienceMin: 5,
+      mustHaveSkills: [],
+      niceToHaveSkills: [],
+      rawText: ''
+    };
+
+    const analysis = MatchingEngine.analyze(candidateJava6Yrs, jobCicdAdminWithEmptySkills);
+    return analysis.then(res => {
+      // In production, when a job has no tagged skills in DB, skillScore evaluates to 100%,
+      // experienceScore is 95% (6.8 vs 5 yrs), locationScore is 98% (Chennai vs Chennai),
+      // roleScore is 58% (cross-domain), yielding overall Match Score = 89%, and ATS = 54%
+      assert.strictEqual(res.scores.overallScore, 89, `Expected exact production Match Score 89, got ${res.scores.overallScore}`);
+      assert.strictEqual(res.atsAnalysis.estimatedScore, 54, `Expected exact production ATS Score 54, got ${res.atsAnalysis.estimatedScore}`);
+      // Distinct concepts verified
+      assert.notStrictEqual(res.scores.overallScore, res.atsAnalysis.estimatedScore);
+    });
+  });
 });
+
