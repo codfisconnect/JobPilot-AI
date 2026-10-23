@@ -21,6 +21,7 @@ const AuthPage = lazy(() => import("./pages/AuthPage").then(m => ({ default: m.A
 const AdminRoot = lazy(() => import("./pages/admin/AdminRoot").then(m => ({ default: m.AdminRoot })));
 const AdminLoginPage = lazy(() => import("./pages/admin/AdminLoginPage").then(m => ({ default: m.AdminLoginPage })));
 import { AuthLayout } from "./layouts/AuthLayout";
+import { EmployerLayout } from "./layouts/EmployerLayout";
 
 import { PilotMamaLoadingScreen } from "./components/common/PilotMamaLoadingScreen";
 
@@ -65,6 +66,9 @@ export const App: React.FC = () => {
     if (cleanPath === '/career' || cleanPath === '/learning') {
       return 'career';
     }
+    if (cleanPath.startsWith('/employer')) {
+      return 'employer';
+    }
     return 'dashboard';
   };
 
@@ -97,6 +101,7 @@ export const App: React.FC = () => {
       learning: 'Pilot Mama | Learning Academy',
       pricing: 'Pilot Mama | Plans, Credits & Premium',
       settings: 'Pilot Mama | Settings & Integrations',
+      employer: 'Pilot Mama | Employer Workspace',
       admin: 'Pilot Mama | Platform Admin Dashboard'
     };
     document.title = tabTitles[currentTab] || 'Pilot Mama — AI Job Application Copilot';
@@ -199,6 +204,46 @@ export const App: React.FC = () => {
     );
   }
 
+  // Dedicated Isolated Employer Workspace Layout (isolated from candidate AppShell)
+  if (currentTab === 'employer') {
+    const path = window.location.pathname.toLowerCase().replace(/\/$/, '');
+    let initialSection = 'jobs';
+    if (path.includes('/careers') || path.includes('/career-source') || path.includes('/careers-source')) {
+      initialSection = 'careers';
+    } else if (path.includes('/candidates') || path.includes('/applicants')) {
+      initialSection = 'candidates';
+    } else if (path.includes('/team') || path.includes('/members')) {
+      initialSection = 'team';
+    }
+
+    return (
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <EmployerLayout
+          activeSection={initialSection}
+          onSelectSection={(sec) => {
+            const targetPath = sec === 'jobs' ? '/employer' : `/employer/${sec}`;
+            if (window.location.pathname !== targetPath) {
+              window.history.pushState({}, '', targetPath);
+            }
+            setCurrentTab('employer');
+          }}
+          onExitEmployer={() => handleNavigate('dashboard')}
+        >
+          <EmployerPage
+            activeSection={initialSection}
+            onSelectSection={(sec) => {
+              const targetPath = sec === 'jobs' ? '/employer' : `/employer/${sec}`;
+              if (window.location.pathname !== targetPath) {
+                window.history.pushState({}, '', targetPath);
+              }
+            }}
+            onNavigate={handleNavigate}
+          />
+        </EmployerLayout>
+      </Suspense>
+    );
+  }
+
   return (
     <AppShell currentTab={currentTab} onSelectTab={tab => handleNavigate(tab)}>
       {currentTab === 'dashboard' && (
@@ -262,12 +307,6 @@ export const App: React.FC = () => {
 
         {currentTab === 'learning' && (
           <CareerPage
-            onNavigate={handleNavigate}
-          />
-        )}
-
-        {currentTab === 'employer' && (
-          <EmployerPage
             onNavigate={handleNavigate}
           />
         )}
