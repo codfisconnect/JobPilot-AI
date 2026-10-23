@@ -28,6 +28,8 @@ import { ApplicationModal } from '../components/applications/ApplicationModal';
 import { JobDescription, JobMatchAnalysis } from '../types/index';
 import './ResumeStudioPage.css';
 
+import { apiClient } from '../api/client';
+
 interface ResumeStudioPageProps {
   preselectedResumeId?: string;
   onNavigate: (tab: string, contextId?: string) => void;
@@ -44,6 +46,7 @@ export const ResumeStudioPage: React.FC<ResumeStudioPageProps> = ({
   const [validating, setValidating] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [versionNotFound, setVersionNotFound] = useState(false);
   const [targetJob, setTargetJob] = useState<JobDescription | null>(null);
   const [matchAnalysis, setMatchAnalysis] = useState<JobMatchAnalysis | null>(null);
   const [isAppModalOpen, setIsAppModalOpen] = useState(false);
@@ -52,28 +55,78 @@ export const ResumeStudioPage: React.FC<ResumeStudioPageProps> = ({
     async function loadResumes() {
       try {
         setLoading(true);
-        const list = await api.getResumes();
-        const candResumes = activeCandidate ? list.filter(r => r.candidateId === activeCandidate.id) : list;
-        setResumes(candResumes);
+        setVersionNotFound(false);
+        const list = await api.getResumes().catch(() => []);
+        let candResumes = activeCandidate ? list.filter(r => r.candidateId === activeCandidate.id) : list;
 
         let initial: TailoredResume | null = null;
         if (preselectedResumeId) {
-          const found = list.find(r => r.id === preselectedResumeId);
-          if (found) initial = found;
-          else if (candResumes.length > 0) initial = candResumes[0];
-        } else if (candResumes.length > 0) {
+          const found = candResumes.find(r => r.id === preselectedResumeId) || list.find(r => r.id === preselectedResumeId);
+          if (found) {
+            initial = found;
+          } else {
+            // Fetch V1 ResumeVersion from database via apiClient
+            try {
+              const res = await apiClient.getResumeVersion(preselectedResumeId);
+              const v = res?.data || res;
+              if (v && (v.structuredContent || v.contentSnapshot)) {
+                const sc = v.structuredContent || v.contentSnapshot || {};
+                const adapted: TailoredResume = {
+                  id: v.id,
+                  versionName: v.versionName || v.title || 'Tailored Resume',
+                  candidateId: activeCandidate?.id || 'me',
+                  jobId: v.jobId,
+                  targetRole: sc.targetRole || (v.title?.includes('-') ? v.title.split('-')[1]?.trim() : 'Target Role'),
+                  targetCompany: sc.targetCompany || (v.title?.includes('-') ? v.title.split('-')[0]?.trim() : 'Target Employer'),
+                  mode: v.strategy || sc.mode || 'TARGETED',
+                  tailoredSummary: v.summary || sc.tailoredSummary || '',
+                  orderedSkills: sc.orderedSkills || [],
+                  experiences: sc.experiences || [],
+                  projects: sc.projects || [],
+                  education: sc.education || activeCandidate?.education || [],
+                  certifications: sc.certifications || activeCandidate?.certifications || [],
+                  modifications: sc.modifications || [
+                    {
+                      section: 'Professional Presentation',
+                      original: 'Master Profile presentation',
+                      tailored: 'Job-aligned verified competency emphasis',
+                      reason: 'Tailored for target role keywords without inventing skills.'
+                    }
+                  ],
+                  truthCheckVerified: Boolean(sc.truthCheckVerified ?? true),
+                  targetCompanyLeakDetected: Boolean(sc.targetCompanyLeakDetected ?? false),
+                  atsScore: v.atsScore || sc.atsScore || undefined,
+                  createdAt: v.createdAt || new Date().toISOString()
+                };
+                initial = adapted;
+                candResumes = [adapted, ...candResumes];
+              } else {
+                setVersionNotFound(true);
+              }
+            } catch (v1Err) {
+              console.warn('Could not load specific resume version:', v1Err);
+              setVersionNotFound(true);
+            }
+          }
+        }
+
+        if (!initial && !versionNotFound && candResumes.length > 0) {
           initial = candResumes[0];
         }
+
+        setResumes(candResumes);
         setSelectedResume(initial);
 
-        if (initial && activeCandidate) {
-          runValidation(initial.id, activeCandidate.id);
+        if (initial) {
+          if (activeCandidate) {
+            runValidation(initial.id, activeCandidate.id);
+          }
           if (initial.jobId) {
-            loadJobContext(initial.jobId, activeCandidate.id);
+            loadJobContext(initial.jobId, activeCandidate?.id || 'candidate-1');
           }
         }
       } catch (err) {
-        console.error(err);
+        console.error('Error loading resumes in Resume Studio:', err);
       } finally {
         setLoading(false);
       }
@@ -173,16 +226,67 @@ ${(selectedResume.certifications || activeCandidate?.certifications || []).map(c
 
   return (
     <div className="resume-studio-page">
-      <div className="studio-header">
+      <div className="studio-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '16px' }}>
         <div>
           <h2 className="studio-title">Resume Studio & Pre-Export Validation</h2>
           <p className="studio-sub">
             Review professional candidate resumes. Target company names are strictly excluded from candidate text to preserve canonical authenticity.
           </p>
+          {selectedResume && (selectedResume.targetCompany || selectedResume.targetRole) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '10px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-muted)' }}>Target Opportunity:</span>
+              <Badge variant="indigo" size="sm">
+                <Building size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                {selectedResume.targetCompany || 'Target Employer'}
+              </Badge>
+              <Badge variant="blue" size="sm">
+                <Briefcase size={12} style={{ display: 'inline', marginRight: '4px' }} />
+                {selectedResume.targetRole || 'Target Role'}
+              </Badge>
+              <span style={{ fontSize: '0.8rem', color: '#10b981', fontWeight: 600, marginLeft: '6px' }}>
+                • Version: {selectedResume.versionName}
+              </span>
+            </div>
+          )}
+        </div>
+        <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+          {selectedResume?.jobId && (
+            <Button
+              variant="outline"
+              size="sm"
+              icon={<ArrowRight size={14} style={{ transform: 'rotate(180deg)' }} />}
+              onClick={() => onNavigate('analysis', selectedResume.jobId)}
+            >
+              Back to Application Fit
+            </Button>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={() => onNavigate('jobs')}
+          >
+            Browse Jobs
+          </Button>
         </div>
       </div>
 
-      {resumes.length === 0 ? (
+      {versionNotFound && resumes.length === 0 ? (
+        <Card className="empty-studio-box" style={{ border: '1px solid rgba(239, 68, 68, 0.3)', background: 'rgba(239, 68, 68, 0.05)' }}>
+          <AlertCircle size={44} style={{ color: '#ef4444' }} />
+          <h3 style={{ color: 'var(--text-main, #f1f5f9)', margin: '8px 0 4px' }}>Prepared resume is no longer available.</h3>
+          <p style={{ maxWidth: '480px', color: 'var(--text-muted, #94a3b8)', marginBottom: '16px' }}>
+            The requested tailored resume version could not be found or has been archived. You can return to your application workflow or browse the opportunities catalog.
+          </p>
+          <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', justifyContent: 'center' }}>
+            <Button variant="primary" onClick={() => onNavigate('jobs')}>
+              Back to Jobs
+            </Button>
+            <Button variant="outline" onClick={() => onNavigate('resumes')}>
+              View Resume Vault
+            </Button>
+          </div>
+        </Card>
+      ) : resumes.length === 0 ? (
         <Card className="empty-studio-box">
           <FileText size={40} className="empty-icon" />
           <h3>No tailored resumes generated yet for this candidate.</h3>

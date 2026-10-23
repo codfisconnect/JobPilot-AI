@@ -190,8 +190,10 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
           setTailoredResume({
             id: v1Result.versionId,
             versionName: v1Result.versionName,
+            atsScore: v1Result.atsScore,
             modifications: v1Result.modifications || ['Tailored bullet points', 'Target company leak verified clean']
           });
+
           showToast(`Immutable Resume Version Created: ${v1Result.versionName}!`);
           return;
         }
@@ -591,13 +593,14 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
                 <div style={{ background: 'rgba(16, 185, 129, 0.08)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(16, 185, 129, 0.25)' }}>
                   <div style={{ fontSize: '0.85rem', color: '#34d399', marginBottom: '4px' }}>Tailored Resume (v1)</div>
                   <div style={{ fontSize: '1.8rem', fontWeight: 700, color: '#10b981' }}>
-                    {Math.min(98, atsAnalysis.estimatedScore + 8)}%
+                    {tailoredResume?.atsScore !== undefined ? `${tailoredResume.atsScore}%` : `${atsAnalysis.estimatedScore}%`}
                   </div>
                   <div style={{ fontSize: '0.78rem', color: '#34d399', marginTop: '4px' }}>
-                    Keyword Match: {Math.min(100, atsAnalysis.breakdown.keywordMatch + 10)}% • Readability: 96%
+                    Keyword Match: {atsAnalysis.breakdown.keywordMatch}% • Readability: 96%
                   </div>
                 </div>
               </div>
+
 
               <div style={{ fontSize: '0.82rem', display: 'flex', flexDirection: 'column', gap: '8px' }}>
                 <div>
@@ -635,7 +638,7 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => onNavigate('resumes', tailoredResume.id)}
+                  onClick={() => onNavigate('studio', tailoredResume.id)}
                 >
                   View Diff
                 </Button>
@@ -680,7 +683,7 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
                   <Button
                     variant="outline"
                     size="sm"
-                    onClick={() => onNavigate('resumes', tailoredResume.id)}
+                    onClick={() => onNavigate('studio', tailoredResume.id)}
                   >
                     View Diff & Studio
                   </Button>
@@ -707,7 +710,7 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
             setExistingApp(app);
             showToast(`Application recorded in ${app.applicationMode.toUpperCase()} mode!`);
           }}
-          onNavigateToResumes={(resumeId) => onNavigate('resumes', resumeId)}
+          onNavigateToResumes={(resumeId) => onNavigate('studio', resumeId)}
           onNavigateToApplications={(appId) => onNavigate('applications', appId)}
           onNavigateToLearning={() => onNavigate('learning')}
         />

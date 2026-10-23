@@ -282,6 +282,12 @@ export class ResumeController {
       const existingVersions = await ResumeRepository.getByCandidateAndJob(candidateId, jobId);
       const tailored = await ResumeTailorService.tailorResume(candidate, job, truthCheck, existingVersions.length, mode);
 
+      // Deterministically calculate actual ATS score for the tailored resume (no artificial boost)
+      const careerTrack = MatchingEngine.detectCareerTrack(candidate, job);
+      const scores = MatchingEngine.calculateScores(candidate, job, truthCheck, careerTrack.isSameTrack);
+      const atsRes = MatchingEngine.performATSAnalysis(candidate, job, truthCheck, scores);
+      tailored.atsScore = atsRes.estimatedScore;
+
       await ResumeRepository.save(tailored);
 
       res.json({ success: true, data: tailored });
@@ -289,6 +295,7 @@ export class ResumeController {
       res.status(500).json({ success: false, error: err.message });
     }
   }
+
 
   public static async validate(req: Request, res: Response) {
     try {
