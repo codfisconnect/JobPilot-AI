@@ -15,6 +15,12 @@ import {
 import { normalizeApiError } from '../../utils/errorUtils';
 import { getCanonicalCompanyName } from '../../utils/companyUtils';
 import {
+  evaluateApplicationReadiness,
+  calculateWorkHistoryExperienceYears,
+  ReadinessBlocker,
+  MANDATORY_ATS_THRESHOLD
+} from '../../utils/readiness';
+import {
   CheckCircle,
   AlertTriangle,
   FileCheck,
@@ -73,6 +79,12 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   const [duplicateWarning, setDuplicateWarning] = useState<ApplicationRecord | null>(null);
   const [externalConfirmed, setExternalConfirmed] = useState(false);
   const [errorBanner, setErrorBanner] = useState<string | null>(null);
+
+  // Application Readiness Data Integrity State
+  const [isExperienceConfirmed, setIsExperienceConfirmed] = useState(false);
+  const [candidateLocationInput, setCandidateLocationInput] = useState(candidate?.location || '');
+  const [isSavingLocation, setIsSavingLocation] = useState(false);
+  const [locationSuccessMsg, setLocationSuccessMsg] = useState<string | null>(null);
 
   // Canonical company name sanitization
   const canonicalCompany = getCanonicalCompanyName(job?.company, job?.sourceUrl, job?.applicationUrl);
@@ -149,25 +161,66 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
 
   if (!isOpen) return null;
 
-  // Validation checks for Readiness
-  const readinessErrors: string[] = [];
-  if (!candidate?.name) readinessErrors.push('Missing Candidate Name');
-  if (!candidate?.email) readinessErrors.push('Missing Email Address');
-  if (!candidate?.phone) readinessErrors.push('Missing Phone Number');
-  if (!candidate?.location) readinessErrors.push('Missing Location');
-  if (!job) readinessErrors.push('Missing Target Job Data');
-
   const matchScore = matchAnalysis?.scores?.overallScore || 75;
   const originalAts = matchAnalysis?.atsAnalysis?.estimatedScore || 78;
   const currentAtsScore = tailoredResume ? Math.min(98, originalAts + 8) : originalAts;
   const skillGaps = matchAnalysis?.atsAnalysis?.keywords?.red || [];
 
-  // Mandatory ATS Gate: Automatic application requires at least 80%
-  const isAtsPassed = currentAtsScore >= 80;
+  // Deterministic Readiness Evaluation
+  const readiness = evaluateApplicationReadiness({
+    candidate,
+    job,
+    currentAtsScore,
+    atsThreshold: MANDATORY_ATS_THRESHOLD,
+    isExperienceConfirmed
+  });
 
-  // Experience conflict detection
-  const resumeYears = candidate?.experiences?.length ? Math.round(candidate.experiences.length * 1.5) : candidate?.yearsOfExperience || 0;
-  const hasExperienceConflict = candidate?.yearsOfExperience !== undefined && resumeYears > 0 && Math.abs(candidate.yearsOfExperience - resumeYears) >= 2;
+  const {
+    isReady: canContinueToSelection,
+    blockers,
+    profileStatedYears,
+    workHistoryYears,
+    experienceDiscrepancy,
+    hasExperienceDiscrepancy,
+    isAtsPassed
+  } = readiness;
+
+  const handleSaveCandidateLocation = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    const trimmed = candidateLocationInput.trim();
+    if (!trimmed) {
+      setErrorBanner('Please enter a valid location (e.g., City, State, or Remote).');
+      return;
+    }
+    try {
+      setIsSavingLocation(true);
+      setErrorBanner(null);
+      // Update candidate profile via API
+      try {
+        await apiClient.updateCandidateProfile({ location: trimmed });
+      } catch {
+        if (candidate?.id) {
+          await api.updateCandidate(candidate.id, { ...candidate, location: trimmed });
+        }
+      }
+      // Mutate local object so UI reacts instantly without requiring reload
+      if (candidate) {
+        candidate.location = trimmed;
+      }
+      setFormFields(prev => ({ ...prev, location: trimmed }));
+      setLocationSuccessMsg('Location saved successfully.');
+      setTimeout(() => setLocationSuccessMsg(null), 3000);
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Failed to update candidate location. Please try again.');
+      setErrorBanner(normalized.message);
+    } finally {
+      setIsSavingLocation(false);
+    }
+  };
+
+  const handleConfirmExperience = () => {
+    setIsExperienceConfirmed(true);
+  };
 
   const handleRunAtsCheck = async () => {
     if (!candidate?.id || !job?.id) {
@@ -399,14 +452,56 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
           </div>
         )}
 
-        {/* Experience Conflict Banner if Candidate Profile vs Resume totals diverge */}
-        {hasExperienceConflict && (
-          <div className="modal-error-banner" style={{ background: 'rgba(234, 179, 8, 0.15)', borderColor: 'rgba(234, 179, 8, 0.4)', color: '#fde047' }}>
-            <div className="modal-error-content">
-              <AlertTriangle size={18} />
-              <span>
-                <strong>Profile & Resume Experience Discrepancy:</strong> Your profile lists {candidate?.yearsOfExperience} years while work history reflects ~{resumeYears} years. Review your experience details before submitting.
-              </span>
+        {/* Experience Discrepancy Banner if Profile vs Work History totals diverge */}
+        {hasExperienceDiscrepancy && (
+          <div className="experience-discrepancy-banner">
+            <div className="discrepancy-header">
+              <AlertTriangle size={18} className="text-amber" />
+              <strong className="discrepancy-title">Profile & Resume Experience Discrepancy</strong>
+              {isExperienceConfirmed ? (
+                <span className="discrepancy-confirmed-badge">✓ Confirmed by Candidate</span>
+              ) : (
+                <span className="discrepancy-unresolved-badge">⚠️ Action Required</span>
+              )}
+            </div>
+            <div className="discrepancy-breakdown-row">
+              <div className="breakdown-col">
+                <span className="breakdown-lbl">Profile Stated Experience:</span>
+                <span className="breakdown-val highlight">{profileStatedYears} years</span>
+              </div>
+              <div className="breakdown-divider">•</div>
+              <div className="breakdown-col">
+                <span className="breakdown-lbl">Verified Work History:</span>
+                <span className="breakdown-val">{workHistoryYears} years</span>
+              </div>
+              <div className="breakdown-divider">•</div>
+              <div className="breakdown-col">
+                <span className="breakdown-lbl">Difference:</span>
+                <span className="breakdown-val diff-val">{experienceDiscrepancy} years</span>
+              </div>
+            </div>
+            <div className="discrepancy-desc">
+              Your stated profile experience ({profileStatedYears} yrs) differs from the sum of confirmed employment history ({workHistoryYears} yrs). Please review your work history, edit/add any missing employment records, or confirm this breakdown if your profile includes non-indexed freelance, consulting, or prior tenure.
+            </div>
+            <div className="discrepancy-actions">
+              {!isExperienceConfirmed ? (
+                <Button
+                  variant="primary"
+                  size="sm"
+                  onClick={handleConfirmExperience}
+                  icon={<Check size={14} />}
+                >
+                  Confirm Experience Breakdown
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsExperienceConfirmed(false)}
+                >
+                  Re-evaluate Discrepancy
+                </Button>
+              )}
             </div>
           </div>
         )}
@@ -575,12 +670,30 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                         <span className="row-val">{job?.role}</span>
                       </div>
                       <div className="summary-row">
-                        <span className="row-key">Location:</span>
-                        <span className="row-val"><MapPin size={13} style={{ display: 'inline', marginRight: '4px' }} />{job?.location}</span>
+                        <span className="row-key">Job Location:</span>
+                        <span className="row-val">
+                          <MapPin size={13} style={{ display: 'inline', marginRight: '4px' }} />
+                          {job?.location || 'Specified by employer'}
+                        </span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="row-key">Candidate Location:</span>
+                        <span className={`row-val ${!candidate?.location ? 'text-amber font-bold' : ''}`}>
+                          {candidate?.location ? (
+                            <>
+                              <MapPin size={13} style={{ display: 'inline', marginRight: '4px' }} />
+                              {candidate.location}
+                            </>
+                          ) : (
+                            'Missing from Profile'
+                          )}
+                        </span>
                       </div>
                       <div className="summary-row">
                         <span className="row-key">Experience Requirement:</span>
-                        <span className="row-val">{job?.experienceRequired || 'Not specified'} (Candidate: {candidate?.yearsOfExperience || 0} yrs)</span>
+                        <span className="row-val">
+                          {job?.experienceRequired || 'Not specified'} (Candidate Stated: {profileStatedYears} yrs | Work History: {workHistoryYears} yrs)
+                        </span>
                       </div>
                       <div className="summary-row">
                         <span className="row-key">Selected Resume:</span>
@@ -596,12 +709,98 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                       </div>
                     </div>
 
-                    {readinessErrors.length > 0 && (
-                      <div className="readiness-errors-box">
-                        <AlertTriangle size={16} />
-                        <div>
-                          <strong>Cannot continue yet:</strong> Please update profile with required fields: {readinessErrors.join(', ')}
+                    {/* Structured Blocker Summary */}
+                    {blockers.length > 0 ? (
+                      <div className="readiness-blockers-container">
+                        <div className="blockers-header">
+                          <AlertTriangle size={18} className="text-amber" />
+                          <h5 className="blockers-count-title">
+                            {blockers.length} {blockers.length === 1 ? 'item needs' : 'items need'} attention before you can apply:
+                          </h5>
                         </div>
+                        <div className="blockers-list">
+                          {blockers.map((b, idx) => (
+                            <div key={b.id + idx} className="blocker-item-card">
+                              <div className="blocker-num">{idx + 1}</div>
+                              <div className="blocker-content">
+                                <div className="blocker-title-row">
+                                  <strong className="blocker-item-title">{b.title}</strong>
+                                </div>
+                                <p className="blocker-item-desc">{b.description}</p>
+
+                                {/* Action: Add Location Inline */}
+                                {b.id === 'MISSING_CANDIDATE_LOCATION' && (
+                                  <form className="inline-location-form" onSubmit={handleSaveCandidateLocation}>
+                                    <input
+                                      type="text"
+                                      className="inline-location-input"
+                                      placeholder="e.g. Bengaluru, Karnataka, India"
+                                      value={candidateLocationInput}
+                                      onChange={e => setCandidateLocationInput(e.target.value)}
+                                      disabled={isSavingLocation}
+                                    />
+                                    <Button
+                                      type="submit"
+                                      size="sm"
+                                      variant="primary"
+                                      loading={isSavingLocation}
+                                    >
+                                      Save Location
+                                    </Button>
+                                    {locationSuccessMsg && (
+                                      <span className="location-success-msg text-emerald">{locationSuccessMsg}</span>
+                                    )}
+                                  </form>
+                                )}
+
+                                {/* Action: Review Experience */}
+                                {b.id === 'PROFILE_DATA_CONFLICT' && (
+                                  <div className="blocker-inline-action">
+                                    <Button
+                                      size="sm"
+                                      variant="primary"
+                                      onClick={handleConfirmExperience}
+                                      icon={<Check size={14} />}
+                                    >
+                                      Confirm Experience Breakdown ({profileStatedYears}y profile vs {workHistoryYears}y records)
+                                    </Button>
+                                  </div>
+                                )}
+
+                                {/* Action: Improve Resume */}
+                                {b.id === 'ATS_BELOW_THRESHOLD' && onNavigateToResumes && (
+                                  <div className="blocker-inline-action">
+                                    <Button
+                                      size="sm"
+                                      variant="primary"
+                                      icon={<FileText size={14} />}
+                                      onClick={() => {
+                                        onClose();
+                                        onNavigateToResumes();
+                                      }}
+                                    >
+                                      Improve Resume in Studio
+                                    </Button>
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      icon={<RotateCcw size={14} />}
+                                      loading={isCheckingAts}
+                                      onClick={handleRunAtsCheck}
+                                    >
+                                      Re-run ATS Check
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="readiness-ready-banner">
+                        <CheckCircle size={18} className="text-emerald" />
+                        <span>All application readiness gates passed. You are ready to proceed with submission.</span>
                       </div>
                     )}
                   </Card>
@@ -623,7 +822,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                       <Button
                         variant="primary"
                         icon={<ArrowRight size={16} />}
-                        disabled={readinessErrors.length > 0 || !isAtsPassed}
+                        disabled={!canContinueToSelection}
                         onClick={() => setCurrentStep('selection')}
                       >
                         Continue to Resume Selection
