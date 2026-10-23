@@ -25,7 +25,9 @@ import {
   Building2,
   MapPin,
   Clock,
-  Layers
+  Layers,
+  AlertCircle,
+  RotateCcw
 } from 'lucide-react';
 import { ApplicationModeBadge } from "../components/common/ApplicationModeBadge";
 import { normalizeApiError } from '../utils/errorUtils';
@@ -59,12 +61,14 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
   const [existingApp, setExistingApp] = useState<any | null>(null);
   const [isAppModalOpen, setIsAppModalOpen] = useState(false);
   const [strategy, setStrategy] = useState<any | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
 
   useEffect(() => {
     async function loadAnalysis() {
       try {
         setIsLoading(true);
 
+        let resolvedAnalysis = null;
         // Try V1 production APIs first
         try {
           const [v1Job, v1Match, v1Gaps, v1TailoredList] = await Promise.all([
@@ -92,7 +96,7 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
           }
 
           if (v1Match) {
-            setAnalysis({
+            resolvedAnalysis = {
               id: v1Match.id,
               scores: v1Match.breakdown ? {
                 overallScore: v1Match.overallScore,
@@ -101,7 +105,7 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
                 roleScore: v1Match.breakdown.roleScore,
                 locationScore: v1Match.breakdown.locationScore,
                 seniorityScore: v1Match.breakdown.seniorityScore
-              } : { overallScore: 80, skillScore: 80, experienceScore: 80, roleScore: 80, locationScore: 80, seniorityScore: 80 },
+              } : { overallScore: v1Match.overallScore, skillScore: v1Match.overallScore, experienceScore: v1Match.overallScore, roleScore: v1Match.overallScore, locationScore: v1Match.overallScore, seniorityScore: v1Match.overallScore },
               recommendation: {
                 level: v1Match.category === 'STRONG_MATCH' ? 'Strongly Recommended' : v1Match.category === 'GOOD_MATCH' ? 'Recommended' : 'Review',
                 color: v1Match.category === 'STRONG_MATCH' ? 'emerald' : v1Match.category === 'GOOD_MATCH' ? 'blue' : 'amber',
@@ -118,7 +122,8 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
               suggestedAnswers: {
                 'Why are you interested in this position?': 'My verified background directly aligns with the technical scope and engineering goals of this role.'
               }
-            });
+            };
+            setAnalysis(resolvedAnalysis);
           }
 
           if (v1Gaps) {
@@ -147,48 +152,27 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
           }
         }
 
-        if (!analysis && activeCandidate) {
+        if (!resolvedAnalysis && activeCandidate) {
           let existingMatch = await api.getMatch(activeCandidate.id, jobId).catch(() => null);
           if (!existingMatch) {
             existingMatch = await api.analyzeMatch(activeCandidate.id, jobId).catch(() => null);
           }
-          if (existingMatch) setAnalysis(existingMatch);
+          if (existingMatch) {
+            resolvedAnalysis = existingMatch;
+            setAnalysis(existingMatch);
+          }
 
           const strat = await api.getResumeStrategy(activeCandidate.id, jobId).catch(() => null);
           if (strat) setStrategy(strat);
         }
 
-        // Safe deterministic fallback so page NEVER gets stuck in perpetual loading state
-        setAnalysis((prev: any) => {
-          if (prev) return prev;
-          return {
-            id: `eval_${jobId}`,
-            scores: { overallScore: 84, skillScore: 85, experienceScore: 82, roleScore: 86, locationScore: 90, seniorityScore: 80 },
-            recommendation: {
-              level: 'Recommended',
-              color: 'blue',
-              description: 'Profile aligns well with core engineering and technical competencies.'
-            },
-            careerTrack: { candidateTrack: 'Engineering', jobTrack: 'Engineering', isSameTrack: true },
-            truthCheck: { greenCount: 4, yellowCount: 1, redCount: 0, items: [] },
-            atsAnalysis: {
-              estimatedScore: 84,
-              disclaimer: 'Estimated ATS Match',
-              breakdown: { keywordMatch: 82, roleAlignment: 85, experienceAlignment: 84, readability: 90 },
-              keywords: { green: ['TypeScript', 'React', 'Node.js'], red: [] }
-            },
-            whyMatch: {
-              matchingStrengths: ['Demonstrated background matching core role requirements.'],
-              missingOrWeakAreas: ['Review any niche workflow tools prior to interview.'],
-              potentialConcerns: ['None detected based on verified competencies.']
-            },
-            suggestedAnswers: {
-              'Why are you interested in this position?': 'My verified background directly aligns with the technical scope and engineering goals of this role.'
-            }
-          };
-        });
+        // If analysis is still null after all attempts, set an explicit error instead of a fake static score
+        if (!resolvedAnalysis) {
+          setLoadError('Unable to calculate match analysis for this job. Please try again.');
+        }
       } catch (err) {
         console.error('Error loading job analysis:', err);
+        setLoadError('An unexpected error occurred while analyzing this job.');
       } finally {
         setIsLoading(false);
       }
@@ -229,12 +213,32 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
     }
   };
 
-  if (isLoading || !job || !analysis) {
+  if (isLoading) {
     return (
       <div className="analysis-loading-state">
         <Sparkles className="spin-icon" size={32} />
         <h3>Pilot Mama is executing 14-point evaluation...</h3>
         <p>Scanning career track alignment, truth-checking candidate skills, and evaluating ATS compatibility.</p>
+      </div>
+    );
+  }
+
+  if (loadError || !job || !analysis) {
+    return (
+      <div className="analysis-error-state" style={{ padding: '40px 20px', textAlign: 'center', maxWidth: '600px', margin: '40px auto' }}>
+        <AlertCircle size={40} className="text-red" style={{ margin: '0 auto 16px auto' }} />
+        <h3>Unable to Calculate Job Match</h3>
+        <p style={{ color: '#94a3b8', marginBottom: '24px' }}>
+          {loadError || 'The match analysis could not be calculated for this job opening.'}
+        </p>
+        <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }}>
+          <Button variant="secondary" icon={<ArrowLeft size={16} />} onClick={onBack}>
+            Back to Jobs
+          </Button>
+          <Button variant="primary" icon={<RotateCcw size={16} />} onClick={() => window.location.reload()}>
+            Retry Analysis
+          </Button>
+        </div>
       </div>
     );
   }

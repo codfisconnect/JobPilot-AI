@@ -5,6 +5,7 @@ import { NotFoundError } from '../utils/errors.js';
 import { LearningRepository } from './repositories.js';
 import { ResumeTailorService } from '../generators/resume.generator.js';
 import { aiProvider } from '../ai/index.js';
+import { calculateWorkHistoryExperienceYears } from '../utils/readiness.js';
 import type { MatchCategory } from '@prisma/client';
 
 export interface SkillMatchItem {
@@ -38,6 +39,11 @@ export interface ATSAnalysisResult {
     formattingScore: number;
     structureScore: number;
     roleAlignmentScore: number;
+  };
+  keywords: {
+    green: string[];
+    yellow: string[];
+    red: string[];
   };
   disclaimer: string;
 }
@@ -260,6 +266,8 @@ export class ProductionMatchingService {
    */
   public static performATSAnalysis(
     greenKeywords: string[],
+    yellowKeywords: string[],
+    redKeywords: string[],
     totalKeywords: number,
     roleScore: number,
     experienceScore: number,
@@ -280,6 +288,11 @@ export class ProductionMatchingService {
         formattingScore: 92,
         structureScore: 94,
         roleAlignmentScore: roleScore
+      },
+      keywords: {
+        green: greenKeywords,
+        yellow: yellowKeywords,
+        red: redKeywords
       },
       disclaimer: 'Estimated ATS Match based on keyword presence, role alignment, and structural standards. Scoring algorithms differ across employer ATS platforms.'
     };
@@ -372,7 +385,8 @@ export class ProductionMatchingService {
     const truthCheck = this.evaluateSkillEvidence(candidateSkillNames, effectiveRequired, effectivePreferred);
 
     // Compute Scores
-    const yearsExp = profile.experiences.length > 0 ? Math.max(3, profile.experiences.length * 1.5) : 3;
+    const calculatedWorkExp = calculateWorkHistoryExperienceYears(profile.experiences);
+    const yearsExp = calculatedWorkExp > 0 ? calculatedWorkExp : (profile.experiences.length > 0 ? profile.experiences.length : 3);
     const { scores, overallScore, category } = this.calculateScores(
       yearsExp,
       profile.location || '',
@@ -389,8 +403,12 @@ export class ProductionMatchingService {
 
     // ATS Analysis
     const greenList = truthCheck.items.filter(i => i.status === 'VERIFIED').map(i => i.skill);
+    const yellowList = truthCheck.items.filter(i => i.status === 'PARTIAL').map(i => i.skill);
+    const redList = truthCheck.items.filter(i => i.status === 'MISSING').map(i => i.skill);
     const atsAnalysis = this.performATSAnalysis(
       greenList,
+      yellowList,
+      redList,
       truthCheck.items.length,
       scores.roleScore,
       scores.experienceScore,

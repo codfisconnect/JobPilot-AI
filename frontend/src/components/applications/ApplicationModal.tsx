@@ -102,6 +102,10 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
     coverLetter: `Dear Hiring Team,\n\nI am excited to submit my application for the ${job?.role || 'open'} role at ${canonicalCompany}. With ${candidate?.yearsOfExperience || 'relevant'} years of demonstrated experience in ${job?.careerTrack || 'the discipline'} and core expertise in ${(candidate?.primarySkills || []).slice(0, 4).join(', ')}, I look forward to contributing high-impact value to your team.\n\nBest regards,\n${candidate?.name || ''}`
   });
 
+  // Job-specific dynamic match & ATS evaluation state
+  const [isLoadingScores, setIsLoadingScores] = useState<boolean>(false);
+  const [scoresError, setScoresError] = useState<string | null>(null);
+
   // Re-sync form fields whenever candidate or job changes
   useEffect(() => {
     if (candidate) {
@@ -135,6 +139,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
     }
   }, [initialMatchAnalysis]);
 
+  // Primary Effect: When modal opens or job.id / candidate.id changes, fetch genuine job-specific match & ATS
   useEffect(() => {
     if (isOpen) {
       setCurrentStep('readiness');
@@ -143,8 +148,95 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       setExternalConfirmed(false);
       setErrorBanner(null);
       checkExistingApplication();
+
+      if (job?.id && candidate?.id) {
+        // If an initial match analysis was passed and matches this specific job, use it
+        if (initialMatchAnalysis && (initialMatchAnalysis.jobId === job.id || (initialMatchAnalysis as any).id === job.id)) {
+          setMatchAnalysis(initialMatchAnalysis);
+          setIsLoadingScores(false);
+          setScoresError(null);
+        } else {
+          // Otherwise, clear previous stale job state and trigger fresh dynamic calculation
+          setMatchAnalysis(null);
+          fetchDynamicScores(job.id, candidate.id);
+        }
+      }
+    } else {
+      // Clear state on close to prevent stale state flicker
+      setMatchAnalysis(null);
+      setIsLoadingScores(false);
+      setScoresError(null);
     }
   }, [isOpen, job?.id, candidate?.id]);
+
+  const fetchDynamicScores = async (jobId: string, candidateId: string) => {
+    try {
+      setIsLoadingScores(true);
+      setScoresError(null);
+
+      // 1. Try V1 Production Matching API
+      try {
+        const v1Match = await apiClient.getJobMatch(jobId);
+        if (v1Match && v1Match.overallScore !== undefined) {
+          const breakdown = v1Match.breakdown || {
+            overallScore: v1Match.overallScore,
+            skillScore: v1Match.overallScore,
+            experienceScore: v1Match.overallScore,
+            roleScore: v1Match.overallScore,
+            locationScore: v1Match.overallScore,
+            seniorityScore: v1Match.overallScore
+          };
+          const atsAnalysis = v1Match.atsAnalysis || {
+            estimatedScore: v1Match.overallScore,
+            disclaimer: 'Estimated ATS Match',
+            breakdown: { keywordMatch: v1Match.overallScore, roleAlignment: breakdown.roleScore, experienceAlignment: breakdown.experienceScore, readability: 90 },
+            keywords: { green: [], yellow: [], red: [] }
+          };
+
+          setMatchAnalysis({
+            id: v1Match.id || jobId,
+            candidateId,
+            jobId,
+            scores: breakdown,
+            recommendation: {
+              category: v1Match.category === 'STRONG_MATCH' ? 'STRONG_MATCH' : 'MODERATE_MATCH',
+              title: v1Match.category === 'STRONG_MATCH' ? 'Strong Match' : 'Good Match',
+              description: `Evaluation confirmed ${v1Match.overallScore}% fit for this position.`,
+              color: 'blue'
+            },
+            careerTrack: v1Match.careerTrack || { candidateTrack: 'Engineering', jobTrack: 'Engineering', isSameTrack: true, transitionPossible: true },
+            truthCheck: v1Match.truthCheck || { passed: true, greenCount: 0, yellowCount: 0, redCount: 0, items: [], summary: 'Truth check completed' },
+            atsAnalysis,
+            whyMatch: {
+              matchingStrengths: [],
+              relevantExperienceHighlights: [],
+              locationAlignment: 'Matched',
+              seniorityAlignment: 'Aligned',
+              missingOrWeakAreas: [],
+              potentialConcerns: []
+            }
+          } as unknown as JobMatchAnalysis);
+          return;
+        }
+      } catch (v1Err) {
+        console.warn('V1 Match API check error, falling back to proto match API:', v1Err);
+      }
+
+      // 2. Fallback to Prototype Match API
+      const res = await api.analyzeMatch(candidateId, jobId);
+      if (res && res.scores?.overallScore !== undefined) {
+        setMatchAnalysis(res);
+      } else {
+        throw new Error('Match analysis returned incomplete score data.');
+      }
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Unable to calculate match score for this job.');
+      setScoresError(normalized.message);
+      setMatchAnalysis(null);
+    } finally {
+      setIsLoadingScores(false);
+    }
+  };
 
   const checkExistingApplication = async () => {
     if (!candidate?.id || !job?.id) return;
@@ -161,9 +253,12 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
 
   if (!isOpen) return null;
 
-  const matchScore = matchAnalysis?.scores?.overallScore || 75;
-  const originalAts = matchAnalysis?.atsAnalysis?.estimatedScore || 78;
-  const currentAtsScore = tailoredResume ? Math.min(98, originalAts + 8) : originalAts;
+  // Genuine job-specific scores: null when loading or calculation is unavailable (NO FAKE 75 / 78 DEFAULTS)
+  const matchScore: number | null = matchAnalysis?.scores?.overallScore ?? null;
+  const originalAts: number | null = matchAnalysis?.atsAnalysis?.estimatedScore ?? null;
+  const currentAtsScore: number | null = originalAts !== null
+    ? (tailoredResume ? Math.min(98, originalAts + 8) : originalAts)
+    : null;
   const skillGaps = matchAnalysis?.atsAnalysis?.keywords?.red || [];
 
   // Deterministic Readiness Evaluation
@@ -230,48 +325,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
     try {
       setIsCheckingAts(true);
       setErrorBanner(null);
-      // Prefer V1 production matching endpoint if available
-      try {
-        const v1Match = await apiClient.getJobMatch(job.id);
-        if (v1Match) {
-          setMatchAnalysis({
-            id: v1Match.id,
-            candidateId: candidate.id,
-            jobId: job.id,
-            scores: v1Match.breakdown ? {
-              overallScore: v1Match.overallScore,
-              skillScore: v1Match.breakdown.skillScore,
-              experienceScore: v1Match.breakdown.experienceScore,
-              roleScore: v1Match.breakdown.roleScore,
-              locationScore: v1Match.breakdown.locationScore,
-              seniorityScore: v1Match.breakdown.seniorityScore
-            } : { overallScore: 80, skillScore: 80, experienceScore: 80, roleScore: 80, locationScore: 80, seniorityScore: 80 },
-            recommendation: {
-              category: v1Match.category === 'STRONG_MATCH' ? 'STRONG_MATCH' : 'MODERATE_MATCH',
-              title: v1Match.category === 'STRONG_MATCH' ? 'Strong Match' : 'Good Match',
-              description: `Evaluation confirmed ${v1Match.overallScore}% fit.`,
-              color: 'blue'
-            },
-            careerTrack: v1Match.careerTrack || { candidateTrack: 'Engineering', jobTrack: 'Engineering', isSameTrack: true, transitionPossible: true },
-            truthCheck: v1Match.truthCheck || { passed: true, greenCount: 0, yellowCount: 0, redCount: 0, items: [], summary: 'Truth check passed' },
-            atsAnalysis: v1Match.atsAnalysis || { estimatedScore: v1Match.overallScore, disclaimer: 'Estimated ATS Match', breakdown: { keywordMatch: 80, roleAlignment: 80, experienceAlignment: 80, skillsAlignment: 80, formatting: 90, readability: 90 }, keywords: { green: [], yellow: [], red: [] } },
-            whyMatch: {
-              matchingStrengths: [],
-              relevantExperienceHighlights: [],
-              locationAlignment: 'Matched',
-              seniorityAlignment: 'Aligned',
-              missingOrWeakAreas: [],
-              potentialConcerns: []
-            }
-          } as unknown as JobMatchAnalysis);
-          return;
-        }
-      } catch {
-        // Fallback to proto API
-      }
-
-      const res = await api.analyzeMatch(candidate.id, job.id);
-      setMatchAnalysis(res);
+      await fetchDynamicScores(job.id, candidate.id);
     } catch (err: unknown) {
       const normalized = normalizeApiError(err, 'ATS compatibility check could not be completed. Please try again.');
       setErrorBanner(normalized.message);
@@ -586,15 +640,37 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                   {/* Job & Match Summary Pod */}
                   <div className="readiness-metrics-grid">
                     <Card className="metric-pod">
-                      <span className="pod-label">Match Score</span>
-                      <div className="pod-value text-indigo">{matchScore}%</div>
+                      <span className="pod-label">Job Match Score</span>
+                      <div className="pod-value text-indigo">
+                        {isLoadingScores ? (
+                          <span className="score-loading-text"><Sparkles className="spin-icon inline-icon" size={16} /> Calculating...</span>
+                        ) : matchScore !== null ? (
+                          `${matchScore}%`
+                        ) : (
+                          <span className="score-unavailable-text">Unavailable</span>
+                        )}
+                      </div>
                       <span className="pod-sub">14-point deterministic fit</span>
                     </Card>
 
                     <Card className="metric-pod">
-                      <span className="pod-label">ATS Simulation Score</span>
-                      <div className={`pod-value ${isAtsPassed ? 'text-emerald' : 'text-red'}`}>{currentAtsScore}%</div>
-                      <span className="pod-sub">{tailoredResume ? 'Tailored Resume (v1)' : 'Master Profile ATS'}</span>
+                      <span className="pod-label">ATS Compatibility</span>
+                      <div className={`pod-value ${isLoadingScores ? 'text-neutral' : isAtsPassed ? 'text-emerald' : 'text-red'}`}>
+                        {isLoadingScores ? (
+                          <span className="score-loading-text"><Sparkles className="spin-icon inline-icon" size={16} /> Calculating...</span>
+                        ) : currentAtsScore !== null ? (
+                          `${currentAtsScore}%`
+                        ) : (
+                          <span className="score-unavailable-text">Unavailable</span>
+                        )}
+                      </div>
+                      <span className="pod-sub">
+                        {isLoadingScores
+                          ? 'Analyzing resume against job requirements...'
+                          : tailoredResume
+                          ? `${tailoredResume.versionName} (Tailored)`
+                          : 'Job-specific ATS Compatibility'}
+                      </span>
                     </Card>
 
                     <Card className="metric-pod">
@@ -606,17 +682,23 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                     </Card>
                   </div>
 
-                  {/* Mandatory ATS Gate Block when ATS < 80% */}
-                  {!isAtsPassed && (
+                  {/* Mandatory ATS Gate Block when ATS < 80% and not currently calculating */}
+                  {!isLoadingScores && !isAtsPassed && (
                     <div className="ats-gate-warning-card">
                       <div className="ats-gate-header">
                         <AlertTriangle size={20} className="text-red" />
-                        <h4 className="ats-gate-title">ATS Compatibility Gate Failed (Required: 80%)</h4>
+                        <h4 className="ats-gate-title">
+                          {currentAtsScore !== null
+                            ? 'ATS Compatibility Gate Failed (Required: 80%)'
+                            : 'ATS Compatibility Calculation Unavailable'}
+                        </h4>
                       </div>
                       <div className="ats-gate-metrics">
                         <div className="ats-gate-metric-item">
                           <span className="ats-gate-metric-lbl">ATS Compatibility</span>
-                          <span className="ats-gate-metric-val failed">{currentAtsScore}%</span>
+                          <span className="ats-gate-metric-val failed">
+                            {currentAtsScore !== null ? `${currentAtsScore}%` : 'Not Calculated'}
+                          </span>
                         </div>
                         <div className="ats-gate-metric-item">
                           <span className="ats-gate-metric-lbl">Minimum Required</span>
@@ -624,11 +706,15 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                         </div>
                         <div className="ats-gate-metric-item">
                           <span className="ats-gate-metric-lbl">Gate Status</span>
-                          <span className="ats-gate-metric-val failed status">❌ Below required threshold</span>
+                          <span className="ats-gate-metric-val failed status">
+                            {currentAtsScore !== null ? '❌ Below required threshold' : '⚠️ Calculation Required'}
+                          </span>
                         </div>
                       </div>
                       <p className="ats-gate-desc">
-                        Automatic application submission is blocked because your ATS score is below the mandatory 80% threshold. Tailor your resume in Resume Studio or address the missing keywords to proceed.
+                        {currentAtsScore !== null
+                          ? 'Automatic application submission is blocked because your ATS score is below the mandatory 80% threshold. Tailor your resume in Resume Studio or address the missing keywords to proceed.'
+                          : (scoresError || 'Unable to calculate ATS compatibility for this job. Please ensure network connectivity and retry.')}
                       </p>
                       <div className="ats-gate-actions">
                         {onNavigateToResumes && (
@@ -814,15 +900,15 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                       <Button
                         variant="outline"
                         icon={<RotateCcw size={14} />}
-                        loading={isCheckingAts}
+                        loading={isCheckingAts || isLoadingScores}
                         onClick={handleRunAtsCheck}
                       >
-                        Run ATS Check
+                        {currentAtsScore !== null ? 'Re-run ATS Check' : 'Calculate ATS Check'}
                       </Button>
                       <Button
                         variant="primary"
                         icon={<ArrowRight size={16} />}
-                        disabled={!canContinueToSelection}
+                        disabled={!canContinueToSelection || isLoadingScores}
                         onClick={() => setCurrentStep('selection')}
                       >
                         Continue to Resume Selection

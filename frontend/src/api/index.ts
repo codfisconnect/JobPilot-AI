@@ -88,9 +88,13 @@ export const api = {
 
   // Match Engine
   analyzeMatch: async (candidateId: string, jobId: string): Promise<JobMatchAnalysis> => {
+    const token = typeof window !== 'undefined' ? localStorage.getItem('pilotmama_access_token') : null;
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
     const res = await fetch(`${API_BASE}/match/analyze`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers,
       body: JSON.stringify({ candidateId, jobId })
     });
     const json = await res.json();
@@ -98,7 +102,11 @@ export const api = {
     return json.data;
   },
   getMatch: async (candidateId: string, jobId: string): Promise<JobMatchAnalysis | null> => {
-    const res = await fetch(`${API_BASE}/match/${candidateId}/${jobId}`);
+    const token = typeof window !== 'undefined' ? localStorage.getItem('pilotmama_access_token') : null;
+    const headers: Record<string, string> = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+
+    const res = await fetch(`${API_BASE}/match/${candidateId}/${jobId}`, { headers });
     const json = await res.json();
     return json.success ? json.data : null;
   },
