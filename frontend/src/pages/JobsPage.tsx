@@ -37,11 +37,13 @@ import './JobsPage.css';
 interface JobsPageProps {
   onSelectJobForAnalysis?: (jobId: string) => void;
   preselectedJobId?: string;
+  onNavigate?: (tab: string, id?: string) => void;
 }
 
 export const JobsPage: React.FC<JobsPageProps> = ({
   onSelectJobForAnalysis,
-  preselectedJobId
+  preselectedJobId,
+  onNavigate
 }) => {
   // Discovery and Query state
   const [jobs, setJobs] = useState<CanonicalJob[]>([]);
@@ -552,7 +554,12 @@ export const JobsPage: React.FC<JobsPageProps> = ({
               variant="primary"
               icon={<FileText size={16} />}
               onClick={() => {
-                window.location.hash = '#/resume';
+                if (onNavigate) {
+                  onNavigate('resumes');
+                } else {
+                  window.history.pushState({}, '', '/resumes');
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }
               }}
             >
               Upload Resume
@@ -561,7 +568,12 @@ export const JobsPage: React.FC<JobsPageProps> = ({
               variant="outline"
               icon={<Briefcase size={16} />}
               onClick={() => {
-                window.location.hash = '#/profile';
+                if (onNavigate) {
+                  onNavigate('profile');
+                } else {
+                  window.history.pushState({}, '', '/profile');
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }
               }}
             >
               Complete Profile
@@ -584,7 +596,18 @@ export const JobsPage: React.FC<JobsPageProps> = ({
           <h3>We couldn't find strong matches yet</h3>
           <p>Update your target roles, skills, or location preferences in your profile to expand recommendations, or explore all active listings.</p>
           <div className="empty-actions-row">
-            <Button variant="outline" size="sm" onClick={() => { window.location.hash = '#/profile'; }}>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (onNavigate) {
+                  onNavigate('profile');
+                } else {
+                  window.history.pushState({}, '', '/profile');
+                  window.dispatchEvent(new PopStateEvent('popstate'));
+                }
+              }}
+            >
               Update Profile
             </Button>
             <Button variant="primary" size="sm" onClick={() => handleTabSwitch('all')}>
