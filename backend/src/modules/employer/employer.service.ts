@@ -54,10 +54,19 @@ export class EmployerService {
    * Get organization profile and member info
    */
   async getMyOrganization(userId: string) {
-    const member = await this.requireEmployerContext(userId);
+    const member = await this.repo.findMemberByUserId(userId);
+    if (!member) {
+      return {
+        organization: null,
+        currentMember: null
+      };
+    }
     const org = await this.repo.findOrganizationById(member.organizationId);
     if (!org) {
-      throw new NotFoundError('Employer organization not found');
+      return {
+        organization: null,
+        currentMember: null
+      };
     }
     return {
       organization: org,

@@ -136,7 +136,7 @@ export const App: React.FC = () => {
     }
   };
 
-  const { isLoading: isAuthLoading } = useAuth();
+  const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
   // Initial Full-Viewport Bootstrap Loading Screen
   if (isAuthLoading) {
@@ -206,6 +206,27 @@ export const App: React.FC = () => {
 
   // Dedicated Isolated Employer Workspace Layout (isolated from candidate AppShell)
   if (currentTab === 'employer') {
+    // If not authenticated after bootstrap, redirect to login with return intent
+    if (!isAuthenticated && !user) {
+      return (
+        <AuthLayout onNavigateHome={() => handleNavigate('dashboard')}>
+          <Suspense fallback={<RouteLoadingFallback />}>
+            <AuthPage
+              initialMode="login"
+              onSuccess={() => {
+                handleNavigate('employer');
+              }}
+              onNavigateMode={(mode) => {
+                const targetPath = mode === 'register' ? '/register' : '/login';
+                if (window.location.pathname !== targetPath) {
+                  window.history.pushState({}, '', targetPath);
+                }
+              }}
+            />
+          </Suspense>
+        </AuthLayout>
+      );
+    }
     const path = window.location.pathname.toLowerCase().replace(/\/$/, '');
     let initialSection = 'jobs';
     if (path.includes('/careers') || path.includes('/career-source') || path.includes('/careers-source')) {
