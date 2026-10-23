@@ -193,4 +193,78 @@ export class EmployerService {
       rating: data.rating
     });
   }
+
+  /**
+   * Connect Careers URL and trigger universal discovery sync into the employer organization
+   */
+  async connectCareersUrl(userId: string, careersUrl: string) {
+    const member = await this.requireEmployerContext(userId);
+    const org = await this.repo.findOrganizationById(member.organizationId);
+    if (!org) {
+      throw new NotFoundError('Employer organization not found');
+    }
+
+    const { JobSourceDiscoveryService } = await import('../../services/jobSourceDiscovery.service.js');
+    const { prisma } = await import('../../database/prisma.js');
+
+    // 1. Run universal discovery and onboarding
+    const onboardResult = await JobSourceDiscoveryService.discoverAndOnboard(careersUrl);
+    if (!onboardResult.success) {
+      throw new ValidationError(onboardResult.error || 'Failed to discover jobs from careers URL');
+    }
+
+    // 2. Update employer organization careers URL
+    await this.repo.updateCareersUrl(member.organizationId, careersUrl);
+
+    // 3. Link discovered jobs to this EmployerOrganization
+    if (org.companyId || onboardResult.companyId) {
+      const companyId = org.companyId || onboardResult.companyId;
+      await prisma.job.updateMany({
+        where: { companyId },
+        data: {
+          organizationId: member.organizationId,
+          organizationJobStatus: 'PUBLISHED'
+        }
+      });
+    }
+
+    return {
+      organizationId: member.organizationId,
+      careersUrl,
+      discovery: onboardResult.discovery,
+      onboardResult
+    };
+  }
+
+
+  /**
+   * Search candidate talent pool (verified consent)
+   */
+  async searchCandidates(
+    userId: string,
+    params: { query?: string; skills?: string; location?: string; page: number; limit: number }
+  ) {
+    await this.requireEmployerContext(userId);
+    return this.repo.searchCandidates(params);
+  }
+
+  /**
+   * List team members
+   */
+  async listMembers(userId: string) {
+    const member = await this.requireEmployerContext(userId);
+    return this.repo.listMembers(member.organizationId);
+  }
+
+  /**
+   * Invite / add team member
+   */
+  async addMember(userId: string, data: { email: string; role: EmployerRole; title?: string }) {
+    const member = await this.requireEmployerContext(userId);
+    if (member.role !== EmployerRole.OWNER && member.role !== EmployerRole.ADMIN) {
+      throw new ForbiddenError('Only organization owners and admins can invite team members');
+    }
+    return this.repo.addMember(member.organizationId, data.email, data.role, data.title);
+  }
 }
+

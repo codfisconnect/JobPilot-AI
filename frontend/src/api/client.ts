@@ -800,6 +800,36 @@ export class ApiClient {
     });
   }
 
+  async connectEmployerCareersUrl(careersUrl: string): Promise<{ success: boolean; data: any; message?: string }> {
+    return this.request('/employer/careers-source/connect', {
+      method: 'POST',
+      body: JSON.stringify({ careersUrl })
+    });
+  }
+
+  async searchEmployerCandidates(params: { query?: string; skills?: string; location?: string; page?: number; limit?: number } = {}): Promise<{ success: boolean; candidates: any[]; pagination: any }> {
+    const qs = new URLSearchParams();
+    if (params.query) qs.append('query', params.query);
+    if (params.skills) qs.append('skills', params.skills);
+    if (params.location) qs.append('location', params.location);
+    if (params.page) qs.append('page', String(params.page));
+    if (params.limit) qs.append('limit', String(params.limit));
+    const query = qs.toString();
+    return this.request(`/employer/candidates/search${query ? `?${query}` : ''}`);
+  }
+
+  async getEmployerMembers(): Promise<{ success: boolean; data: any[] }> {
+    return this.request('/employer/team');
+  }
+
+  async inviteEmployerMember(data: { email: string; role: string; title?: string }): Promise<{ success: boolean; data: any }> {
+    return this.request('/employer/team/invite', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+
   // Sprint 9: AI Career Agent APIs
   async createAgentSession(title?: string): Promise<{ success: boolean; data: any }> {
     return this.request('/agent/sessions', {
@@ -894,6 +924,14 @@ export class ApiClient {
     const query = qs.toString();
     return this.requestPaginated<AdminEmployerItem>(`/admin/employers${query ? `?${query}` : ''}`);
   }
+
+  async verifyAdminEmployer(id: string, status: string = 'VERIFIED'): Promise<any> {
+    return this.request<any>(`/admin/employers/${id}/verify`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status })
+    });
+  }
+
 
   async getAdminPayments(params: { page?: number; pageSize?: number; search?: string; status?: string } = {}): Promise<PaginatedResponse<AdminPaymentItem>> {
     const qs = new URLSearchParams();

@@ -174,4 +174,71 @@ export class EmployerController {
       next(err);
     }
   };
+
+  connectCareersUrl = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = this.getUserId(req);
+      const { careersUrl } = req.body;
+      if (!careersUrl || typeof careersUrl !== 'string') {
+        res.status(400).json({ success: false, error: 'A valid careers URL is required' });
+        return;
+      }
+      const result = await this.service.connectCareersUrl(userId, careersUrl);
+      res.status(200).json({
+        success: true,
+        data: result,
+        message: 'Careers URL connected and initial sync triggered successfully'
+      });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  searchCandidates = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = this.getUserId(req);
+      const query = String(req.query.query || '');
+      const skills = String(req.query.skills || '');
+      const location = String(req.query.location || '');
+      const page = Math.max(1, parseInt(req.query.page as string, 10) || 1);
+      const limit = Math.min(50, Math.max(1, parseInt(req.query.limit as string, 10) || 20));
+
+      const result = await this.service.searchCandidates(userId, {
+        query: query || undefined,
+        skills: skills || undefined,
+        location: location || undefined,
+        page,
+        limit
+      });
+      res.status(200).json({ success: true, ...result });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  listMembers = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = this.getUserId(req);
+      const members = await this.service.listMembers(userId);
+      res.status(200).json({ success: true, data: members });
+    } catch (err) {
+      next(err);
+    }
+  };
+
+  addMember = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const userId = this.getUserId(req);
+      const { email, role, title } = req.body;
+      if (!email || !role) {
+        res.status(400).json({ success: false, error: 'Email and role are required' });
+        return;
+      }
+      const member = await this.service.addMember(userId, { email, role, title });
+      res.status(201).json({ success: true, data: member });
+    } catch (err) {
+      next(err);
+    }
+  };
 }
+

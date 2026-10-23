@@ -22,8 +22,20 @@ employerRouter.post('/jobs/:id/publish', controller.publishJob);
 employerRouter.post('/jobs/:id/pause', controller.pauseJob);
 employerRouter.post('/jobs/:id/close', controller.closeJob);
 
+// Careers Source Connection (Universal Discovery Integration)
+employerRouter.post('/careers-source/connect', controller.connectCareersUrl);
+
 // Applicant Pipeline
 employerRouter.get('/jobs/:id/applications', controller.listJobApplications);
 employerRouter.get('/applications/:id', controller.getApplicationDetail);
 employerRouter.patch('/applications/:id/stage', controller.updateApplicationStage);
 employerRouter.post('/applications/:id/notes', controller.addApplicationNote);
+
+// Candidate Talent Pool Discovery (Consent-based)
+employerRouter.get('/candidates/search', controller.searchCandidates);
+
+// Team & Role Management
+employerRouter.get('/team', controller.listMembers);
+employerRouter.post('/team/invite', controller.addMember);
+
+

@@ -176,6 +176,22 @@ export class AdminController {
     }
   }
 
+  async verifyEmployer(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const id = String(req.params.id);
+      const { status } = req.body;
+      const org = await adminService.verifyEmployer(id, status || 'VERIFIED');
+      res.status(200).json({
+        success: true,
+        data: org,
+        message: `Employer organization status updated to ${status || 'VERIFIED'}`
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+
   async getPayments(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const query = paymentsFilterSchema.parse(req.query);
