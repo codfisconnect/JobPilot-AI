@@ -79,8 +79,9 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
     try {
       setLoadingHistory(true);
       const res = await apiClient.getBulkJobSourcesHistory(1, 25);
-      if (res?.imports) {
-        setHistoryRuns(res.imports);
+      const importsList = res?.imports || res?.data?.imports || (Array.isArray(res?.data) ? res.data : []);
+      if (Array.isArray(importsList)) {
+        setHistoryRuns(importsList);
       }
     } catch (err: any) {
       console.error('Failed to load bulk history:', err);
@@ -91,6 +92,13 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
 
   useEffect(() => {
     loadHistory();
+    // Recover persisted active batch on mount / refresh
+    try {
+      const persistedId = sessionStorage.getItem('pilotmama_active_bulk_job_id');
+      if (persistedId && !activeJobId) {
+        setActiveJobId(persistedId);
+      }
+    } catch {}
   }, []);
 
   // Polling for Active Job
@@ -109,19 +117,22 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
 
         if (!isSubscribed) return;
 
-        if (jobRes?.job) {
-          setActiveJob(jobRes.job);
+        const resolvedJob = jobRes?.job || jobRes?.data?.job || jobRes?.data;
+        const resolvedItems = itemsRes?.items || itemsRes?.data?.items || (Array.isArray(itemsRes?.data) ? itemsRes.data : []);
+
+        if (resolvedJob) {
+          setActiveJob(resolvedJob);
         }
-        if (itemsRes?.items) {
-          setActiveItems(itemsRes.items);
+        if (Array.isArray(resolvedItems) && resolvedItems.length > 0) {
+          setActiveItems(resolvedItems);
         }
 
         // If job reached terminal state, stop fast polling
         if (
-          jobRes?.job?.status === 'COMPLETED' ||
-          jobRes?.job?.status === 'PARTIAL' ||
-          jobRes?.job?.status === 'FAILED' ||
-          jobRes?.job?.status === 'CANCELLED'
+          resolvedJob?.status === 'COMPLETED' ||
+          resolvedJob?.status === 'PARTIAL' ||
+          resolvedJob?.status === 'FAILED' ||
+          resolvedJob?.status === 'CANCELLED'
         ) {
           return;
         }
@@ -182,8 +193,9 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
     try {
       setValidating(true);
       const res = await apiClient.validateBulkJobSources({ urls });
-      if (res?.preview) {
-        setPreviewResult(res.preview);
+      const previewData = res?.preview || res?.data?.preview || res?.data;
+      if (previewData) {
+        setPreviewResult(previewData);
         setPreviewRevision(currentRev);
       }
     } catch (err: any) {
@@ -219,14 +231,20 @@ export const BulkJobSourcesPage: React.FC<BulkJobSourcesPageProps> = ({ onBackTo
         maxConcurrency: concurrency
       });
 
-      if (res?.bulkJobId) {
-        setActiveJobId(res.bulkJobId);
+      const returnedId = res?.bulkJobId || res?.batchId || res?.id || res?.data?.bulkJobId || res?.data?.batchId || res?.data?.id;
+
+      if (returnedId) {
+        setActiveJobId(returnedId);
+        try {
+          sessionStorage.setItem('pilotmama_active_bulk_job_id', returnedId);
+        } catch {}
         // Clear input immediately so admin can paste another batch
         setInputText('');
         setInputRevision(prev => prev + 1);
         setPreviewResult(null);
         setPreviewRevision(-1);
-        setActionSuccess(`Bulk discovery batch started with ${res.accepted || urls.length} accepted source(s).`);
+        const acceptedCount = res?.accepted ?? res?.data?.accepted ?? urls.length;
+        setActionSuccess(`Bulk discovery batch started with ${acceptedCount} accepted source(s).`);
         // Refresh history
         loadHistory();
       } else {

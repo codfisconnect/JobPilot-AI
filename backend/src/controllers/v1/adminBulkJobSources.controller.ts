@@ -38,6 +38,7 @@ export class AdminBulkJobSourcesController {
 
       res.status(200).json({
         success: true,
+        data: preview,
         preview
       });
     } catch (err) {
@@ -68,15 +69,22 @@ export class AdminBulkJobSourcesController {
         maxConcurrency: parsed.data.maxConcurrency
       });
 
-      res.status(202).json({
-        success: true,
-        message: 'Bulk job source import initialized.',
+      const responseData = {
         bulkJobId: result.bulkJobId,
+        batchId: result.bulkJobId,
+        id: result.bulkJobId,
         total: result.total,
         accepted: result.accepted,
         rejected: result.rejected,
         duplicates: result.duplicates,
         alreadyConnected: result.alreadyConnected
+      };
+
+      res.status(202).json({
+        success: true,
+        message: 'Bulk job source import initialized.',
+        data: responseData,
+        ...responseData
       });
     } catch (err) {
       next(err);
@@ -109,6 +117,15 @@ export class AdminBulkJobSourcesController {
 
       res.status(200).json({
         success: true,
+        data: {
+          imports,
+          pagination: {
+            page,
+            limit,
+            total,
+            totalPages: Math.ceil(total / limit)
+          }
+        },
         imports,
         pagination: {
           page,
@@ -148,6 +165,10 @@ export class AdminBulkJobSourcesController {
 
       res.status(200).json({
         success: true,
+        data: {
+          job: bulkJob,
+          ...bulkJob
+        },
         job: bulkJob
       });
     } catch (err) {
@@ -174,6 +195,9 @@ export class AdminBulkJobSourcesController {
 
       res.status(200).json({
         success: true,
+        data: {
+          items
+        },
         items
       });
     } catch (err) {
