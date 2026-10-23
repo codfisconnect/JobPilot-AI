@@ -711,9 +711,47 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                           </span>
                         </div>
                       </div>
+
+                      {/* Diagnostic Breakdown: Why Match Score != ATS Score */}
+                      {matchScore !== null && currentAtsScore !== null && matchScore > currentAtsScore && (
+                        <div className="ats-fit-distinction-note">
+                          <strong>💡 Why is Match Score {matchScore}% while ATS is {currentAtsScore}%?</strong>
+                          <p>
+                            Your background and verified experience are a strong fit for this role ({matchScore}% overall fit), but your selected resume does not explicitly communicate enough of this specific job's technical terminology and keywords ({currentAtsScore}% ATS alignment).
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Granular ATS Keywords Breakdown */}
+                      {matchAnalysis?.atsAnalysis?.keywords && (
+                        <div className="ats-keywords-diagnostic">
+                          {matchAnalysis.atsAnalysis.keywords.red && matchAnalysis.atsAnalysis.keywords.red.length > 0 && (
+                            <div className="ats-missing-keywords-row">
+                              <span className="keyword-category-lbl text-red font-semibold">Missing from selected resume:</span>
+                              <div className="keyword-pills-wrap">
+                                {matchAnalysis.atsAnalysis.keywords.red.map((kw: string) => (
+                                  <span key={kw} className="keyword-pill pill-red">✕ {kw}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+
+                          {matchAnalysis.atsAnalysis.keywords.green && matchAnalysis.atsAnalysis.keywords.green.length > 0 && (
+                            <div className="ats-matched-keywords-row">
+                              <span className="keyword-category-lbl text-emerald font-semibold">Strongly matched in resume:</span>
+                              <div className="keyword-pills-wrap">
+                                {matchAnalysis.atsAnalysis.keywords.green.map((kw: string) => (
+                                  <span key={kw} className="keyword-pill pill-green">✓ {kw}</span>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
                       <p className="ats-gate-desc">
                         {currentAtsScore !== null
-                          ? 'Automatic application submission is blocked because your ATS score is below the mandatory 80% threshold. Tailor your resume in Resume Studio or address the missing keywords to proceed.'
+                          ? 'Automatic application submission requires an ATS compatibility score of at least 80%. Tailor your resume specifically for this job to align your experience descriptions with the role terminology.'
                           : (scoresError || 'Unable to calculate ATS compatibility for this job. Please ensure network connectivity and retry.')}
                       </p>
                       <div className="ats-gate-actions">
@@ -727,7 +765,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                               onNavigateToResumes();
                             }}
                           >
-                            Improve Resume in Studio
+                            Tailor Resume in Studio
                           </Button>
                         )}
                         <Button
@@ -788,9 +826,23 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                         </span>
                       </div>
                       <div className="summary-row">
-                        <span className="row-key">Identified Skill Gaps:</span>
+                        <span className="row-key">Candidate Skill Gaps:</span>
                         <span className="row-val">
-                          {skillGaps.length > 0 ? skillGaps.slice(0, 3).join(', ') : 'None detected'}
+                          {skillGaps.length > 0 ? (
+                            <span className="text-amber">{skillGaps.slice(0, 3).join(', ')}</span>
+                          ) : (
+                            <span className="text-emerald">None detected (Candidate skills qualify)</span>
+                          )}
+                        </span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="row-key">Resume Keyword Gaps:</span>
+                        <span className="row-val">
+                          {matchAnalysis?.atsAnalysis?.keywords?.red && matchAnalysis.atsAnalysis.keywords.red.length > 0 ? (
+                            <span className="text-red font-semibold">{matchAnalysis.atsAnalysis.keywords.red.length} keywords unaddressed in resume</span>
+                          ) : (
+                            <span className="text-emerald">Full keyword alignment</span>
+                          )}
                         </span>
                       </div>
                     </div>
