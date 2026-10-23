@@ -48,6 +48,9 @@ export const App: React.FC = () => {
     if (cleanPath === '/resumes') {
       return 'resumes';
     }
+    if (cleanPath.startsWith('/studio')) {
+      return 'studio';
+    }
     if (cleanPath === '/applications') {
       return 'applications';
     }
@@ -72,15 +75,27 @@ export const App: React.FC = () => {
     return 'dashboard';
   };
 
+  const getContextIdFromPath = (path: string): string | undefined => {
+    const cleanPath = path.replace(/\/$/, '');
+    if (cleanPath.startsWith('/studio/')) {
+      const parts = cleanPath.split('/');
+      return parts[2] || undefined;
+    }
+    return undefined;
+  };
+
   const [currentTab, setCurrentTab] = useState<string>(() => {
     return getTabFromPath(window.location.pathname);
   });
-  const [contextId, setContextId] = useState<string | undefined>(undefined);
+  const [contextId, setContextId] = useState<string | undefined>(() => {
+    return getContextIdFromPath(window.location.pathname);
+  });
 
   // Sync route on popstate (browser back/forward)
   React.useEffect(() => {
     const handlePopState = () => {
       setCurrentTab(getTabFromPath(window.location.pathname));
+      setContextId(getContextIdFromPath(window.location.pathname));
     };
     window.addEventListener('popstate', handlePopState);
     return () => window.removeEventListener('popstate', handlePopState);
@@ -93,6 +108,7 @@ export const App: React.FC = () => {
       profile: 'Pilot Mama | My Profile',
       jobs: 'Pilot Mama | Jobs',
       resumes: 'Pilot Mama | Resumes',
+      studio: 'Pilot Mama | Resume Studio & Diff View',
       analysis: 'Pilot Mama | Job Fit Analysis',
       applications: 'Pilot Mama | Applications Pipeline',
       'saved-jobs': 'Pilot Mama | Saved Jobs',
@@ -119,6 +135,7 @@ export const App: React.FC = () => {
       auth: '/login',
       jobs: '/jobs',
       resumes: '/resumes',
+      studio: id ? `/studio/${id}` : '/studio',
       applications: '/applications',
       profile: '/profile',
       settings: '/settings',

@@ -670,7 +670,7 @@ export class ProductionMatchingService {
         jobId: job.id,
         versionName: tailored.versionName,
         strategy: mode as any,
-        atsScore: tailored.atsScore || matchAnalysis.atsAnalysis?.estimatedScore || 85,
+        atsScore: tailored.atsScore || matchAnalysis.atsAnalysis?.estimatedScore || 0,
         contentSnapshot: tailored as any,
         structuredContent: tailored as any
       }

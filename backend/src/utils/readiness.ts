@@ -105,7 +105,11 @@ export interface ReadinessEvaluationParams {
 
 export interface ReadinessEvaluationResult {
   isReady: boolean;
+  canProceedToPreparation: boolean;
+  canProceedToSubmission: boolean;
   blockers: ReadinessBlocker[];
+  preparationBlockers: ReadinessBlocker[];
+  submissionBlockers: ReadinessBlocker[];
   profileStatedYears: number;
   workHistoryYears: number;
   experienceDiscrepancy: number; // profile - workHistory
@@ -117,6 +121,7 @@ export interface ReadinessEvaluationResult {
   atsThreshold: number;
   isAtsPassed: boolean;
 }
+
 
 export const MANDATORY_ATS_THRESHOLD = 80;
 
@@ -211,7 +216,7 @@ export function evaluateApplicationReadiness(
       blockers.push({
         id: 'ATS_BELOW_THRESHOLD',
         title: 'ATS Below Mandatory Threshold',
-        description: `Current ATS score for this job is ${currentAtsScore}%. Minimum required threshold to submit is ${atsThreshold}%. Tailor your resume to bridge missing skill keywords.`,
+        description: `Current ATS score for this job is ${currentAtsScore}%. Minimum required threshold to submit is ${atsThreshold}%. Tailoring may improve ATS compatibility by aligning your verified experience with the job's terminology.`,
         severity: 'BLOCKING',
         actionLabel: 'Improve Resume'
       });
@@ -237,9 +242,16 @@ export function evaluateApplicationReadiness(
     });
   }
 
+  const preparationBlockers = blockers.filter(b => b.id !== 'ATS_BELOW_THRESHOLD');
+  const submissionBlockers = blockers.filter(b => b.id === 'ATS_BELOW_THRESHOLD');
+
   return {
     isReady: blockers.length === 0,
+    canProceedToPreparation: preparationBlockers.length === 0,
+    canProceedToSubmission: blockers.length === 0,
     blockers,
+    preparationBlockers,
+    submissionBlockers,
     profileStatedYears,
     workHistoryYears,
     experienceDiscrepancy: diff,
@@ -252,3 +264,4 @@ export function evaluateApplicationReadiness(
     isAtsPassed
   };
 }
+

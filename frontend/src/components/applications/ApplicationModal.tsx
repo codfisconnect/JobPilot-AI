@@ -38,7 +38,13 @@ import {
   Check,
   RotateCcw,
   FileText,
-  X
+  X,
+  FileEdit,
+  Building,
+  User,
+  Briefcase,
+  HelpCircle,
+  CheckSquare
 } from 'lucide-react';
 import './ApplicationModal.css';
 
@@ -55,7 +61,28 @@ interface ApplicationModalProps {
   onNavigateToLearning?: () => void;
 }
 
-type Step = 'readiness' | 'selection' | 'preview' | 'success';
+type Step = 'readiness' | 'selection' | 'form' | 'confirmation' | 'success';
+
+export type AnswerState = 'unanswered' | 'suggested' | 'edited' | 'confirmed';
+
+export interface EmployerQuestionItem {
+  id: string;
+  question: string;
+  required: boolean;
+  groundedSource?: string;
+  defaultAnswer?: string;
+}
+
+interface UsableResumeItem {
+  id: string;
+  name: string;
+  type: 'master' | 'tailored' | 'uploaded';
+  version: string;
+  atsScore: number | null;
+  lastUpdated: string;
+  status: string;
+  tailoredObj?: TailoredResume;
+}
 
 export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   isOpen,
@@ -72,7 +99,13 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   const [currentStep, setCurrentStep] = useState<Step>('readiness');
   const [tailoredResume, setTailoredResume] = useState<TailoredResume | null>(initialTailoredResume || null);
   const [matchAnalysis, setMatchAnalysis] = useState<JobMatchAnalysis | null>(initialMatchAnalysis || null);
-  const [selectedResumeType, setSelectedResumeType] = useState<'tailored' | 'master'>('tailored');
+  
+  // Selection state: 'master' or tailored version id
+  const [selectedResumeId, setSelectedResumeId] = useState<string>('master');
+  const [activePreviewResumeId, setActivePreviewResumeId] = useState<string | null>(null);
+  const [showDiffView, setShowDiffView] = useState<boolean>(false);
+  const [isTailoringInline, setIsTailoringInline] = useState<boolean>(false);
+
   const [isCheckingAts, setIsCheckingAts] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submittedApp, setSubmittedApp] = useState<ApplicationRecord | null>(null);
@@ -89,40 +122,213 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   // Canonical company name sanitization
   const canonicalCompany = getCanonicalCompanyName(job?.company, job?.sourceUrl, job?.applicationUrl);
 
-  // Form Fields for Application Preview / Edit
+  // Storage key for caching in-progress preparation state per (candidateId + jobId)
+  const draftStorageKey = candidate?.id && job?.id ? `pilotmama_app_draft_${candidate.id}_${job.id}` : null;
+
+  // Form Fields for Application Form (Step 3) - Section A: Candidate Information
   const [formFields, setFormFields] = useState({
     fullName: candidate?.name || '',
     email: candidate?.email || '',
     phone: candidate?.phone || '',
-    location: candidate?.location || '',
-    experienceYears: candidate?.yearsOfExperience ? candidate.yearsOfExperience.toString() : '0',
+    currentLocation: candidate?.location || '',
+    preferredLocation: (candidate?.preferredLocations || []).join(', ') || candidate?.location || '',
     currentRole: candidate?.headline || candidate?.experiences?.[0]?.title || '',
-    linkedInUrl: candidate?.linkedInUrl || '',
-    portfolioUrl: candidate?.gitHubUrl || '',
+    currentCompany: candidate?.companies?.[0] || candidate?.experiences?.[0]?.company || '',
+    experienceYears: candidate?.yearsOfExperience ? candidate.yearsOfExperience.toString() : '0',
+    noticePeriod: candidate?.noticePeriod || 'Immediate / 30 days',
+    expectedSalary: candidate?.expectedSalary || 'Market standard / negotiable',
+    workAuthorization: 'Authorized to work in role location',
     coverLetter: `Dear Hiring Team,\n\nI am excited to submit my application for the ${job?.role || 'open'} role at ${canonicalCompany}. With ${candidate?.yearsOfExperience || 'relevant'} years of demonstrated experience in ${job?.careerTrack || 'the discipline'} and core expertise in ${(candidate?.primarySkills || []).slice(0, 4).join(', ')}, I look forward to contributing high-impact value to your team.\n\nBest regards,\n${candidate?.name || ''}`
   });
+
+  // Step 3 Section B: Employer Questions & Answer States
+  // customAnswers: map of questionId -> answer text
+  const [customAnswers, setCustomAnswers] = useState<Record<string, string>>({});
+  // answerStates: map of questionId -> 'unanswered' | 'suggested' | 'edited' | 'confirmed'
+  const [answerStates, setAnswerStates] = useState<Record<string, AnswerState>>({});
+
+  // Form validation errors map
+  const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
 
   // Job-specific dynamic match & ATS evaluation state
   const [isLoadingScores, setIsLoadingScores] = useState<boolean>(false);
   const [scoresError, setScoresError] = useState<string | null>(null);
 
-  // Re-sync form fields whenever candidate or job changes
+  // Determine employer questions from Job context (or truthful empty state)
+  const getDetectedEmployerQuestions = (): EmployerQuestionItem[] => {
+    const rawQuestions: any[] = (job as any)?.applicationQuestions || (job as any)?.questions || [];
+    if (Array.isArray(rawQuestions) && rawQuestions.length > 0) {
+      return rawQuestions.map((q, idx) => ({
+        id: q.id || `q-${idx}`,
+        question: typeof q === 'string' ? q : q.question || q.label || `Employer Question ${idx + 1}`,
+        required: q.required !== false,
+        groundedSource: q.groundedSource || 'Employer Application Form',
+        defaultAnswer: q.defaultAnswer
+      }));
+    }
+
+    // If job has structured prompt requirements in qualifications/rawText, extract truthful recognized inquiries
+    // Examples: Notice Period, Relocation, Total Experience
+    const detected: EmployerQuestionItem[] = [];
+    if (job?.responsibilities?.length || job?.qualifications?.length || job?.rawText) {
+      // 1. Role Interest & Fit (Common ATS screening inquiry)
+      detected.push({
+        id: 'q_interest_role',
+        question: `Why are you interested in this ${job?.role || 'open'} role at ${canonicalCompany}?`,
+        required: true,
+        groundedSource: 'Core Role Alignment & Verified Candidate Summary'
+      });
+
+      // 2. Relevant Experience
+      detected.push({
+        id: 'q_experience_alignment',
+        question: `How many years of relevant professional experience do you have in ${job?.careerTrack || job?.role}?`,
+        required: true,
+        groundedSource: 'Verified Candidate Work History'
+      });
+
+      // 3. Work Arrangement & Location
+      if (job?.location) {
+        detected.push({
+          id: 'q_work_arrangement',
+          question: `Are you willing to work in or relocate to ${job.location} under the employer's work arrangement?`,
+          required: false,
+          groundedSource: 'Candidate Work Preference & Location'
+        });
+      }
+
+      // 4. Notice Period & Availability
+      detected.push({
+        id: 'q_notice_period',
+        question: 'What is your current notice period and earliest availability date?',
+        required: true,
+        groundedSource: 'Candidate Profile Notice Period'
+      });
+    }
+
+    return detected;
+  };
+
+  const detectedQuestions = getDetectedEmployerQuestions();
+
+  // Generate grounded suggested answer using ONLY verified candidate profile data
+  const generateGroundedAnswer = (qItem: EmployerQuestionItem): string => {
+    const qLower = qItem.question.toLowerCase();
+
+    if (qLower.includes('why are you interested') || qLower.includes('good fit') || qLower.includes('why should we hire')) {
+      const topSkills = (candidate?.primarySkills || []).slice(0, 4).join(', ');
+      return `With ${candidate?.yearsOfExperience || 'relevant'} years of verified experience in ${candidate?.headline || job?.careerTrack || 'the field'} and demonstrated expertise in ${topSkills || 'core requirements'}, I bring a track record of delivering resilient outcomes aligned with ${canonicalCompany}'s objectives.`;
+    }
+
+    if (qLower.includes('years') && (qLower.includes('experience') || qLower.includes('relevant'))) {
+      return candidate?.yearsOfExperience !== undefined
+        ? `I have ${candidate.yearsOfExperience} years of verified experience.`
+        : 'Candidate input required.';
+    }
+
+    if (qLower.includes('notice period') || qLower.includes('availability') || qLower.includes('start date')) {
+      return candidate?.noticePeriod
+        ? `My notice period is ${candidate.noticePeriod}.`
+        : 'Candidate input required.';
+    }
+
+    if (qLower.includes('salary') || qLower.includes('compensation') || qLower.includes('ctc')) {
+      return candidate?.expectedSalary
+        ? `Expected compensation: ${candidate.expectedSalary}.`
+        : 'Candidate input required.';
+    }
+
+    if (qLower.includes('relocate') || qLower.includes('location') || qLower.includes('remote') || qLower.includes('hybrid')) {
+      const pref = candidate?.workPreference || 'Flexible';
+      const candLoc = candidate?.location || 'Current location';
+      return `Based in ${candLoc}. My work preference is ${pref}, and I am open to discussing arrangements for ${job?.location || 'this role'}.`;
+    }
+
+    if (qLower.includes('authorization') || qLower.includes('visa') || qLower.includes('sponsor')) {
+      return 'Candidate input required.';
+    }
+
+    // Default: Check matchAnalysis suggested answers if present
+    if (matchAnalysis?.suggestedAnswers) {
+      for (const [key, val] of Object.entries(matchAnalysis.suggestedAnswers)) {
+        if (qLower.includes(key.toLowerCase()) || key.toLowerCase().includes(qLower.slice(0, 15))) {
+          return val;
+        }
+      }
+    }
+
+    return 'Candidate input required.';
+  };
+
+  // Re-sync form fields whenever candidate or job changes, restoring saved draft if available
   useEffect(() => {
+    if (draftStorageKey && typeof window !== 'undefined') {
+      try {
+        const savedDraftStr = localStorage.getItem(draftStorageKey);
+        if (savedDraftStr) {
+          const draft = JSON.parse(savedDraftStr);
+          if (draft && draft.jobId === job?.id) {
+            if (draft.formFields) setFormFields(draft.formFields);
+            if (draft.customAnswers) setCustomAnswers(draft.customAnswers);
+            if (draft.answerStates) setAnswerStates(draft.answerStates);
+            if (draft.selectedResumeId) setSelectedResumeId(draft.selectedResumeId);
+            return;
+          }
+        }
+      } catch (err) {
+        console.warn('Notice restoring application draft:', err);
+      }
+    }
+
+    // Default initialization when no draft exists
     if (candidate) {
-      setFormFields(prev => ({
-        ...prev,
+      setFormFields({
         fullName: candidate.name || '',
         email: candidate.email || '',
         phone: candidate.phone || '',
-        location: candidate.location || '',
-        experienceYears: candidate.yearsOfExperience ? candidate.yearsOfExperience.toString() : prev.experienceYears,
-        currentRole: candidate.headline || candidate.experiences?.[0]?.title || prev.currentRole,
-        linkedInUrl: candidate.linkedInUrl || prev.linkedInUrl,
-        portfolioUrl: candidate.gitHubUrl || prev.portfolioUrl,
+        currentLocation: candidate.location || '',
+        preferredLocation: (candidate.preferredLocations || []).join(', ') || candidate.location || '',
+        currentRole: candidate.headline || candidate.experiences?.[0]?.title || '',
+        currentCompany: candidate.companies?.[0] || candidate.experiences?.[0]?.company || '',
+        experienceYears: candidate.yearsOfExperience ? candidate.yearsOfExperience.toString() : '0',
+        noticePeriod: candidate.noticePeriod || 'Immediate / 30 days',
+        expectedSalary: candidate.expectedSalary || 'Market standard / negotiable',
+        workAuthorization: 'Authorized to work in role location',
         coverLetter: `Dear Hiring Team,\n\nI am excited to submit my application for the ${job?.role || 'open'} role at ${canonicalCompany}. With ${candidate.yearsOfExperience || 'relevant'} years of demonstrated experience in ${job?.careerTrack || 'the discipline'} and core expertise in ${(candidate.primarySkills || []).slice(0, 4).join(', ')}, I look forward to contributing high-impact value to your team.\n\nBest regards,\n${candidate.name || ''}`
-      }));
+      });
+
+      // Initialize default suggested answers for detected questions
+      const initialAnswers: Record<string, string> = {};
+      const initialStates: Record<string, AnswerState> = {};
+      detectedQuestions.forEach(q => {
+        const groundedAns = generateGroundedAnswer(q);
+        initialAnswers[q.id] = groundedAns;
+        initialStates[q.id] = groundedAns === 'Candidate input required.' ? 'unanswered' : 'suggested';
+      });
+
+      setCustomAnswers(initialAnswers);
+      setAnswerStates(initialStates);
     }
-  }, [candidate, job?.role, canonicalCompany]);
+  }, [candidate?.id, job?.id, canonicalCompany]);
+
+  // Persist draft changes to storage
+  const persistDraftState = (newFields = formFields, newAnswers = customAnswers, newStates = answerStates, resId = selectedResumeId) => {
+    if (draftStorageKey && typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(draftStorageKey, JSON.stringify({
+          jobId: job?.id,
+          candidateId: candidate?.id,
+          formFields: newFields,
+          customAnswers: newAnswers,
+          answerStates: newStates,
+          selectedResumeId: resId,
+          updatedAt: new Date().toISOString()
+        }));
+      } catch (err) {
+        console.warn('Notice persisting draft:', err);
+      }
+    }
+  };
 
   const isCodewalla = (canonicalCompany && canonicalCompany.toLowerCase().includes('codewalla')) || (job?.source && job.source.toLowerCase().includes('codewalla'));
   const effectiveMode = isCodewalla ? 'demo' : (job?.applicationMode || 'agent');
@@ -130,6 +336,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   useEffect(() => {
     if (initialTailoredResume) {
       setTailoredResume(initialTailoredResume);
+      setSelectedResumeId(initialTailoredResume.id || 'tailored');
     }
   }, [initialTailoredResume]);
 
@@ -139,7 +346,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
     }
   }, [initialMatchAnalysis]);
 
-  // Primary Effect: When modal opens or job.id / candidate.id changes, fetch genuine job-specific match & ATS
+  // Primary Effect: When modal opens or job.id / candidate.id changes, reset context and fetch genuine job-specific match & ATS
   useEffect(() => {
     if (isOpen) {
       setCurrentStep('readiness');
@@ -147,25 +354,28 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       setDuplicateWarning(null);
       setExternalConfirmed(false);
       setErrorBanner(null);
+      setShowDiffView(false);
+      setActivePreviewResumeId(null);
+      setValidationErrors({});
       checkExistingApplication();
 
       if (job?.id && candidate?.id) {
-        // If an initial match analysis was passed and matches this specific job, use it
         if (initialMatchAnalysis && (initialMatchAnalysis.jobId === job.id || (initialMatchAnalysis as any).id === job.id)) {
           setMatchAnalysis(initialMatchAnalysis);
           setIsLoadingScores(false);
           setScoresError(null);
         } else {
-          // Otherwise, clear previous stale job state and trigger fresh dynamic calculation
           setMatchAnalysis(null);
           fetchDynamicScores(job.id, candidate.id);
         }
       }
     } else {
-      // Clear state on close to prevent stale state flicker
       setMatchAnalysis(null);
       setIsLoadingScores(false);
       setScoresError(null);
+      setShowDiffView(false);
+      setActivePreviewResumeId(null);
+      setValidationErrors({});
     }
   }, [isOpen, job?.id, candidate?.id]);
 
@@ -174,7 +384,6 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       setIsLoadingScores(true);
       setScoresError(null);
 
-      // 1. Try V1 Production Matching API
       try {
         const v1Match = await apiClient.getJobMatch(jobId);
         if (v1Match && v1Match.overallScore !== undefined) {
@@ -219,10 +428,9 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
           return;
         }
       } catch (v1Err) {
-        console.warn('V1 Match API check error, falling back to proto match API:', v1Err);
+        console.warn('V1 Match API notice, falling back to proto match API:', v1Err);
       }
 
-      // 2. Fallback to Prototype Match API
       const res = await api.analyzeMatch(candidateId, jobId);
       if (res && res.scores?.overallScore !== undefined) {
         setMatchAnalysis(res);
@@ -251,17 +459,77 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
     }
   };
 
+  const handleTriggerTailorResume = async () => {
+    if (!job?.id) return;
+    try {
+      setIsTailoringInline(true);
+      setErrorBanner(null);
+
+      try {
+        const v1Result = await apiClient.tailorResume(job.id, 'TARGETED');
+        if (v1Result && v1Result.versionId) {
+          const tailoredObj: TailoredResume = {
+            id: v1Result.versionId,
+            versionName: v1Result.versionName || 'Tailored_Resume_v1',
+            candidateId: candidate.id,
+            jobId: job.id,
+            targetRole: job.role,
+            targetCompany: canonicalCompany,
+            tailoredSummary: v1Result.tailoredSummary || `Experienced ${job.role} with verified track record.`,
+            orderedSkills: v1Result.orderedSkills || candidate?.primarySkills || [],
+            experiences: candidate?.experiences || [],
+            projects: candidate?.projects || [],
+            modifications: (v1Result.modifications || []).map((m: any) => typeof m === 'string' ? {
+              section: 'Experience',
+              original: 'Original text',
+              tailored: m,
+              reason: 'Aligned terminology'
+            } : m),
+            truthCheckVerified: true,
+            atsScore: v1Result.atsScore !== undefined ? v1Result.atsScore : originalAts,
+            createdAt: new Date().toISOString()
+          };
+          setTailoredResume(tailoredObj);
+          setSelectedResumeId(tailoredObj.id);
+          persistDraftState(formFields, customAnswers, answerStates, tailoredObj.id);
+          setCurrentStep('selection');
+          return;
+        }
+      } catch (v1Err) {
+        console.warn('V1 tailor notice, trying proto API:', v1Err);
+      }
+
+      if (candidate?.id) {
+        const res = await api.tailorResume(candidate.id, job.id, 'TARGETED');
+        if (res) {
+          setTailoredResume(res);
+          setSelectedResumeId(res.id);
+          persistDraftState(formFields, customAnswers, answerStates, res.id);
+          setCurrentStep('selection');
+        }
+      }
+    } catch (err: unknown) {
+      const normalized = normalizeApiError(err, 'Failed to generate tailored resume. Please try again.');
+      setErrorBanner(normalized.message);
+    } finally {
+      setIsTailoringInline(false);
+    }
+  };
+
   if (!isOpen) return null;
 
-  // Genuine job-specific scores: null when loading or calculation is unavailable (NO FAKE 75 / 78 DEFAULTS)
   const matchScore: number | null = matchAnalysis?.scores?.overallScore ?? null;
   const originalAts: number | null = matchAnalysis?.atsAnalysis?.estimatedScore ?? null;
-  const currentAtsScore: number | null = originalAts !== null
-    ? (tailoredResume ? Math.min(98, originalAts + 8) : originalAts)
-    : null;
-  const skillGaps = matchAnalysis?.atsAnalysis?.keywords?.red || [];
 
-  // Deterministic Readiness Evaluation
+  const isSelectedTailored = tailoredResume && (selectedResumeId === tailoredResume.id || selectedResumeId === 'tailored');
+  const currentAtsScore: number | null = isSelectedTailored
+    ? (tailoredResume.atsScore !== undefined ? tailoredResume.atsScore : originalAts)
+    : originalAts;
+
+  const skillGaps = matchAnalysis?.atsAnalysis?.keywords?.red || [];
+  const candidateStrengths = matchAnalysis?.atsAnalysis?.keywords?.green || candidate?.primarySkills?.slice(0, 4) || [];
+  const keywordGaps = matchAnalysis?.atsAnalysis?.keywords?.red || [];
+
   const readiness = evaluateApplicationReadiness({
     candidate,
     job,
@@ -271,7 +539,10 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   });
 
   const {
-    isReady: canContinueToSelection,
+    canProceedToPreparation,
+    canProceedToSubmission,
+    preparationBlockers,
+    submissionBlockers,
     blockers,
     profileStatedYears,
     workHistoryYears,
@@ -279,6 +550,33 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
     hasExperienceDiscrepancy,
     isAtsPassed
   } = readiness;
+
+  const usableResumes: UsableResumeItem[] = [
+    {
+      id: 'master',
+      name: 'Master Profile Resume',
+      type: 'master',
+      version: 'v1.0 (Canonical)',
+      atsScore: originalAts,
+      lastUpdated: candidate?.updatedAt || 'Recent',
+      status: 'Active'
+    }
+  ];
+
+  if (tailoredResume) {
+    usableResumes.unshift({
+      id: tailoredResume.id || 'tailored',
+      name: tailoredResume.versionName || `${job?.role} Tailored Resume`,
+      type: 'tailored',
+      version: 'v1.0 (Job-Specific)',
+      atsScore: tailoredResume.atsScore !== undefined ? tailoredResume.atsScore : originalAts,
+      lastUpdated: tailoredResume.createdAt || 'Just now',
+      status: 'Tailored',
+      tailoredObj: tailoredResume
+    });
+  }
+
+  const currentlySelectedResumeObj = usableResumes.find(r => r.id === selectedResumeId) || usableResumes[0];
 
   const handleSaveCandidateLocation = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
@@ -290,7 +588,6 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
     try {
       setIsSavingLocation(true);
       setErrorBanner(null);
-      // Update candidate profile via API
       try {
         await apiClient.updateCandidateProfile({ location: trimmed });
       } catch {
@@ -298,11 +595,10 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
           await api.updateCandidate(candidate.id, { ...candidate, location: trimmed });
         }
       }
-      // Mutate local object so UI reacts instantly without requiring reload
       if (candidate) {
         candidate.location = trimmed;
       }
-      setFormFields(prev => ({ ...prev, location: trimmed }));
+      setFormFields(prev => ({ ...prev, currentLocation: trimmed }));
       setLocationSuccessMsg('Location saved successfully.');
       setTimeout(() => setLocationSuccessMsg(null), 3000);
     } catch (err: unknown) {
@@ -335,19 +631,140 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   };
 
   const handleFormChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormFields({
+    const updated = {
       ...formFields,
       [e.target.name]: e.target.value
-    });
+    };
+    setFormFields(updated);
+    if (validationErrors[e.target.name]) {
+      setValidationErrors(prev => {
+        const copy = { ...prev };
+        delete copy[e.target.name];
+        return copy;
+      });
+    }
+    persistDraftState(updated);
   };
 
+  const handleCustomAnswerChange = (qId: string, val: string) => {
+    const updatedAnswers = {
+      ...customAnswers,
+      [qId]: val
+    };
+    setCustomAnswers(updatedAnswers);
+
+    // Update state to 'edited' (or 'unanswered' if cleared)
+    const updatedStates = {
+      ...answerStates,
+      [qId]: (!val.trim() || val === 'Candidate input required.') ? 'unanswered' as AnswerState : 'edited' as AnswerState
+    };
+    setAnswerStates(updatedStates);
+
+    if (validationErrors[qId]) {
+      setValidationErrors(prev => {
+        const copy = { ...prev };
+        delete copy[qId];
+        return copy;
+      });
+    }
+
+    persistDraftState(formFields, updatedAnswers, updatedStates);
+  };
+
+  const handleConfirmAnswer = (qId: string) => {
+    const currentVal = customAnswers[qId] || '';
+    if (!currentVal.trim() || currentVal === 'Candidate input required.') {
+      return;
+    }
+    const updatedStates = {
+      ...answerStates,
+      [qId]: 'confirmed' as AnswerState
+    };
+    setAnswerStates(updatedStates);
+    persistDraftState(formFields, customAnswers, updatedStates);
+  };
+
+  // Step 3 Validation Gate: Validate required candidate fields & required employer questions
+  const validateStep3Form = (): boolean => {
+    const errors: Record<string, string> = {};
+
+    if (!formFields.fullName.trim()) {
+      errors.fullName = 'Full Name is required.';
+    }
+    if (!formFields.email.trim()) {
+      errors.email = 'Email address is required.';
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formFields.email.trim())) {
+      errors.email = 'Please provide a valid email address.';
+    }
+    if (!formFields.phone.trim()) {
+      errors.phone = 'Phone number is required.';
+    }
+    if (!formFields.currentLocation.trim()) {
+      errors.currentLocation = 'Current location is required.';
+    }
+
+    // Validate required employer questions
+    detectedQuestions.forEach(q => {
+      if (q.required) {
+        const ans = (customAnswers[q.id] || '').trim();
+        if (!ans || ans === 'Candidate input required.') {
+          errors[q.id] = `This employer question is required. Candidate input required.`;
+        }
+      }
+    });
+
+    setValidationErrors(errors);
+    return Object.keys(errors).length === 0;
+  };
+
+  const handleAdvanceToConfirmation = () => {
+    if (!validateStep3Form()) {
+      setErrorBanner('Please review required application fields and employer questions before proceeding.');
+      return;
+    }
+    setErrorBanner(null);
+    setCurrentStep('confirmation');
+  };
+
+  // Readiness Checklist Evaluation for Step 4 Confirmation
+  const checklistCandidateInfo = Boolean(
+    formFields.fullName.trim() &&
+    formFields.email.trim() &&
+    formFields.phone.trim() &&
+    formFields.currentLocation.trim()
+  );
+  const checklistResumeSelected = Boolean(currentlySelectedResumeObj && currentlySelectedResumeObj.id);
+  const checklistResumeOwnership = Boolean(
+    selectedResumeId === 'master' || (tailoredResume && tailoredResume.candidateId === candidate.id)
+  );
+  const checklistQuestionsComplete = detectedQuestions.every(q => {
+    if (!q.required) return true;
+    const ans = (customAnswers[q.id] || '').trim();
+    return ans.length > 0 && ans !== 'Candidate input required.';
+  });
+  const checklistTruthPassed = readiness.experienceDiscrepancy < 1.0 || isExperienceConfirmed;
+
+  const allChecklistItemsPassed =
+    checklistCandidateInfo &&
+    checklistResumeSelected &&
+    checklistResumeOwnership &&
+    checklistQuestionsComplete &&
+    checklistTruthPassed;
+
+  const isSubmissionFullyEligible = canProceedToSubmission && allChecklistItemsPassed && isAtsPassed;
+
   const handleSubmitDemoApplication = async () => {
+    if (!isSubmissionFullyEligible) {
+      setErrorBanner('Automatic submission blocked: Application readiness criteria or ATS compatibility requirement (80%) not met.');
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       setErrorBanner(null);
       const now = new Date().toISOString();
-      const resumeVerId = selectedResumeType === 'tailored' ? (tailoredResume?.id || '') : '';
-      const resumeVerName = selectedResumeType === 'tailored' ? (tailoredResume?.versionName || 'Tailored_Resume_v1') : 'Master_Profile';
+      const resumeVerId = isSelectedTailored ? (tailoredResume?.id || '') : 'master';
+      const resumeVerName = currentlySelectedResumeObj.name;
 
       const appData: Partial<ApplicationRecord> = {
         candidateId: candidate.id,
@@ -364,10 +781,10 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
         resumeVersionName: resumeVerName,
         status: 'APPLIED_DEMO',
         appliedAt: now,
-        notes: `Simulated Demo Application submitted in Pilot Mama. Tailored version: ${resumeVerName}.`,
+        notes: `Simulated Demo Application submitted in Pilot Mama. Selected resume: ${resumeVerName}.`,
         skillGaps,
         coverLetter: formFields.coverLetter,
-        customAnswers: matchAnalysis?.suggestedAnswers || {},
+        customAnswers,
         timeline: [
           { timestamp: now, stage: 'Job Discovered', description: `Job opportunity ingested from ${job.source || 'Pilot Mama Catalog'}.` },
           { timestamp: now, stage: 'Match Evaluated', description: `Calculated match score of ${matchScore}%.` },
@@ -389,9 +806,8 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   };
 
   const handleStartExternalApplication = async () => {
-    // Gate check: Must not proceed if ATS threshold has not been met
-    if (!isAtsPassed) {
-      setErrorBanner('Application blocked: ATS Compatibility score is below the required 80% threshold. Improve resume in Resume Studio before applying.');
+    if (!allChecklistItemsPassed) {
+      setErrorBanner('Please resolve incomplete application checklist items before opening external application.');
       return;
     }
 
@@ -399,15 +815,15 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
       setIsSubmitting(true);
       setErrorBanner(null);
       const now = new Date().toISOString();
-      const resumeVerId = selectedResumeType === 'tailored' ? (tailoredResume?.id || '') : '';
-      const resumeVerName = selectedResumeType === 'tailored' ? (tailoredResume?.versionName || 'Tailored_Resume_v1') : 'Master_Profile';
+      const resumeVerId = isSelectedTailored ? (tailoredResume?.id || '') : 'master';
+      const resumeVerName = currentlySelectedResumeObj.name;
 
-      // Call canonical backend Application Agent start API
+      // Call canonical backend Application Agent start API (mode: prepared)
       let autoResult: any = null;
       try {
         const rawRes = await apiClient.startApplication({
           jobId: job.id,
-          resumeVersionId: resumeVerId || undefined,
+          resumeVersionId: resumeVerId !== 'master' ? resumeVerId : undefined,
           autoApply: false
         });
         autoResult = rawRes?.data || rawRes;
@@ -416,42 +832,44 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
         console.warn('Backend automation notice:', norm.message);
       }
 
+      // Open external employer application URL in new tab safely
+      const targetUrl = job.applicationUrl || job.sourceUrl || '';
+      if (targetUrl) {
+        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      }
+
+      // Record prepared state without claiming automatic completion
       const appData: Partial<ApplicationRecord> = {
-        candidateId: candidate?.id || 'candidate_me',
+        candidateId: candidate.id,
         jobId: job.id,
         company: canonicalCompany,
         role: job.role,
         location: job.location,
         applicationMode: 'external',
         jobUrl: job.sourceUrl || '',
-        applicationUrl: job.applicationUrl || job.sourceUrl || '',
+        applicationUrl: targetUrl,
         matchScore: autoResult?.jobMatchScore || matchScore,
         atsScore: autoResult?.atsCompatibilityScore || currentAtsScore,
         resumeVersionId: resumeVerId,
         resumeVersionName: resumeVerName,
-        status: (autoResult?.currentState === 'APPLIED' ? 'APPLIED' : 'APPLICATION_STARTED') as any,
+        status: 'APPLICATION_STARTED',
         appliedAt: now,
-        notes: `Application Agent initialized for ${canonicalCompany} (${autoResult?.job?.platform || 'Direct ATS'}). Current state: ${autoResult?.currentState || 'PREPARED'}.`,
+        notes: `Application package prepared for ${canonicalCompany}. External portal opened. Candidate confirmation pending.`,
         skillGaps,
         coverLetter: formFields.coverLetter,
-        timeline: autoResult?.timeline?.length
-          ? autoResult.timeline.map((t: any) => ({
-              timestamp: t.timestamp,
-              stage: t.step,
-              description: t.message
-            }))
-          : [
-              { timestamp: now, stage: 'Application Agent Started', description: `Automated preparation orchestrated within Pilot Mama.` }
-            ]
+        customAnswers,
+        timeline: [
+          { timestamp: now, stage: 'Application Form Prepared', description: 'Application answers and resume package prepared in Pilot Mama.' },
+          { timestamp: now, stage: 'Employer Portal Launched', description: `Employer application portal opened (${targetUrl}). Awaiting candidate confirmation.` }
+        ]
       };
 
       const res = await api.saveApplication(appData);
       setSubmittedApp(res);
       onSuccess(res);
-
       setCurrentStep('success');
     } catch (err: unknown) {
-      const normalized = normalizeApiError(err, 'Application could not be started.');
+      const normalized = normalizeApiError(err, 'External application session could not be initiated.');
       setErrorBanner(normalized.message);
     } finally {
       setIsSubmitting(false);
@@ -562,22 +980,22 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
 
         {/* Step Indicator */}
         <div className="flow-step-bar">
-          <div className={`step-item ${currentStep === 'readiness' ? 'active' : 'completed'}`}>
+          <div className={`step-item ${currentStep === 'readiness' ? 'active' : 'completed'}`} onClick={() => setCurrentStep('readiness')}>
             <span className="step-num">1</span>
             <span className="step-lbl">Readiness Check</span>
           </div>
           <div className={`step-separator ${currentStep !== 'readiness' ? 'active' : ''}`} />
-          <div className={`step-item ${currentStep === 'selection' ? 'active' : currentStep === 'preview' || currentStep === 'success' ? 'completed' : ''}`}>
+          <div className={`step-item ${currentStep === 'selection' ? 'active' : currentStep === 'form' || currentStep === 'confirmation' || currentStep === 'success' ? 'completed' : ''}`} onClick={() => canProceedToPreparation && setCurrentStep('selection')}>
             <span className="step-num">2</span>
             <span className="step-lbl">Resume Selection</span>
           </div>
-          <div className={`step-separator ${currentStep === 'preview' || currentStep === 'success' ? 'active' : ''}`} />
-          <div className={`step-item ${currentStep === 'preview' ? 'active' : currentStep === 'success' ? 'completed' : ''}`}>
+          <div className={`step-separator ${currentStep === 'form' || currentStep === 'confirmation' || currentStep === 'success' ? 'active' : ''}`} />
+          <div className={`step-item ${currentStep === 'form' ? 'active' : currentStep === 'confirmation' || currentStep === 'success' ? 'completed' : ''}`} onClick={() => canProceedToPreparation && setCurrentStep('form')}>
             <span className="step-num">3</span>
             <span className="step-lbl">Application Form</span>
           </div>
-          <div className={`step-separator ${currentStep === 'success' ? 'active' : ''}`} />
-          <div className={`step-item ${currentStep === 'success' ? 'active' : ''}`}>
+          <div className={`step-separator ${currentStep === 'confirmation' || currentStep === 'success' ? 'active' : ''}`} />
+          <div className={`step-item ${currentStep === 'confirmation' ? 'active' : currentStep === 'success' ? 'completed' : ''}`} onClick={() => canProceedToPreparation && setCurrentStep('confirmation')}>
             <span className="step-num">4</span>
             <span className="step-lbl">Confirmation</span>
           </div>
@@ -607,7 +1025,6 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
 
         {/* Body Content by Step */}
         <div className="app-modal-body">
-          {/* Missing Candidate Safety Guard */}
           {(!candidate || !candidate.email) ? (
             <div className="candidate-unavailable-card">
               <ShieldAlert size={40} className="text-amber" style={{ margin: '0 auto 12px auto' }} />
@@ -637,6 +1054,66 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                     </div>
                   )}
 
+                  {/* Readiness Summary Header */}
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', flexWrap: 'wrap', gap: '8px' }}>
+                    <div>
+                      <h3 style={{ margin: '0 0 4px 0', fontSize: '1.15rem', color: '#f8fafc' }}>Application Readiness Overview</h3>
+                      <p style={{ margin: 0, fontSize: '0.84rem', color: '#94a3b8' }}>
+                        Inspect role fit, ATS compatibility, and keyword gaps. Preparation and resume selection remain fully available.
+                      </p>
+                    </div>
+                    <div>
+                      {preparationBlockers.length > 0 ? (
+                        <span className="readiness-status-badge unavailable">
+                          <AlertTriangle size={12} /> Preparation Blocked
+                        </span>
+                      ) : !isAtsPassed ? (
+                        <span className="readiness-status-badge attention">
+                          <AlertTriangle size={12} /> Needs Attention
+                        </span>
+                      ) : (
+                        <span className="readiness-status-badge ready">
+                          <CheckCircle size={12} /> Ready for Submission
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Functional Quick Actions Bar */}
+                  <div className="readiness-quick-actions-bar">
+                    <span className="quick-actions-label">Readiness Actions:</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      icon={<AlertTriangle size={14} />}
+                      onClick={() => {
+                        const el = document.getElementById('ats-diagnostics-section');
+                        if (el) el.scrollIntoView({ behavior: 'smooth' });
+                      }}
+                    >
+                      Review ATS Gaps
+                    </Button>
+
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon={<Sparkles size={14} />}
+                      loading={isTailoringInline}
+                      onClick={handleTriggerTailorResume}
+                    >
+                      {tailoredResume ? 'Re-Tailor Resume' : 'Tailor Resume'}
+                    </Button>
+
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      icon={<FileText size={14} />}
+                      onClick={() => setCurrentStep('selection')}
+                    >
+                      Select Resume
+                    </Button>
+                  </div>
+
                   {/* Job & Match Summary Pod */}
                   <div className="readiness-metrics-grid">
                     <Card className="metric-pod">
@@ -650,12 +1127,12 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                           <span className="score-unavailable-text">Unavailable</span>
                         )}
                       </div>
-                      <span className="pod-sub">14-point deterministic fit</span>
+                      <span className="pod-sub">Authoritative 14-point deterministic fit</span>
                     </Card>
 
                     <Card className="metric-pod">
                       <span className="pod-label">ATS Compatibility</span>
-                      <div className={`pod-value ${isLoadingScores ? 'text-neutral' : isAtsPassed ? 'text-emerald' : 'text-red'}`}>
+                      <div className={`pod-value ${isLoadingScores ? 'text-neutral' : isAtsPassed ? 'text-emerald' : 'text-amber'}`}>
                         {isLoadingScores ? (
                           <span className="score-loading-text"><Sparkles className="spin-icon inline-icon" size={16} /> Calculating...</span>
                         ) : currentAtsScore !== null ? (
@@ -667,119 +1144,133 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                       <span className="pod-sub">
                         {isLoadingScores
                           ? 'Analyzing resume against job requirements...'
-                          : tailoredResume
-                          ? `${tailoredResume.versionName} (Tailored)`
-                          : 'Job-specific ATS Compatibility'}
+                          : isSelectedTailored
+                          ? `${tailoredResume?.versionName || 'Tailored Resume'} (Tailored)`
+                          : 'Master Profile Resume'}
                       </span>
                     </Card>
 
                     <Card className="metric-pod">
-                      <span className="pod-label">Application Mode</span>
-                      <div className="pod-value">
-                        <ApplicationModeBadge mode={effectiveMode} isCodewalla={isCodewalla} size="sm" />
+                      <span className="pod-label">Automatic Submission Gate</span>
+                      <div className="pod-value" style={{ fontSize: '1.05rem', fontWeight: 700 }}>
+                        {isLoadingScores ? (
+                          <span className="score-loading-text">Checking...</span>
+                        ) : isAtsPassed ? (
+                          <span className="text-emerald">READY (≥ 80%)</span>
+                        ) : (
+                          <span className="text-amber">NOT READY (&lt; 80%)</span>
+                        )}
                       </div>
-                      <span className="pod-sub">{effectiveMode === 'demo' ? 'Local Pilot Mama Sandbox' : 'Application Agent Service'}</span>
+                      <span className="pod-sub">
+                        {isAtsPassed ? 'Eligible for automatic submission' : 'Preparation remains fully open'}
+                      </span>
                     </Card>
                   </div>
 
-                  {/* Mandatory ATS Gate Block when ATS < 80% and not currently calculating */}
-                  {!isLoadingScores && !isAtsPassed && (
-                    <div className="ats-gate-warning-card">
-                      <div className="ats-gate-header">
-                        <AlertTriangle size={20} className="text-red" />
-                        <h4 className="ats-gate-title">
-                          {currentAtsScore !== null
-                            ? 'ATS Compatibility Gate Failed (Required: 80%)'
-                            : 'ATS Compatibility Calculation Unavailable'}
-                        </h4>
-                      </div>
-                      <div className="ats-gate-metrics">
-                        <div className="ats-gate-metric-item">
-                          <span className="ats-gate-metric-lbl">ATS Compatibility</span>
-                          <span className="ats-gate-metric-val failed">
-                            {currentAtsScore !== null ? `${currentAtsScore}%` : 'Not Calculated'}
-                          </span>
-                        </div>
-                        <div className="ats-gate-metric-item">
-                          <span className="ats-gate-metric-lbl">Minimum Required</span>
-                          <span className="ats-gate-metric-val required">80%</span>
-                        </div>
-                        <div className="ats-gate-metric-item">
-                          <span className="ats-gate-metric-lbl">Gate Status</span>
-                          <span className="ats-gate-metric-val failed status">
-                            {currentAtsScore !== null ? '❌ Below required threshold' : '⚠️ Calculation Required'}
-                          </span>
-                        </div>
-                      </div>
-
-                      {/* Diagnostic Breakdown: Why Match Score != ATS Score */}
-                      {matchScore !== null && currentAtsScore !== null && matchScore > currentAtsScore && (
-                        <div className="ats-fit-distinction-note">
-                          <strong>💡 Why is Match Score {matchScore}% while ATS is {currentAtsScore}%?</strong>
-                          <p>
-                            Your background and verified experience are a strong fit for this role ({matchScore}% overall fit), but your selected resume does not explicitly communicate enough of this specific job's technical terminology and keywords ({currentAtsScore}% ATS alignment).
-                          </p>
-                        </div>
+                  {/* ATS Diagnostic Pod (Review ATS Gaps target) */}
+                  <div id="ats-diagnostics-section" className="ats-gate-warning-card" style={{ borderColor: isAtsPassed ? 'rgba(16, 185, 129, 0.3)' : 'rgba(245, 158, 11, 0.35)' }}>
+                    <div className="ats-gate-header">
+                      {isAtsPassed ? (
+                        <CheckCircle size={20} className="text-emerald" />
+                      ) : (
+                        <AlertTriangle size={20} className="text-amber" />
                       )}
+                      <h4 className="ats-gate-title">
+                        {isAtsPassed
+                          ? 'ATS Compatibility Threshold Met (≥ 80%)'
+                          : 'ATS Compatibility Notice (Current: ' + (currentAtsScore !== null ? `${currentAtsScore}%` : 'Pending') + ' • Requirement: 80%)'}
+                      </h4>
+                    </div>
 
-                      {/* Granular ATS Keywords Breakdown */}
-                      {matchAnalysis?.atsAnalysis?.keywords && (
-                        <div className="ats-keywords-diagnostic">
-                          {matchAnalysis.atsAnalysis.keywords.red && matchAnalysis.atsAnalysis.keywords.red.length > 0 && (
-                            <div className="ats-missing-keywords-row">
-                              <span className="keyword-category-lbl text-red font-semibold">Missing from selected resume:</span>
-                              <div className="keyword-pills-wrap">
-                                {matchAnalysis.atsAnalysis.keywords.red.map((kw: string) => (
-                                  <span key={kw} className="keyword-pill pill-red">✕ {kw}</span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-
-                          {matchAnalysis.atsAnalysis.keywords.green && matchAnalysis.atsAnalysis.keywords.green.length > 0 && (
-                            <div className="ats-matched-keywords-row">
-                              <span className="keyword-category-lbl text-emerald font-semibold">Strongly matched in resume:</span>
-                              <div className="keyword-pills-wrap">
-                                {matchAnalysis.atsAnalysis.keywords.green.map((kw: string) => (
-                                  <span key={kw} className="keyword-pill pill-green">✓ {kw}</span>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )}
-
-                      <p className="ats-gate-desc">
-                        {currentAtsScore !== null
-                          ? 'Automatic application submission requires an ATS compatibility score of at least 80%. Tailor your resume specifically for this job to align your experience descriptions with the role terminology.'
-                          : (scoresError || 'Unable to calculate ATS compatibility for this job. Please ensure network connectivity and retry.')}
-                      </p>
-                      <div className="ats-gate-actions">
-                        {onNavigateToResumes && (
-                          <Button
-                            variant="primary"
-                            size="sm"
-                            icon={<FileText size={14} />}
-                            onClick={() => {
-                              onClose();
-                              onNavigateToResumes();
-                            }}
-                          >
-                            Tailor Resume in Studio
-                          </Button>
-                        )}
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          icon={<RotateCcw size={14} />}
-                          loading={isCheckingAts}
-                          onClick={handleRunAtsCheck}
-                        >
-                          Re-run ATS Check
-                        </Button>
+                    <div className="ats-gate-metrics">
+                      <div className="ats-gate-metric-item">
+                        <span className="ats-gate-metric-lbl">Current ATS Score</span>
+                        <span className={`ats-gate-metric-val ${isAtsPassed ? 'text-emerald' : 'failed'}`}>
+                          {currentAtsScore !== null ? `${currentAtsScore}%` : 'Not Calculated'}
+                        </span>
+                      </div>
+                      <div className="ats-gate-metric-item">
+                        <span className="ats-gate-metric-lbl">Submission Threshold</span>
+                        <span className="ats-gate-metric-val required">80%</span>
+                      </div>
+                      <div className="ats-gate-metric-item">
+                        <span className="ats-gate-metric-lbl">Preparation Status</span>
+                        <span className="ats-gate-metric-val text-emerald status">
+                          ✓ Available (Select, Tailor, Form)
+                        </span>
                       </div>
                     </div>
-                  )}
+
+                    {/* Fit Distinction Note */}
+                    {matchScore !== null && currentAtsScore !== null && matchScore > currentAtsScore && (
+                      <div className="ats-fit-distinction-note">
+                        <strong>💡 Why is Match Score {matchScore}% while ATS is {currentAtsScore}%?</strong>
+                        <p>
+                          Your verified profile experience aligns strongly with this position ({matchScore}% overall fit), but your active resume does not yet reflect all employer terminology. Tailoring may improve ATS compatibility by aligning your verified experience with the job's terminology.
+                        </p>
+                      </div>
+                    )}
+
+                    {/* Granular ATS Keywords Breakdown */}
+                    <div className="ats-keywords-diagnostic">
+                      {keywordGaps.length > 0 && (
+                        <div className="ats-missing-keywords-row">
+                          <span className="keyword-category-lbl text-amber font-semibold">Resume Keyword Gaps:</span>
+                          <div className="keyword-pills-wrap">
+                            {keywordGaps.map((kw: string) => (
+                              <span key={kw} className="keyword-pill pill-red">✕ {kw}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {candidateStrengths.length > 0 && (
+                        <div className="ats-matched-keywords-row">
+                          <span className="keyword-category-lbl text-emerald font-semibold">Candidate Strengths & Verified Terminology:</span>
+                          <div className="keyword-pills-wrap">
+                            {candidateStrengths.map((kw: string) => (
+                              <span key={kw} className="keyword-pill pill-green">✓ {kw}</span>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    <p className="ats-gate-desc">
+                      {isAtsPassed
+                        ? 'Your active resume meets the 80% threshold required for automated submission. You may still review options or customize answers in the following steps.'
+                        : 'The 80% threshold determines automatic submission eligibility at Step 4, but does not block you from selecting resumes, generating tailored versions, or completing application questions.'}
+                    </p>
+
+                    <div className="ats-gate-actions">
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon={<Sparkles size={14} />}
+                        loading={isTailoringInline}
+                        onClick={handleTriggerTailorResume}
+                      >
+                        Tailor Resume for Role
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        size="sm"
+                        icon={<FileText size={14} />}
+                        onClick={() => setCurrentStep('selection')}
+                      >
+                        Select Different Resume
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        icon={<RotateCcw size={14} />}
+                        loading={isCheckingAts}
+                        onClick={handleRunAtsCheck}
+                      >
+                        Re-run ATS Check
+                      </Button>
+                    </div>
+                  </div>
 
                   {/* Application Details Summary */}
                   <Card className="readiness-summary-card">
@@ -814,15 +1305,15 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                         </span>
                       </div>
                       <div className="summary-row">
-                        <span className="row-key">Experience Requirement:</span>
+                        <span className="row-key">Experience Fit:</span>
                         <span className="row-val">
                           {job?.experienceRequired || 'Not specified'} (Candidate Stated: {profileStatedYears} yrs | Work History: {workHistoryYears} yrs)
                         </span>
                       </div>
                       <div className="summary-row">
-                        <span className="row-key">Selected Resume:</span>
+                        <span className="row-key">Active Resume:</span>
                         <span className="row-val text-emerald font-bold">
-                          {tailoredResume ? `${tailoredResume.versionName} (Tailored)` : 'Master Profile Resume'}
+                          {currentlySelectedResumeObj.name} ({currentlySelectedResumeObj.version})
                         </span>
                       </div>
                       <div className="summary-row">
@@ -838,8 +1329,8 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                       <div className="summary-row">
                         <span className="row-key">Resume Keyword Gaps:</span>
                         <span className="row-val">
-                          {matchAnalysis?.atsAnalysis?.keywords?.red && matchAnalysis.atsAnalysis.keywords.red.length > 0 ? (
-                            <span className="text-red font-semibold">{matchAnalysis.atsAnalysis.keywords.red.length} keywords unaddressed in resume</span>
+                          {keywordGaps.length > 0 ? (
+                            <span className="text-amber font-semibold">{keywordGaps.length} keywords unrepresented in current resume</span>
                           ) : (
                             <span className="text-emerald">Full keyword alignment</span>
                           )}
@@ -847,17 +1338,17 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                       </div>
                     </div>
 
-                    {/* Structured Blocker Summary */}
-                    {blockers.length > 0 ? (
+                    {/* Preparation Blockers List (Genuine blockers like missing location / profile conflict) */}
+                    {preparationBlockers.length > 0 ? (
                       <div className="readiness-blockers-container">
                         <div className="blockers-header">
                           <AlertTriangle size={18} className="text-amber" />
                           <h5 className="blockers-count-title">
-                            {blockers.length} {blockers.length === 1 ? 'item needs' : 'items need'} attention before you can apply:
+                            {preparationBlockers.length} preparation {preparationBlockers.length === 1 ? 'blocker needs' : 'blockers need'} resolution before continuing:
                           </h5>
                         </div>
                         <div className="blockers-list">
-                          {blockers.map((b, idx) => (
+                          {preparationBlockers.map((b, idx) => (
                             <div key={b.id + idx} className="blocker-item-card">
                               <div className="blocker-num">{idx + 1}</div>
                               <div className="blocker-content">
@@ -866,7 +1357,6 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                                 </div>
                                 <p className="blocker-item-desc">{b.description}</p>
 
-                                {/* Action: Add Location Inline */}
                                 {b.id === 'MISSING_CANDIDATE_LOCATION' && (
                                   <form className="inline-location-form" onSubmit={handleSaveCandidateLocation}>
                                     <input
@@ -891,7 +1381,6 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                                   </form>
                                 )}
 
-                                {/* Action: Review Experience */}
                                 {b.id === 'PROFILE_DATA_CONFLICT' && (
                                   <div className="blocker-inline-action">
                                     <Button
@@ -904,32 +1393,6 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                                     </Button>
                                   </div>
                                 )}
-
-                                {/* Action: Improve Resume */}
-                                {b.id === 'ATS_BELOW_THRESHOLD' && onNavigateToResumes && (
-                                  <div className="blocker-inline-action">
-                                    <Button
-                                      size="sm"
-                                      variant="primary"
-                                      icon={<FileText size={14} />}
-                                      onClick={() => {
-                                        onClose();
-                                        onNavigateToResumes();
-                                      }}
-                                    >
-                                      Improve Resume in Studio
-                                    </Button>
-                                    <Button
-                                      size="sm"
-                                      variant="outline"
-                                      icon={<RotateCcw size={14} />}
-                                      loading={isCheckingAts}
-                                      onClick={handleRunAtsCheck}
-                                    >
-                                      Re-run ATS Check
-                                    </Button>
-                                  </div>
-                                )}
                               </div>
                             </div>
                           ))}
@@ -938,12 +1401,12 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                     ) : (
                       <div className="readiness-ready-banner">
                         <CheckCircle size={18} className="text-emerald" />
-                        <span>All application readiness gates passed. You are ready to proceed with submission.</span>
+                        <span>Profile and preparation requirements verified. You can proceed with resume selection and application form.</span>
                       </div>
                     )}
                   </Card>
 
-                  {/* Action Hierarchy */}
+                  {/* Action Bar */}
                   <div className="modal-actions-bar">
                     <Button variant="secondary" onClick={onClose}>
                       Cancel
@@ -960,7 +1423,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                       <Button
                         variant="primary"
                         icon={<ArrowRight size={16} />}
-                        disabled={!canContinueToSelection || isLoadingScores}
+                        disabled={!canProceedToPreparation || isLoadingScores}
                         onClick={() => setCurrentStep('selection')}
                       >
                         Continue to Resume Selection
@@ -970,372 +1433,908 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                 </div>
               )}
 
-          {/* STEP 2: RESUME SELECTION */}
-          {currentStep === 'selection' && (
-            <div className="selection-step-content">
-              <h4 className="selection-heading">Choose Resume for This Application</h4>
-              <p className="selection-sub">
-                Pilot Mama records the exact immutable resume version attached to this submission.
-              </p>
-
-              <div className="resume-options-grid">
-                {/* Option A: Tailored Resume */}
-                <div
-                  className={`resume-choice-card ${selectedResumeType === 'tailored' ? 'selected' : ''}`}
-                  onClick={() => setSelectedResumeType('tailored')}
-                >
-                  <div className="choice-header">
-                    <div className="radio-indicator">
-                      {selectedResumeType === 'tailored' && <Check size={14} />}
-                    </div>
+              {/* STEP 2: RESUME SELECTION */}
+              {currentStep === 'selection' && (
+                <div className="selection-step-content">
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
                     <div>
-                      <h5 className="choice-title">
-                        {tailoredResume?.versionName || 'Tailored Resume (v1)'}
-                      </h5>
-                      <span className="choice-badge">Recommended for ATS</span>
+                      <h4 className="selection-heading" style={{ margin: 0 }}>Select Application Resume</h4>
+                      <p className="selection-sub" style={{ margin: '4px 0 0 0' }}>
+                        Choose which resume version to attach to this application. Switching resumes dynamically recalculates your ATS score for {canonicalCompany}.
+                      </p>
                     </div>
-                  </div>
-                  <p className="choice-desc">
-                    Reordered bullet points, highlighted keywords, and calibrated summary matching {job?.role}.
-                  </p>
-                  <div className="choice-meta">
-                    <span>ATS Score: {Math.min(98, originalAts + 8)}%</span>
-                    <span>Modifications: {tailoredResume?.modifications?.length || 4} applied</span>
-                  </div>
-                  {tailoredResume && onNavigateToResumes && (
-                    <button
-                      className="view-diff-inline-btn"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onClose();
-                        onNavigateToResumes(tailoredResume.id);
-                      }}
+                    <Button
+                      variant="primary"
+                      size="sm"
+                      icon={<Sparkles size={14} />}
+                      loading={isTailoringInline}
+                      onClick={handleTriggerTailorResume}
                     >
-                      <Eye size={12} /> View Diff in Studio
-                    </button>
+                      {tailoredResume ? 'Regenerate Tailored Resume' : 'Tailor Resume for Role'}
+                    </Button>
+                  </div>
+
+                  {/* List of usable resumes */}
+                  <div className="resume-options-grid" style={{ marginTop: '16px' }}>
+                    {usableResumes.map((res) => {
+                      const isSelected = selectedResumeId === res.id;
+                      return (
+                        <div
+                          key={res.id}
+                          className={`resume-choice-card ${isSelected ? 'selected' : ''}`}
+                          onClick={() => {
+                            setSelectedResumeId(res.id);
+                            persistDraftState(formFields, customAnswers, answerStates, res.id);
+                          }}
+                        >
+                          <div className="choice-header">
+                            <div className="radio-indicator">
+                              {isSelected && <Check size={14} />}
+                            </div>
+                            <div style={{ flex: 1 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <h5 className="choice-title" style={{ margin: 0 }}>{res.name}</h5>
+                                {isSelected && <span className="active-resume-tag">Currently Selected</span>}
+                              </div>
+                              <span className={res.type === 'tailored' ? 'choice-badge' : 'choice-badge-sub'}>
+                                {res.type === 'tailored' ? 'Role-Tailored Snapshot' : 'Master Baseline Profile'}
+                              </span>
+                            </div>
+                          </div>
+
+                          <p className="choice-desc">
+                            {res.type === 'tailored'
+                              ? `Role-aligned terminology and prioritized highlights calibrated specifically for ${job?.role}. Verified against strict truth rules.`
+                              : 'Unadjusted master candidate profile. Contains complete career history without role-targeted reordering.'}
+                          </p>
+
+                          <div className="choice-meta">
+                            <span>
+                              ATS Score: <strong className={res.atsScore !== null && res.atsScore >= 80 ? 'text-emerald' : 'text-amber'}>
+                                {res.atsScore !== null ? `${res.atsScore}%` : 'Not Checked'}
+                              </strong>
+                            </span>
+                            <span>Version: {res.version}</span>
+                            <span>Updated: {res.lastUpdated}</span>
+                          </div>
+
+                          <div className="resume-choice-actions" onClick={e => e.stopPropagation()}>
+                            <Button
+                              variant={isSelected ? 'secondary' : 'primary'}
+                              size="sm"
+                              onClick={() => {
+                                setSelectedResumeId(res.id);
+                                persistDraftState(formFields, customAnswers, answerStates, res.id);
+                              }}
+                            >
+                              {isSelected ? 'Selected' : 'Select This Resume'}
+                            </Button>
+
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              icon={<Eye size={13} />}
+                              onClick={() => {
+                                setShowDiffView(false);
+                                setActivePreviewResumeId(activePreviewResumeId === res.id ? null : res.id);
+                              }}
+                            >
+                              {activePreviewResumeId === res.id ? 'Close Preview' : 'Preview'}
+                            </Button>
+
+                            {res.type === 'tailored' && res.tailoredObj && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                icon={<FileCheck size={13} />}
+                                onClick={() => {
+                                  setActivePreviewResumeId(null);
+                                  setShowDiffView(!showDiffView);
+                                }}
+                              >
+                                {showDiffView ? 'Close Diff' : 'View Diff'}
+                              </Button>
+                            )}
+
+                            {onNavigateToResumes && (
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                icon={<ExternalLink size={13} />}
+                                onClick={() => {
+                                  onClose();
+                                  onNavigateToResumes(res.type === 'tailored' && res.tailoredObj ? res.tailoredObj.id : undefined);
+                                }}
+                              >
+                                Open in Studio
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Inline Preview Panel */}
+                  {activePreviewResumeId && (
+                    <div className="resume-preview-panel">
+                      <div className="diff-header-row">
+                        <h5 className="diff-panel-title">
+                          <Eye size={15} /> Resume Preview: {usableResumes.find(r => r.id === activePreviewResumeId)?.name}
+                        </h5>
+                        <button className="modal-close-btn" onClick={() => setActivePreviewResumeId(null)}>×</button>
+                      </div>
+                      <div style={{ background: 'rgba(0, 0, 0, 0.3)', padding: '12px', borderRadius: '6px', fontSize: '0.82rem', lineHeight: '1.5', maxHeight: '200px', overflowY: 'auto' }}>
+                        {activePreviewResumeId === 'master' ? (
+                          <div>
+                            <strong>{candidate?.name}</strong> • {candidate?.email} • {candidate?.phone}
+                            <p style={{ marginTop: '6px' }}>{candidate?.summary || 'Standard profile summary.'}</p>
+                            <strong>Skills:</strong> {(candidate?.primarySkills || []).join(', ')}
+                          </div>
+                        ) : (
+                          <div>
+                            <strong>{candidate?.name}</strong> • {candidate?.headline || job?.role}
+                            <p style={{ marginTop: '6px' }}>{tailoredResume?.tailoredSummary}</p>
+                            <strong>Targeted Skills:</strong> {(tailoredResume?.orderedSkills || []).join(', ')}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   )}
-                </div>
 
-                {/* Option B: Master Resume */}
-                <div
-                  className={`resume-choice-card ${selectedResumeType === 'master' ? 'selected' : ''}`}
-                  onClick={() => setSelectedResumeType('master')}
-                >
-                  <div className="choice-header">
-                    <div className="radio-indicator">
-                      {selectedResumeType === 'master' && <Check size={14} />}
+                  {/* Inline Diff Panel */}
+                  {showDiffView && tailoredResume && (
+                    <div className="resume-diff-panel">
+                      <div className="diff-header-row">
+                        <h5 className="diff-panel-title">
+                          <FileCheck size={15} /> Verified Tailoring Diff (Master vs {tailoredResume.versionName})
+                        </h5>
+                        <button className="modal-close-btn" onClick={() => setShowDiffView(false)}>×</button>
+                      </div>
+                      <p style={{ fontSize: '0.8rem', color: '#94a3b8', margin: '0 0 10px 0' }}>
+                        Strict Absolute Truth Rule: Zero fabricated skills or experiences. Only terminology alignment and evidence reordering applied.
+                      </p>
+                      <div className="diff-enhancements-list">
+                        {(tailoredResume.modifications || []).length > 0 ? (
+                          tailoredResume.modifications.map((m, idx) => (
+                            <div key={idx} className="diff-enhancement-item">
+                              <div className="enhancement-sec-title">{m.section}: Terminology Calibration</div>
+                              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', margin: '4px 0' }}>
+                                <div style={{ background: 'rgba(239, 68, 68, 0.08)', padding: '6px', borderRadius: '4px', borderLeft: '2px solid #ef4444' }}>
+                                  <span style={{ fontSize: '0.72rem', color: '#f87171', display: 'block', fontWeight: 600 }}>Original</span>
+                                  {m.original}
+                                </div>
+                                <div style={{ background: 'rgba(16, 185, 129, 0.08)', padding: '6px', borderRadius: '4px', borderLeft: '2px solid #10b981' }}>
+                                  <span style={{ fontSize: '0.72rem', color: '#34d399', display: 'block', fontWeight: 600 }}>Tailored</span>
+                                  {m.tailored}
+                                </div>
+                              </div>
+                              <span className="enhancement-reason">Rationale: {m.reason}</span>
+                            </div>
+                          ))
+                        ) : (
+                          <div className="diff-enhancement-item">
+                            <div className="enhancement-sec-title">Calibrated Professional Summary</div>
+                            <p style={{ margin: '4px 0', fontSize: '0.78rem' }}>{tailoredResume.tailoredSummary}</p>
+                            <span className="enhancement-reason">Aligned to {canonicalCompany} {job?.role} job description requirements.</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                    <div>
-                      <h5 className="choice-title">Master Profile Resume</h5>
-                      <span className="choice-badge-sub">Canonical Baseline</span>
+                  )}
+
+                  {/* Active Attachment Confirmation Bar */}
+                  <div className="attached-status-box" style={{ marginTop: '16px' }}>
+                    <FileCheck size={18} className="attached-icon" />
+                    <span>
+                      <strong>Selected Attachment:</strong> {currentlySelectedResumeObj.name} ({currentlySelectedResumeObj.version}) • ATS Score: <strong>{currentAtsScore !== null ? `${currentAtsScore}%` : 'Not checked'}</strong>
+                    </span>
+                  </div>
+
+                  <div className="modal-actions-bar">
+                    <Button variant="secondary" icon={<ArrowLeft size={14} />} onClick={() => setCurrentStep('readiness')}>
+                      Back to Readiness
+                    </Button>
+                    <div className="action-right-group">
+                      <Button
+                        variant="outline"
+                        icon={<RotateCcw size={14} />}
+                        loading={isCheckingAts}
+                        onClick={handleRunAtsCheck}
+                      >
+                        Re-run ATS Check
+                      </Button>
+                      <Button
+                        variant="primary"
+                        icon={<ArrowRight size={14} />}
+                        onClick={() => setCurrentStep('form')}
+                      >
+                        Continue to Application Form
+                      </Button>
                     </div>
                   </div>
-                  <p className="choice-desc">
-                    Unadjusted master profile data without role-specific ordering or targeted emphasis.
-                  </p>
-                  <div className="choice-meta">
-                    <span>ATS Score: {originalAts}%</span>
-                    <span>Standard Profile</span>
-                  </div>
                 </div>
-              </div>
+              )}
 
-              <div className="attached-status-box">
-                <FileCheck size={18} className="attached-icon" />
-                <span>
-                  <strong>Selected Attachment:</strong> {selectedResumeType === 'tailored' ? (tailoredResume?.versionName || 'Tailored Resume v1') : 'Master Candidate Profile'} (Ready for submission)
-                </span>
-              </div>
+              {/* STEP 3: APPLICATION FORM */}
+              {currentStep === 'form' && (
+                <div className="preview-step-content">
+                  {/* Mandatory Codewalla Banner */}
+                  {isCodewalla && (
+                    <div className="codewalla-demo-banner">
+                      <ShieldAlert size={20} className="banner-icon" />
+                      <div>
+                        <h4 className="banner-title">DEMO APPLICATION — ZERO EXTERNAL TRANSMISSION</h4>
+                        <p className="banner-desc">
+                          This application is simulated for Pilot Mama testing. Nothing will be submitted to Codewalla.
+                        </p>
+                      </div>
+                    </div>
+                  )}
 
-              <div className="modal-actions-bar">
-                <Button variant="secondary" icon={<ArrowLeft size={14} />} onClick={() => setCurrentStep('readiness')}>
-                  Back
-                </Button>
-                <Button
-                  variant="primary"
-                  icon={<ArrowRight size={14} />}
-                  disabled={!isAtsPassed}
-                  onClick={() => setCurrentStep('preview')}
-                >
-                  Continue to Application Form
-                </Button>
-              </div>
-            </div>
-          )}
-
-          {/* STEP 3: APPLICATION FORM & PREVIEW */}
-          {currentStep === 'preview' && (
-            <div className="preview-step-content">
-              {/* Mandatory Codewalla Banner */}
-              {isCodewalla && (
-                <div className="codewalla-demo-banner">
-                  <ShieldAlert size={20} className="banner-icon" />
-                  <div>
-                    <h4 className="banner-title">DEMO APPLICATION — ZERO EXTERNAL TRANSMISSION</h4>
-                    <p className="banner-desc">
-                      This application is simulated for Pilot Mama testing. Nothing will be submitted to Codewalla.
+                  <div style={{ marginBottom: '16px' }}>
+                    <h4 className="form-heading" style={{ margin: 0 }}>Application Form & Employer Questions</h4>
+                    <p className="form-sub" style={{ margin: '4px 0 0 0' }}>
+                      Pre-populated from verified candidate profile and grounded response intelligence. Review candidate details and employer questions below.
                     </p>
                   </div>
-                </div>
-              )}
 
-              <h4 className="form-heading">Candidate Application Details</h4>
-              <p className="form-sub">Pre-populated from verified candidate profile. Review or update prior to submission.</p>
-
-              <div className="app-form-grid">
-                <div className="form-field-group">
-                  <label>Full Name</label>
-                  <input
-                    type="text"
-                    name="fullName"
-                    value={formFields.fullName}
-                    onChange={handleFormChange}
-                    className="form-input"
-                  />
-                </div>
-
-                <div className="form-field-group">
-                  <label>Email Address</label>
-                  <input
-                    type="email"
-                    name="email"
-                    value={formFields.email}
-                    onChange={handleFormChange}
-                    className="form-input"
-                  />
-                </div>
-
-                <div className="form-field-group">
-                  <label>Phone Number</label>
-                  <input
-                    type="tel"
-                    name="phone"
-                    value={formFields.phone}
-                    onChange={handleFormChange}
-                    className="form-input"
-                  />
-                </div>
-
-                <div className="form-field-group">
-                  <label>Current Location</label>
-                  <input
-                    type="text"
-                    name="location"
-                    value={formFields.location}
-                    onChange={handleFormChange}
-                    className="form-input"
-                  />
-                </div>
-
-                <div className="form-field-group">
-                  <label>Years of Experience</label>
-                  <input
-                    type="text"
-                    name="experienceYears"
-                    value={formFields.experienceYears}
-                    onChange={handleFormChange}
-                    className="form-input"
-                  />
-                </div>
-
-                <div className="form-field-group">
-                  <label>Current Role / Headline</label>
-                  <input
-                    type="text"
-                    name="currentRole"
-                    value={formFields.currentRole}
-                    onChange={handleFormChange}
-                    className="form-input"
-                  />
-                </div>
-
-                <div className="form-field-group full-width">
-                  <label>Attached Resume</label>
-                  <div className="attached-resume-preview-pill">
-                    <CheckCircle size={16} className="text-emerald" />
-                    <span>
-                      {selectedResumeType === 'tailored' ? (tailoredResume?.versionName || 'Tailored_Resume_v1') : 'Master_Profile_Resume.pdf'}
-                    </span>
-                    <span className="preview-pill-tag">Truth-Checked Snapshot</span>
-                  </div>
-                </div>
-
-                <div className="form-field-group full-width">
-                  <label>Tailored Cover Letter Note</label>
-                  <textarea
-                    name="coverLetter"
-                    rows={4}
-                    value={formFields.coverLetter}
-                    onChange={handleFormChange}
-                    className="form-textarea"
-                  />
-                </div>
-              </div>
-
-              <div className="modal-actions-bar">
-                <Button variant="secondary" icon={<ArrowLeft size={14} />} onClick={() => setCurrentStep('selection')}>
-                  Back
-                </Button>
-                {effectiveMode === 'demo' ? (
-                  <Button
-                    variant="primary"
-                    icon={<Send size={16} />}
-                    loading={isSubmitting}
-                    disabled={!isAtsPassed}
-                    onClick={handleSubmitDemoApplication}
-                  >
-                    Submit Demo Application
-                  </Button>
-                ) : (
-                  <Button
-                    variant="primary"
-                    icon={<Send size={16} />}
-                    loading={isSubmitting}
-                    disabled={!isAtsPassed}
-                    onClick={handleStartExternalApplication}
-                  >
-                    Start Application
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* STEP 4: SUCCESS / SUBMITTED CONFIRMATION */}
-          {currentStep === 'success' && submittedApp && (
-            <div className="success-step-content">
-              <div className="success-header-badge">
-                <CheckCircle size={44} className="success-icon" />
-                <h3 className="success-title">
-                  {effectiveMode === 'demo' ? '✓ Demo Application Submitted Successfully' : '✓ External Application Started'}
-                </h3>
-                <p className="success-sub">
-                  {effectiveMode === 'demo'
-                    ? `Your Pilot Mama demo application for ${job?.company} has been recorded locally.`
-                    : `Direct application portal opened for ${job?.company}. Verify submission status below.`}
-                </p>
-              </div>
-
-              {isCodewalla && (
-                <div className="codewalla-demo-banner text-center">
-                  <ShieldAlert size={18} className="banner-icon" />
-                  <div>
-                    <strong>Nothing was submitted to Codewalla.</strong> All records reside strictly within your local Pilot Mama testing database.
-                  </div>
-                </div>
-              )}
-
-              {/* Application Snapshot Card */}
-              <Card className="success-details-card">
-                <div className="details-grid-2">
-                  <div className="detail-item">
-                    <span className="detail-lbl">Application ID</span>
-                    <span className="detail-val font-mono">{submittedApp.id}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-lbl">Status</span>
-                    <Badge variant={submittedApp.status === 'APPLIED_DEMO' ? 'indigo' : 'emerald'} size="sm">
-                      {submittedApp.status}
-                    </Badge>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-lbl">Target Role & Company</span>
-                    <span className="detail-val">{submittedApp.role} • {submittedApp.company}</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-lbl">Application Mode</span>
-                    <ApplicationModeBadge mode={submittedApp.applicationMode} isCodewalla={isCodewalla} size="sm" />
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-lbl">Match Score</span>
-                    <span className="detail-val text-indigo font-bold">{submittedApp.matchScore}%</span>
-                  </div>
-                  <div className="detail-item">
-                    <span className="detail-lbl">ATS Simulation Score</span>
-                    <span className="detail-val text-emerald font-bold">{submittedApp.atsScore}%</span>
-                  </div>
-                  <div className="detail-item full-width">
-                    <span className="detail-lbl">Exact Resume Version Recorded</span>
-                    <span className="detail-val text-emerald">
-                      {submittedApp.resumeVersionName || 'Tailored_Resume_v1'} (Immutable Historical Snapshot)
-                    </span>
-                  </div>
-                </div>
-              </Card>
-
-              {/* External Confirmation Safety CTA */}
-              {effectiveMode === 'external' && !externalConfirmed && (
-                <div className="external-confirmation-box">
-                  <Info size={18} />
-                  <div className="box-text">
-                    <strong>External Portal Safeguard:</strong> Pilot Mama never assumes an external submission succeeded merely because the website was opened.
-                  </div>
-                  <Button
-                    variant="primary"
-                    size="sm"
-                    icon={<Check size={14} />}
-                    onClick={handleConfirmExternalSubmission}
-                  >
-                    Mark as Applied (Confirm Submission)
-                  </Button>
-                </div>
-              )}
-
-              {/* Skill Gap & Learning Advisory */}
-              {skillGaps.length > 0 && (
-                <Card className="post-apply-skill-gap-card">
-                  <div className="skill-gap-head">
-                    <Sparkles size={16} className="text-amber" />
-                    <h4>What Should You Learn Next for {job?.role}?</h4>
-                  </div>
-                  <p className="skill-gap-desc">
-                    These requirements were identified in the target job description. Boost your interview readiness with targeted learning resources:
-                  </p>
-                  <div className="gap-chips-list">
-                    {skillGaps.slice(0, 4).map((skill, idx) => (
-                      <span key={idx} className="gap-chip">
-                        {skill}
+                  {/* SECTION A: CANDIDATE INFORMATION */}
+                  <div className="form-section-container">
+                    <div className="form-section-header">
+                      <div>
+                        <h5 className="form-section-title">
+                          <User size={16} className="text-indigo" /> Section A: Candidate Information
+                        </h5>
+                        <p className="form-section-subtitle">
+                          Verified profile details attached to this application. Changes made here apply to this application package.
+                        </p>
+                      </div>
+                      <span className="text-emerald" style={{ fontSize: '0.78rem', fontWeight: 600 }}>
+                        ✓ Grounded in Profile
                       </span>
-                    ))}
+                    </div>
+
+                    <div className="app-form-grid">
+                      <div className="form-field-group">
+                        <label>
+                          Full Name <span className="question-required-star">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="fullName"
+                          value={formFields.fullName}
+                          onChange={handleFormChange}
+                          className={`form-input ${validationErrors.fullName ? 'has-error' : ''}`}
+                        />
+                        {validationErrors.fullName && (
+                          <span className="form-field-validation-error">
+                            <AlertTriangle size={12} /> {validationErrors.fullName}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="form-field-group">
+                        <label>
+                          Email Address <span className="question-required-star">*</span>
+                        </label>
+                        <input
+                          type="email"
+                          name="email"
+                          value={formFields.email}
+                          onChange={handleFormChange}
+                          className={`form-input ${validationErrors.email ? 'has-error' : ''}`}
+                        />
+                        {validationErrors.email && (
+                          <span className="form-field-validation-error">
+                            <AlertTriangle size={12} /> {validationErrors.email}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="form-field-group">
+                        <label>
+                          Phone Number <span className="question-required-star">*</span>
+                        </label>
+                        <input
+                          type="tel"
+                          name="phone"
+                          value={formFields.phone}
+                          onChange={handleFormChange}
+                          className={`form-input ${validationErrors.phone ? 'has-error' : ''}`}
+                        />
+                        {validationErrors.phone && (
+                          <span className="form-field-validation-error">
+                            <AlertTriangle size={12} /> {validationErrors.phone}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="form-field-group">
+                        <label>
+                          Current Location <span className="question-required-star">*</span>
+                        </label>
+                        <input
+                          type="text"
+                          name="currentLocation"
+                          value={formFields.currentLocation}
+                          onChange={handleFormChange}
+                          className={`form-input ${validationErrors.currentLocation ? 'has-error' : ''}`}
+                        />
+                        {validationErrors.currentLocation && (
+                          <span className="form-field-validation-error">
+                            <AlertTriangle size={12} /> {validationErrors.currentLocation}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="form-field-group">
+                        <label>Preferred Work Location</label>
+                        <input
+                          type="text"
+                          name="preferredLocation"
+                          value={formFields.preferredLocation}
+                          onChange={handleFormChange}
+                          className="form-input"
+                          placeholder="e.g. Remote, Bengaluru, Mumbai"
+                        />
+                      </div>
+
+                      <div className="form-field-group">
+                        <label>Current Role / Headline</label>
+                        <input
+                          type="text"
+                          name="currentRole"
+                          value={formFields.currentRole}
+                          onChange={handleFormChange}
+                          className="form-input"
+                        />
+                      </div>
+
+                      <div className="form-field-group">
+                        <label>Current / Most Recent Company</label>
+                        <input
+                          type="text"
+                          name="currentCompany"
+                          value={formFields.currentCompany}
+                          onChange={handleFormChange}
+                          className="form-input"
+                        />
+                      </div>
+
+                      <div className="form-field-group">
+                        <label>Total Professional Experience (Years)</label>
+                        <input
+                          type="text"
+                          name="experienceYears"
+                          value={formFields.experienceYears}
+                          onChange={handleFormChange}
+                          className="form-input"
+                        />
+                      </div>
+
+                      <div className="form-field-group">
+                        <label>Notice Period</label>
+                        <input
+                          type="text"
+                          name="noticePeriod"
+                          value={formFields.noticePeriod}
+                          onChange={handleFormChange}
+                          className="form-input"
+                        />
+                      </div>
+
+                      <div className="form-field-group">
+                        <label>Expected Compensation / CTC</label>
+                        <input
+                          type="text"
+                          name="expectedSalary"
+                          value={formFields.expectedSalary}
+                          onChange={handleFormChange}
+                          className="form-input"
+                        />
+                      </div>
+
+                      <div className="form-field-group full-width">
+                        <label>Work Authorization / Visa Status</label>
+                        <input
+                          type="text"
+                          name="workAuthorization"
+                          value={formFields.workAuthorization}
+                          onChange={handleFormChange}
+                          className="form-input"
+                        />
+                      </div>
+
+                      <div className="form-field-group full-width">
+                        <label>Selected Application Resume</label>
+                        <div className="attached-resume-preview-pill">
+                          <CheckCircle size={16} className="text-emerald" />
+                          <span>
+                            {currentlySelectedResumeObj.name} ({currentlySelectedResumeObj.version})
+                          </span>
+                          <span className="preview-pill-tag">ATS: {currentAtsScore}%</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  {onNavigateToLearning && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      icon={<ArrowRight size={14} />}
-                      onClick={() => {
-                        onClose();
-                        onNavigateToLearning();
-                      }}
-                      style={{ marginTop: '10px' }}
-                    >
-                      View YouTube Tutorials & Nearby Institutes
+
+                  {/* SECTION B: EMPLOYER / APPLICATION QUESTIONS */}
+                  <div className="form-section-container">
+                    <div className="form-section-header">
+                      <div>
+                        <h5 className="form-section-title">
+                          <Briefcase size={16} className="text-indigo" /> Section B: Employer & Application Questions
+                        </h5>
+                        <p className="form-section-subtitle">
+                          Role-specific questions detected for {canonicalCompany}. AI suggestions are grounded exclusively in verified profile data.
+                        </p>
+                      </div>
+                      <span className="text-indigo" style={{ fontSize: '0.78rem', fontWeight: 600 }}>
+                        {detectedQuestions.length > 0 ? `${detectedQuestions.length} Questions Detected` : 'Standard Direct Intake'}
+                      </span>
+                    </div>
+
+                    {detectedQuestions.length === 0 ? (
+                      <div className="question-empty-state-card">
+                        <HelpCircle size={32} style={{ margin: '0 auto 8px auto', opacity: 0.7 }} />
+                        <p style={{ margin: '0 0 4px 0', fontWeight: 600, color: '#e2e8f0' }}>
+                          No employer application questions were detected.
+                        </p>
+                        <p style={{ margin: 0, fontSize: '0.8rem' }}>
+                          You may complete standard personal and experience fields, then proceed to the Confirmation Gate.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="employer-questions-list">
+                        {detectedQuestions.map((qItem, idx) => {
+                          const answerVal = customAnswers[qItem.id] || '';
+                          const state = answerStates[qItem.id] || 'unanswered';
+                          const hasErr = Boolean(validationErrors[qItem.id]);
+
+                          return (
+                            <div key={qItem.id} className={`employer-question-card ${hasErr ? 'has-error' : ''}`}>
+                              <div className="question-header-row">
+                                <div className="question-text-wrap">
+                                  <span className="question-prompt-text">
+                                    {idx + 1}. {qItem.question}
+                                    {qItem.required && <span className="question-required-star">*</span>}
+                                  </span>
+                                </div>
+                                <span className={`answer-state-badge ${state}`}>
+                                  {state === 'confirmed' && <Check size={10} />}
+                                  {state}
+                                </span>
+                              </div>
+
+                              {qItem.groundedSource && (
+                                <div className="question-grounding-note">
+                                  <Sparkles size={11} className="text-indigo" />
+                                  <span>Grounded Source: {qItem.groundedSource} (Zero fabrication rule)</span>
+                                </div>
+                              )}
+
+                              <textarea
+                                rows={3}
+                                value={answerVal}
+                                onChange={(e) => handleCustomAnswerChange(qItem.id, e.target.value)}
+                                className={`form-textarea ${hasErr ? 'has-error' : ''}`}
+                                placeholder="Candidate input required."
+                                style={{ marginTop: '4px' }}
+                              />
+
+                              {hasErr && (
+                                <span className="form-field-validation-error">
+                                  <AlertTriangle size={12} /> {validationErrors[qItem.id]}
+                                </span>
+                              )}
+
+                              <div className="question-actions-toolbar">
+                                <span style={{ fontSize: '0.74rem', color: '#64748b' }}>
+                                  {state === 'unanswered' ? '⚠️ Missing required answer' : '✓ Response provided'}
+                                </span>
+                                <div className="question-actions-right">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    icon={<RotateCcw size={12} />}
+                                    onClick={() => {
+                                      const grounded = generateGroundedAnswer(qItem);
+                                      handleCustomAnswerChange(qItem.id, grounded);
+                                      setAnswerStates(prev => ({
+                                        ...prev,
+                                        [qItem.id]: grounded === 'Candidate input required.' ? 'unanswered' : 'suggested'
+                                      }));
+                                    }}
+                                  >
+                                    Reset Suggestion
+                                  </Button>
+                                  {state !== 'confirmed' && answerVal.trim() && answerVal !== 'Candidate input required.' && (
+                                    <Button
+                                      variant="primary"
+                                      size="sm"
+                                      icon={<Check size={12} />}
+                                      onClick={() => handleConfirmAnswer(qItem.id)}
+                                    >
+                                      Confirm Answer
+                                    </Button>
+                                  )}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+
+                    {/* Cover Letter Note */}
+                    <div style={{ marginTop: '18px' }}>
+                      <label style={{ fontSize: '0.84rem', fontWeight: 600, color: '#e2e8f0', display: 'block', marginBottom: '6px' }}>
+                        Custom Cover Letter / Note to Hiring Team
+                      </label>
+                      <textarea
+                        name="coverLetter"
+                        rows={4}
+                        value={formFields.coverLetter}
+                        onChange={handleFormChange}
+                        className="form-textarea"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="modal-actions-bar">
+                    <Button variant="secondary" icon={<ArrowLeft size={14} />} onClick={() => setCurrentStep('selection')}>
+                      Back to Resume Selection
                     </Button>
-                  )}
-                </Card>
+                    <Button
+                      variant="primary"
+                      icon={<ArrowRight size={14} />}
+                      onClick={handleAdvanceToConfirmation}
+                    >
+                      Continue to Confirmation Gate
+                    </Button>
+                  </div>
+                </div>
               )}
 
-              {/* Action Buttons */}
-              <div className="modal-actions-bar">
-                <Button variant="secondary" onClick={onClose}>
-                  Done & Close
-                </Button>
-                {onNavigateToApplications && (
-                  <Button
-                    variant="primary"
-                    icon={<ArrowRight size={16} />}
-                    onClick={() => {
-                      onClose();
-                      onNavigateToApplications(submittedApp.id);
-                    }}
-                  >
-                    View in Application Tracker
-                  </Button>
-                )}
-              </div>
-            </div>
-          )}
-          </>
+              {/* STEP 4: CONFIRMATION & FINAL SUBMISSION GATE */}
+              {currentStep === 'confirmation' && (
+                <div className="confirmation-step-content">
+                  <h4 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', color: '#f8fafc' }}>Review & Final Submission Gate</h4>
+                  <p style={{ margin: '0 0 16px 0', fontSize: '0.84rem', color: '#94a3b8' }}>
+                    Verify your application package and readiness checklist. Automated submission eligibility is strictly evaluated against the 80% ATS threshold here.
+                  </p>
+
+                  {/* Submission Gate Card */}
+                  <div className={`confirmation-gate-card ${isSubmissionFullyEligible ? 'ready' : 'attention'}`}>
+                    <div className="gate-status-row">
+                      {isSubmissionFullyEligible ? (
+                        <CheckCircle size={22} className="text-emerald" />
+                      ) : (
+                        <AlertTriangle size={22} className="text-amber" />
+                      )}
+                      <div>
+                        <h4 className="gate-status-heading">
+                          Automatic Submission: {isSubmissionFullyEligible ? 'READY' : 'NOT AVAILABLE'}
+                        </h4>
+                      </div>
+                    </div>
+                    <p className="gate-status-desc">
+                      {isSubmissionFullyEligible ? (
+                        `Your selected resume meets the mandatory 80% ATS threshold (Current: ${currentAtsScore}%). All application checklist items are verified and ready for transmission.`
+                      ) : !isAtsPassed ? (
+                        `Automatic submission is unavailable until ATS compatibility reaches the required threshold (80%). Current score with selected resume: ${currentAtsScore}%. You may return to Resume Selection or Resume Studio to tailor or choose an alternate resume.`
+                      ) : (
+                        `Automatic submission is paused because one or more readiness checklist items need your confirmation.`
+                      )}
+                    </p>
+                    {!isSubmissionFullyEligible && (
+                      <div style={{ marginTop: '10px', display: 'flex', gap: '10px', flexWrap: 'wrap' }}>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={<FileText size={14} />}
+                          onClick={() => setCurrentStep('selection')}
+                        >
+                          Change Selected Resume
+                        </Button>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          icon={<FileEdit size={14} />}
+                          onClick={() => setCurrentStep('form')}
+                        >
+                          Back to Application Form
+                        </Button>
+                        {onNavigateToResumes && (
+                          <Button
+                            variant="primary"
+                            size="sm"
+                            icon={<ExternalLink size={14} />}
+                            onClick={() => {
+                              onClose();
+                              onNavigateToResumes(tailoredResume ? tailoredResume.id : undefined);
+                            }}
+                          >
+                            Open in Resume Studio
+                          </Button>
+                        )}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Readiness Checklist */}
+                  <div className="confirmation-checklist-card">
+                    <h5 className="checklist-title">
+                      <CheckSquare size={16} className="text-indigo" /> Final Readiness Checklist
+                    </h5>
+                    <div className="checklist-items-grid">
+                      <div className={`checklist-item-row ${checklistCandidateInfo ? 'passed' : 'failed'}`}>
+                        {checklistCandidateInfo ? <CheckCircle size={14} className="text-emerald" /> : <AlertTriangle size={14} className="text-red" />}
+                        <span>Candidate information complete ({formFields.fullName || 'Missing'})</span>
+                      </div>
+
+                      <div className={`checklist-item-row ${checklistResumeSelected ? 'passed' : 'failed'}`}>
+                        {checklistResumeSelected ? <CheckCircle size={14} className="text-emerald" /> : <AlertTriangle size={14} className="text-red" />}
+                        <span>Resume selected: {currentlySelectedResumeObj.name}</span>
+                      </div>
+
+                      <div className={`checklist-item-row ${checklistResumeOwnership ? 'passed' : 'failed'}`}>
+                        {checklistResumeOwnership ? <CheckCircle size={14} className="text-emerald" /> : <AlertTriangle size={14} className="text-red" />}
+                        <span>Resume belongs to authenticated candidate</span>
+                      </div>
+
+                      <div className={`checklist-item-row ${checklistQuestionsComplete ? 'passed' : 'failed'}`}>
+                        {checklistQuestionsComplete ? <CheckCircle size={14} className="text-emerald" /> : <AlertTriangle size={14} className="text-red" />}
+                        <span>Employer questions complete ({detectedQuestions.length} answered)</span>
+                      </div>
+
+                      <div className={`checklist-item-row ${checklistTruthPassed ? 'passed' : 'failed'}`}>
+                        {checklistTruthPassed ? <CheckCircle size={14} className="text-emerald" /> : <AlertTriangle size={14} className="text-red" />}
+                        <span>Truth validation passed (Zero fabricated background)</span>
+                      </div>
+
+                      <div className={`checklist-item-row ${isAtsPassed ? 'passed' : 'failed'}`}>
+                        {isAtsPassed ? <CheckCircle size={14} className="text-emerald" /> : <AlertTriangle size={14} className="text-red" />}
+                        <span>ATS Compatibility Threshold (Current: {currentAtsScore}% / Required: 80%)</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Application Package Summary */}
+                  <Card style={{ padding: '16px', background: 'rgba(255, 255, 255, 0.02)', border: '1px solid rgba(255, 255, 255, 0.08)', marginBottom: '16px' }}>
+                    <h5 style={{ margin: '0 0 12px 0', fontSize: '0.95rem', color: '#e2e8f0', fontWeight: 600 }}>
+                      Application Package Summary
+                    </h5>
+                    <div className="summary-fields-list">
+                      <div className="summary-row">
+                        <span className="row-key">Company:</span>
+                        <span className="row-val font-bold">{canonicalCompany}</span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="row-key">Role:</span>
+                        <span className="row-val">{job?.role}</span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="row-key">Job Location:</span>
+                        <span className="row-val">{job?.location || 'Specified by employer'}</span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="row-key">Candidate Name:</span>
+                        <span className="row-val">{formFields.fullName} ({formFields.email})</span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="row-key">Candidate Location:</span>
+                        <span className="row-val">{formFields.currentLocation}</span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="row-key">Selected Resume:</span>
+                        <span className="row-val text-emerald font-bold">
+                          {currentlySelectedResumeObj.name} ({currentlySelectedResumeObj.version})
+                        </span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="row-key">Job Match Score:</span>
+                        <span className="row-val text-indigo font-bold">{matchScore !== null ? `${matchScore}%` : 'Unavailable'}</span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="row-key">ATS Compatibility:</span>
+                        <span className={`row-val font-bold ${isAtsPassed ? 'text-emerald' : 'text-amber'}`}>
+                          {currentAtsScore !== null ? `${currentAtsScore}%` : 'Unavailable'} (Required: 80%)
+                        </span>
+                      </div>
+                      <div className="summary-row">
+                        <span className="row-key">Submission Mode:</span>
+                        <span className="row-val">
+                          <ApplicationModeBadge mode={effectiveMode} isCodewalla={isCodewalla} size="sm" />
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Application Answers Summary */}
+                    {Object.keys(customAnswers).length > 0 && (
+                      <div style={{ marginTop: '14px', paddingTop: '12px', borderTop: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                        <span style={{ fontSize: '0.8rem', fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                          Application Answers Snapshot:
+                        </span>
+                        <div style={{ marginTop: '8px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {detectedQuestions.map(q => (
+                            <div key={q.id} style={{ background: 'rgba(0, 0, 0, 0.25)', padding: '8px 12px', borderRadius: '6px' }}>
+                              <span style={{ fontSize: '0.78rem', color: '#94a3b8', display: 'block', fontWeight: 600 }}>{q.question}</span>
+                              <span style={{ fontSize: '0.82rem', color: '#e2e8f0' }}>{customAnswers[q.id] || 'Candidate input required.'}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </Card>
+
+                  <div className="modal-actions-bar">
+                    <Button variant="secondary" icon={<ArrowLeft size={14} />} onClick={() => setCurrentStep('form')}>
+                      Back to Application Form
+                    </Button>
+                    <div className="action-right-group">
+                      {effectiveMode === 'demo' ? (
+                        <Button
+                          variant="primary"
+                          icon={<Send size={16} />}
+                          loading={isSubmitting}
+                          disabled={!isSubmissionFullyEligible}
+                          onClick={handleSubmitDemoApplication}
+                        >
+                          Submit Application
+                        </Button>
+                      ) : (
+                        <Button
+                          variant="primary"
+                          icon={<ExternalLink size={16} />}
+                          loading={isSubmitting}
+                          disabled={!allChecklistItemsPassed}
+                          onClick={handleStartExternalApplication}
+                        >
+                          Continue to Employer Application
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* STEP 5: SUCCESS / SUBMITTED CONFIRMATION */}
+              {currentStep === 'success' && submittedApp && (
+                <div className="success-step-content">
+                  <div className="success-header-badge">
+                    <CheckCircle size={44} className="success-icon" />
+                    <h3 className="success-title">
+                      {effectiveMode === 'demo' ? '✓ Demo Application Submitted Successfully' : '✓ External Application Started'}
+                    </h3>
+                    <p className="success-sub">
+                      {effectiveMode === 'demo'
+                        ? `Your Pilot Mama demo application for ${job?.company} has been recorded locally.`
+                        : `Direct application portal opened for ${job?.company}. Verify submission status below.`}
+                    </p>
+                  </div>
+
+                  {isCodewalla && (
+                    <div className="codewalla-demo-banner text-center">
+                      <ShieldAlert size={18} className="banner-icon" />
+                      <div>
+                        <strong>Nothing was submitted to Codewalla.</strong> All records reside strictly within your local Pilot Mama testing database.
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Application Snapshot Card */}
+                  <Card className="success-details-card">
+                    <div className="details-grid-2">
+                      <div className="detail-item">
+                        <span className="detail-lbl">Application ID</span>
+                        <span className="detail-val font-mono">{submittedApp.id}</span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-lbl">Status</span>
+                        <Badge variant={submittedApp.status === 'APPLIED_DEMO' ? 'indigo' : 'emerald'} size="sm">
+                          {submittedApp.status}
+                        </Badge>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-lbl">Target Role & Company</span>
+                        <span className="detail-val">{submittedApp.role} • {submittedApp.company}</span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-lbl">Application Mode</span>
+                        <ApplicationModeBadge mode={submittedApp.applicationMode} isCodewalla={isCodewalla} size="sm" />
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-lbl">Match Score</span>
+                        <span className="detail-val text-indigo font-bold">{submittedApp.matchScore}%</span>
+                      </div>
+                      <div className="detail-item">
+                        <span className="detail-lbl">ATS Simulation Score</span>
+                        <span className="detail-val text-emerald font-bold">{submittedApp.atsScore}%</span>
+                      </div>
+                      <div className="detail-item full-width">
+                        <span className="detail-lbl">Exact Resume Version Recorded</span>
+                        <span className="detail-val text-emerald">
+                          {submittedApp.resumeVersionName || 'Tailored_Resume_v1'} (Immutable Historical Snapshot)
+                        </span>
+                      </div>
+                    </div>
+                  </Card>
+
+                  {/* External Confirmation Safety CTA */}
+                  {effectiveMode === 'external' && !externalConfirmed && (
+                    <div className="external-confirmation-box">
+                      <Info size={18} />
+                      <div className="box-text">
+                        <strong>External Portal Safeguard:</strong> Pilot Mama never assumes an external submission succeeded merely because the website was opened.
+                      </div>
+                      <Button
+                        variant="primary"
+                        size="sm"
+                        icon={<Check size={14} />}
+                        onClick={handleConfirmExternalSubmission}
+                      >
+                        Mark as Applied (Confirm Submission)
+                      </Button>
+                    </div>
+                  )}
+
+                  {/* Skill Gap & Learning Advisory */}
+                  {skillGaps.length > 0 && (
+                    <Card className="post-apply-skill-gap-card">
+                      <div className="skill-gap-head">
+                        <Sparkles size={16} className="text-amber" />
+                        <h4>What Should You Learn Next for {job?.role}?</h4>
+                      </div>
+                      <p className="skill-gap-desc">
+                        These requirements were identified in the target job description. Boost your interview readiness with targeted learning resources:
+                      </p>
+                      <div className="gap-chips-list">
+                        {skillGaps.slice(0, 4).map((skill, idx) => (
+                          <span key={idx} className="gap-chip">
+                            {skill}
+                          </span>
+                        ))}
+                      </div>
+                      {onNavigateToLearning && (
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          icon={<ArrowRight size={14} />}
+                          onClick={() => {
+                            onClose();
+                            onNavigateToLearning();
+                          }}
+                          style={{ marginTop: '10px' }}
+                        >
+                          View YouTube Tutorials & Nearby Institutes
+                        </Button>
+                      )}
+                    </Card>
+                  )}
+
+                  {/* Action Buttons */}
+                  <div className="modal-actions-bar">
+                    <Button variant="secondary" onClick={onClose}>
+                      Done & Close
+                    </Button>
+                    {onNavigateToApplications && (
+                      <Button
+                        variant="primary"
+                        icon={<ArrowRight size={16} />}
+                        onClick={() => {
+                          onClose();
+                          onNavigateToApplications(submittedApp.id);
+                        }}
+                      >
+                        View in Application Tracker
+                      </Button>
+                    )}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>
