@@ -6,6 +6,9 @@ import { authenticateJwt, optionalAuthenticateJwt } from '../../middleware/auth.
 
 export const jobRouter = Router();
 
+// Personalized Recommendations Route (Registered before /:id wildcard)
+jobRouter.get('/recommended', optionalAuthenticateJwt, JobControllerV1.getRecommendedJobs);
+
 // Public or Authenticated Job Search and Detail (candidates discover jobs without requiring an admin token)
 jobRouter.get('/', optionalAuthenticateJwt, JobControllerV1.listJobs);
 jobRouter.get('/:id', optionalAuthenticateJwt, JobControllerV1.getJobById);

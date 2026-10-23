@@ -136,7 +136,7 @@ export class MatchingEngine {
   }
 
   public static detectCareerTrack(candidate: CandidateProfile, job: JobDescription) {
-    const candTrack = (candidate.targetRoles[0] || 'Software Engineer').toLowerCase();
+    const candTrack = (candidate.targetRoles?.[0] || (candidate as any).headline || 'Software Engineer').toLowerCase();
     const jobTrack = (job.careerTrack || job.role).toLowerCase();
 
     let isSameTrack = false;

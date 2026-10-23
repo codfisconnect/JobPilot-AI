@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { JobQueryService } from '../../services/jobQuery.service.js';
 import { JobIngestionService } from '../../services/jobIngestion.service.js';
+import { JobRecommendationService } from '../../services/jobRecommendation.service.js';
 import { RemoteType, EmploymentType, JobStatus } from '@prisma/client';
 
 export class JobControllerV1 {
@@ -80,6 +81,47 @@ export class JobControllerV1 {
         success: true,
         data: result.items,
         pagination: result.pagination
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * GET /api/v1/jobs/recommended - Get personalized recommendations for authenticated candidate
+   */
+  public static async getRecommendedJobs(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user?.userId;
+      if (!userId) {
+        res.status(200).json({
+          success: true,
+          data: [],
+          pagination: { page: 1, pageSize: 12, total: 0, totalPages: 0 },
+          hasProfileData: false,
+          profileState: 'EMPTY'
+        });
+        return;
+      }
+
+      const { page, pageSize, country, location, remoteType, employmentType } = req.query;
+
+      const result = await JobRecommendationService.getRecommendations(userId, {
+        page: page ? Number(page) : 1,
+        pageSize: pageSize ? Number(pageSize) : 12,
+        country: country ? String(country) : undefined,
+        location: location ? String(location) : undefined,
+        remoteType: remoteType ? String(remoteType) : undefined,
+        employmentType: employmentType ? String(employmentType) : undefined
+      });
+
+      res.status(200).json({
+        success: true,
+        data: result.items,
+        pagination: result.pagination,
+        hasProfileData: result.hasProfileData,
+        profileState: result.profileState,
+        profileSummary: result.profileSummary
       });
     } catch (err) {
       next(err);

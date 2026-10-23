@@ -117,6 +117,10 @@ export const JobsPage: React.FC<JobsPageProps> = ({
   const [isProcessing, setIsProcessing] = useState(false);
   const [modalError, setModalError] = useState<string | null>(null);
 
+  // Mode: 'recommended' or 'all'
+  const [activeTab, setActiveTab] = useState<'recommended' | 'all'>('recommended');
+  const [profileState, setProfileState] = useState<'EMPTY' | 'PARTIAL' | 'COMPLETE'>('COMPLETE');
+
   // Load canonical company names once for filter dropdown
   useEffect(() => {
     let mounted = true;
@@ -134,47 +138,80 @@ export const JobsPage: React.FC<JobsPageProps> = ({
     };
   }, []);
 
-  const fetchCanonicalJobs = useCallback(async (targetPage = 1) => {
+  const loadJobs = useCallback(async (targetPage = 1, forceTab?: 'recommended' | 'all') => {
     setLoading(true);
     setError(null);
-    try {
-      const res = await apiClient.getCanonicalJobs({
-        query: searchQuery.trim() || undefined,
-        country: countryFilter.trim() || undefined,
-        location: locationFilter.trim() || undefined,
-        remoteType: remoteFilter || undefined,
-        employmentType: employmentFilter || undefined,
-        sourceType: sourceFilter || undefined,
-        companyName: companyFilter || undefined,
-        postedDays: postedDateFilter || undefined,
-        sortBy: sortFilter,
-        page: targetPage,
-        pageSize: 12
-      });
+    const currentTab = forceTab || activeTab;
+    const hasSearchQuery = Boolean(searchQuery.trim());
 
-      setJobs(res.data);
-      if (res.pagination) {
-        setPage(res.pagination.page);
-        setTotalPages(res.pagination.totalPages);
-        setTotalCount(res.pagination.total);
+    try {
+      // 1. Unrestricted Search mode OR All Jobs tab: fetch from universal canonical jobs catalogue
+      if (hasSearchQuery || currentTab === 'all') {
+        const res = await apiClient.getCanonicalJobs({
+          query: searchQuery.trim() || undefined,
+          country: countryFilter.trim() || undefined,
+          location: locationFilter.trim() || undefined,
+          remoteType: remoteFilter || undefined,
+          employmentType: employmentFilter || undefined,
+          sourceType: sourceFilter || undefined,
+          companyName: companyFilter || undefined,
+          postedDays: postedDateFilter || undefined,
+          sortBy: sortFilter,
+          page: targetPage,
+          pageSize: 12
+        });
+
+        setJobs(res.data);
+        if (res.pagination) {
+          setPage(res.pagination.page);
+          setTotalPages(res.pagination.totalPages);
+          setTotalCount(res.pagination.total);
+        }
+      } else {
+        // 2. Recommended for You tab: fetch personalized recommendations
+        const res = await apiClient.getRecommendedJobs({
+          page: targetPage,
+          pageSize: 12,
+          country: countryFilter.trim() || undefined,
+          location: locationFilter.trim() || undefined,
+          remoteType: remoteFilter || undefined,
+          employmentType: employmentFilter || undefined
+        });
+
+        if (res.profileState) {
+          setProfileState(res.profileState);
+        }
+
+        setJobs(res.items || []);
+        if (res.pagination) {
+          setPage(res.pagination.page);
+          setTotalPages(res.pagination.totalPages);
+          setTotalCount(res.pagination.total);
+        }
       }
     } catch (err: any) {
-      console.error('Failed to load canonical jobs:', err);
+      console.error('Failed to load opportunities:', err);
       const norm = normalizeApiError(err, 'Unable to fetch job opportunities');
       setError(norm.message);
     } finally {
       setLoading(false);
     }
-  }, [searchQuery, countryFilter, locationFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
+  }, [activeTab, searchQuery, countryFilter, locationFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
 
-  // Initial and reactive fetch upon filter modifications
+  // Initial and reactive fetch upon filter modifications or activeCandidate update
   useEffect(() => {
-    fetchCanonicalJobs(1);
-  }, [countryFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
+    loadJobs(1);
+  }, [activeTab, activeCandidate, countryFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    fetchCanonicalJobs(1);
+    loadJobs(1);
+  };
+
+  const handleTabSwitch = (tab: 'recommended' | 'all') => {
+    setActiveTab(tab);
+    setPage(1);
+    loadJobs(1, tab);
   };
 
   const handleResetFilters = () => {
@@ -216,7 +253,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
           return;
         }
         const created = await api.parseJob(pastedJD, 'pasted');
-        await fetchCanonicalJobs(1);
+        await loadJobs(1);
         setIsAddModalOpen(false);
         setPastedJD('');
         if (onSelectJobForAnalysis) onSelectJobForAnalysis(created.id);
@@ -234,7 +271,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
           return;
         }
         if (res.data) {
-          await fetchCanonicalJobs(1);
+          await loadJobs(1);
           setIsAddModalOpen(false);
           setJobUrl('');
           if (onSelectJobForAnalysis) onSelectJobForAnalysis(res.data.id);
@@ -252,10 +289,20 @@ export const JobsPage: React.FC<JobsPageProps> = ({
       {/* Header & Main Controls */}
       <div className="jobs-header-row">
         <div>
-          <h2 className="jobs-page-title">Explore Opportunities</h2>
+          <h2 className="jobs-page-title">
+            {activeTab === 'recommended' && !searchQuery.trim() ? 'Personalized Job Discovery' : 'Explore All Opportunities'}
+          </h2>
           <p className="jobs-page-sub">
-            <span className="desktop-only-text">Discover opportunities from connected company career sources with automated deduplication and source transparency.</span>
-            <span className="mobile-only-text">Find verified jobs from trusted company sources.</span>
+            <span className="desktop-only-text">
+              {activeTab === 'recommended' && !searchQuery.trim()
+                ? 'Opportunities prioritized for your profile, skills, experience, and career goals.'
+                : 'Discover universal opportunities from connected company career sources with verified transparency.'}
+            </span>
+            <span className="mobile-only-text">
+              {activeTab === 'recommended' && !searchQuery.trim()
+                ? 'Curated opportunities matching your profile.'
+                : 'Find verified jobs from trusted company sources.'}
+            </span>
           </p>
         </div>
 
@@ -282,6 +329,26 @@ export const JobsPage: React.FC<JobsPageProps> = ({
             Add Target Job
           </Button>
         </div>
+      </div>
+
+      {/* Mode Navigation Tabs */}
+      <div className="jobs-nav-tabs">
+        <button
+          type="button"
+          className={`jobs-tab-button ${activeTab === 'recommended' && !searchQuery.trim() ? 'active' : ''}`}
+          onClick={() => handleTabSwitch('recommended')}
+        >
+          <Sparkles size={16} className="inline mr-1" />
+          <span>Recommended for You</span>
+        </button>
+        <button
+          type="button"
+          className={`jobs-tab-button ${activeTab === 'all' || searchQuery.trim() ? 'active' : ''}`}
+          onClick={() => handleTabSwitch('all')}
+        >
+          <Globe size={16} className="inline mr-1" />
+          <span>All Jobs {searchQuery.trim() ? `(Search: "${searchQuery}")` : ''}</span>
+        </button>
       </div>
 
       {/* Filter and Search Bar */}
@@ -387,7 +454,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
             <option value="salary">Highest Salary</option>
           </select>
 
-          <Button variant="secondary" size="sm" onClick={() => fetchCanonicalJobs(1)}>
+          <Button variant="secondary" size="sm" onClick={() => loadJobs(1)}>
             Search
           </Button>
 
@@ -463,18 +530,76 @@ export const JobsPage: React.FC<JobsPageProps> = ({
         <div className="jobs-error-banner">
           <AlertCircle size={20} />
           <span>{error}</span>
-          <Button variant="outline" size="sm" onClick={() => fetchCanonicalJobs(1)}>
+          <Button variant="outline" size="sm" onClick={() => loadJobs(1)}>
             Retry
           </Button>
         </div>
       )}
 
-      {/* Empty State */}
-      {!loading && !error && jobs.length === 0 && (
+      {/* Onboarding Guidance State for Candidate with no profile & no resume */}
+      {!loading && !error && jobs.length === 0 && activeTab === 'recommended' && !searchQuery.trim() && profileState === 'EMPTY' && (
+        <div className="jobs-onboarding-card">
+          <div className="onboarding-badge">
+            <Sparkles size={16} />
+            <span>Personalized Experience</span>
+          </div>
+          <h3 className="onboarding-title">Let's personalize your job search</h3>
+          <p className="onboarding-description">
+            Upload your resume or add your skills and experience to receive tailored recommendations, deterministic match scoring, and ATS compatibility insights.
+          </p>
+          <div className="onboarding-actions-row">
+            <Button
+              variant="primary"
+              icon={<FileText size={16} />}
+              onClick={() => {
+                window.location.hash = '#/resume';
+              }}
+            >
+              Upload Resume
+            </Button>
+            <Button
+              variant="outline"
+              icon={<Briefcase size={16} />}
+              onClick={() => {
+                window.location.hash = '#/profile';
+              }}
+            >
+              Complete Profile
+            </Button>
+            <Button
+              variant="secondary"
+              icon={<Globe size={16} />}
+              onClick={() => handleTabSwitch('all')}
+            >
+              Browse All Jobs
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Empty State when no recommendations found for candidate with profile */}
+      {!loading && !error && jobs.length === 0 && activeTab === 'recommended' && !searchQuery.trim() && profileState !== 'EMPTY' && (
+        <div className="jobs-empty-state">
+          <Sparkles size={40} className="empty-icon" />
+          <h3>We couldn't find strong matches yet</h3>
+          <p>Update your target roles, skills, or location preferences in your profile to expand recommendations, or explore all active listings.</p>
+          <div className="empty-actions-row">
+            <Button variant="outline" size="sm" onClick={() => { window.location.hash = '#/profile'; }}>
+              Update Profile
+            </Button>
+            <Button variant="primary" size="sm" onClick={() => handleTabSwitch('all')}>
+              Explore All Jobs
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* General Empty State for All Jobs or Search */}
+      {!loading && !error && jobs.length === 0 && (activeTab === 'all' || searchQuery.trim()) && (
         <div className="jobs-empty-state">
           <Briefcase size={40} className="empty-icon" />
           <h3>No matching job opportunities found</h3>
-          <p>Try broadening your search keywords or reset filter parameters.</p>
+          <p>{searchQuery.trim() ? `No results found for "${searchQuery}". Try different keywords or reset filters.` : 'Try broadening your search keywords or reset filter parameters.'}</p>
           <Button variant="outline" size="sm" onClick={handleResetFilters}>
             Reset Filters
           </Button>
@@ -503,7 +628,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
             size="sm"
             disabled={page <= 1}
             icon={<ChevronLeft size={16} />}
-            onClick={() => fetchCanonicalJobs(page - 1)}
+            onClick={() => loadJobs(page - 1)}
           >
             Previous
           </Button>
@@ -515,7 +640,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
             size="sm"
             disabled={page >= totalPages}
             icon={<ChevronRight size={16} />}
-            onClick={() => fetchCanonicalJobs(page + 1)}
+            onClick={() => loadJobs(page + 1)}
           >
             Next
           </Button>
@@ -691,7 +816,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
                 variant="primary"
                 onClick={() => {
                   setIsMobileFilterOpen(false);
-                  fetchCanonicalJobs(1);
+                  loadJobs(1);
                 }}
               >
                 Apply Filters

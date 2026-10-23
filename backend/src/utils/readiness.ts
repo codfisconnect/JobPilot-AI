@@ -5,38 +5,38 @@
  */
 
 export interface ExperienceItemInput {
-  id?: string;
-  company?: string;
-  title?: string;
-  location?: string;
-  startDate?: string;
-  endDate?: string;
-  isCurrent?: boolean;
-  duration?: string;
-  description?: string;
-  responsibilities?: string[];
-  technologies?: string[];
+  id?: string | null;
+  company?: string | null;
+  title?: string | null;
+  location?: string | null;
+  startDate?: string | Date | null;
+  endDate?: string | Date | null;
+  isCurrent?: boolean | null;
+  duration?: string | null;
+  description?: string | null;
+  responsibilities?: string[] | null;
+  technologies?: string[] | null;
 }
 
 export interface CandidateProfileInput {
-  id?: string;
-  name?: string;
-  fullName?: string;
-  headline?: string;
-  email?: string;
-  phone?: string;
-  location?: string;
-  yearsOfExperience?: number;
-  experiences?: ExperienceItemInput[];
+  id?: string | null;
+  name?: string | null;
+  fullName?: string | null;
+  headline?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  location?: string | null;
+  yearsOfExperience?: number | null;
+  experiences?: ExperienceItemInput[] | null;
 }
 
 export interface JobDescriptionInput {
-  id?: string;
-  role?: string;
-  title?: string;
-  company?: string;
-  location?: string;
-  experienceRequired?: string;
+  id?: string | null;
+  role?: string | null;
+  title?: string | null;
+  company?: string | null;
+  location?: string | null;
+  experienceRequired?: string | null;
 }
 
 export type BlockerId =
@@ -72,9 +72,8 @@ export function calculateWorkHistoryExperienceYears(experiences?: ExperienceItem
     let hasValidDates = false;
     if (exp.startDate) {
       const start = new Date(exp.startDate);
-      const end = exp.isCurrent || !exp.endDate || exp.endDate.toLowerCase() === 'present'
-        ? new Date()
-        : new Date(exp.endDate);
+      const isPresent = exp.isCurrent || !exp.endDate || (typeof exp.endDate === 'string' && exp.endDate.toLowerCase() === 'present');
+      const end = isPresent ? new Date() : new Date(exp.endDate as string | Date);
 
       if (!isNaN(start.getTime()) && !isNaN(end.getTime()) && end.getTime() >= start.getTime()) {
         const days = (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24);
@@ -99,7 +98,7 @@ export function calculateWorkHistoryExperienceYears(experiences?: ExperienceItem
 export interface ReadinessEvaluationParams {
   candidate?: CandidateProfileInput | null;
   job?: JobDescriptionInput | null;
-  currentAtsScore: number;
+  currentAtsScore?: number | null;
   atsThreshold?: number; // default 80
   isExperienceConfirmed?: boolean;
 }
@@ -114,7 +113,7 @@ export interface ReadinessEvaluationResult {
   candidateLocation: string;
   jobLocation: string;
   isLocationMissing: boolean;
-  atsScore: number;
+  atsScore: number | null;
   atsThreshold: number;
   isAtsPassed: boolean;
 }
@@ -206,15 +205,25 @@ export function evaluateApplicationReadiness(
   }
 
   // 4. ATS Gate (Mandatory >= 80%)
-  const isAtsPassed = currentAtsScore >= atsThreshold;
+  const isAtsPassed = typeof currentAtsScore === 'number' && currentAtsScore >= atsThreshold;
   if (!isAtsPassed) {
-    blockers.push({
-      id: 'ATS_BELOW_THRESHOLD',
-      title: 'ATS Below Mandatory Threshold',
-      description: `Current ATS score is ${currentAtsScore}%. Minimum required threshold to submit is ${atsThreshold}%. Tailor your resume to bridge missing skill keywords.`,
-      severity: 'BLOCKING',
-      actionLabel: 'Improve Resume'
-    });
+    if (typeof currentAtsScore === 'number') {
+      blockers.push({
+        id: 'ATS_BELOW_THRESHOLD',
+        title: 'ATS Below Mandatory Threshold',
+        description: `Current ATS score for this job is ${currentAtsScore}%. Minimum required threshold to submit is ${atsThreshold}%. Tailor your resume to bridge missing skill keywords.`,
+        severity: 'BLOCKING',
+        actionLabel: 'Improve Resume'
+      });
+    } else {
+      blockers.push({
+        id: 'ATS_BELOW_THRESHOLD',
+        title: 'ATS Compatibility Calculation Unavailable',
+        description: `ATS compatibility has not yet been computed for this job and resume. Click "Run ATS Check" to calculate before submitting.`,
+        severity: 'BLOCKING',
+        actionLabel: 'Run ATS Check'
+      });
+    }
   }
 
   // 5. Job Availability
@@ -238,7 +247,7 @@ export function evaluateApplicationReadiness(
     candidateLocation,
     jobLocation,
     isLocationMissing,
-    atsScore: currentAtsScore,
+    atsScore: typeof currentAtsScore === 'number' ? currentAtsScore : null,
     atsThreshold,
     isAtsPassed
   };

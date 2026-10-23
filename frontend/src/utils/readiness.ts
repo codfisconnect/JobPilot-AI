@@ -68,7 +68,7 @@ export function calculateWorkHistoryExperienceYears(experiences?: DetailedExperi
 export interface ReadinessEvaluationParams {
   candidate?: CandidateProfile | null;
   job?: JobDescription | null;
-  currentAtsScore: number;
+  currentAtsScore?: number | null;
   atsThreshold?: number; // default 80
   isExperienceConfirmed?: boolean;
 }
@@ -83,7 +83,7 @@ export interface ReadinessEvaluationResult {
   candidateLocation: string;
   jobLocation: string;
   isLocationMissing: boolean;
-  atsScore: number;
+  atsScore: number | null;
   atsThreshold: number;
   isAtsPassed: boolean;
 }
@@ -174,15 +174,25 @@ export function evaluateApplicationReadiness(
   }
 
   // 4. ATS Gate (Mandatory >= 80%)
-  const isAtsPassed = currentAtsScore >= atsThreshold;
+  const isAtsPassed = typeof currentAtsScore === 'number' && currentAtsScore >= atsThreshold;
   if (!isAtsPassed) {
-    blockers.push({
-      id: 'ATS_BELOW_THRESHOLD',
-      title: 'ATS Below Mandatory Threshold',
-      description: `Current ATS score is ${currentAtsScore}%. Minimum required threshold to submit is ${atsThreshold}%. Tailor your resume to bridge missing skill keywords.`,
-      severity: 'BLOCKING',
-      actionLabel: 'Improve Resume'
-    });
+    if (typeof currentAtsScore === 'number') {
+      blockers.push({
+        id: 'ATS_BELOW_THRESHOLD',
+        title: 'ATS Below Mandatory Threshold',
+        description: `Current ATS score for this job is ${currentAtsScore}%. Minimum required threshold to submit is ${atsThreshold}%. Tailor your resume to bridge missing skill keywords.`,
+        severity: 'BLOCKING',
+        actionLabel: 'Improve Resume'
+      });
+    } else {
+      blockers.push({
+        id: 'ATS_BELOW_THRESHOLD',
+        title: 'ATS Compatibility Calculation Unavailable',
+        description: `ATS compatibility has not yet been computed for this job and resume. Click "Run ATS Check" to calculate before submitting.`,
+        severity: 'BLOCKING',
+        actionLabel: 'Run ATS Check'
+      });
+    }
   }
 
   // 5. Job Availability
@@ -206,7 +216,7 @@ export function evaluateApplicationReadiness(
     candidateLocation,
     jobLocation,
     isLocationMissing,
-    atsScore: currentAtsScore,
+    atsScore: typeof currentAtsScore === 'number' ? currentAtsScore : null,
     atsThreshold,
     isAtsPassed
   };
