@@ -44,7 +44,16 @@ export class AdminService {
     return adminRepository.getEmployers(params);
   }
 
+  async verifyEmployer(id: string, status: string) {
+    const { prisma } = await import('../../database/prisma.js');
+    return prisma.employerOrganization.update({
+      where: { id },
+      data: { verificationStatus: status as any }
+    });
+  }
+
   async getPayments(params: { page: number; pageSize: number; search?: string; status?: string }) {
+
     return adminRepository.getPayments(params);
   }
 

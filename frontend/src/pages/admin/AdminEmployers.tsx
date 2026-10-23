@@ -85,12 +85,13 @@ export const AdminEmployers: React.FC = () => {
                   <th>Posted Jobs</th>
                   <th>Verification</th>
                   <th>Registered</th>
+                  <th>Admin Action</th>
                 </tr>
               </thead>
               <tbody>
                 {employers.length === 0 ? (
                   <tr>
-                    <td colSpan={7} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
+                    <td colSpan={8} style={{ textAlign: 'center', padding: '40px', color: 'var(--text-muted)' }}>
                       No employers found matching criteria.
                     </td>
                   </tr>
@@ -113,12 +114,56 @@ export const AdminEmployers: React.FC = () => {
                         </span>
                       </td>
                       <td>{new Date(e.createdAt).toLocaleDateString()}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: '6px' }}>
+                          {e.verificationStatus !== 'VERIFIED' ? (
+                            <button
+                              onClick={async () => {
+                                await apiClient.verifyAdminEmployer(e.id, 'VERIFIED');
+                                loadEmployers(page);
+                              }}
+                              style={{
+                                padding: '4px 10px',
+                                background: 'rgba(34, 197, 94, 0.1)',
+                                color: '#16a34a',
+                                border: '1px solid rgba(34, 197, 94, 0.3)',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Verify
+                            </button>
+                          ) : (
+                            <button
+                              onClick={async () => {
+                                await apiClient.verifyAdminEmployer(e.id, 'REJECTED');
+                                loadEmployers(page);
+                              }}
+                              style={{
+                                padding: '4px 10px',
+                                background: 'rgba(239, 68, 68, 0.1)',
+                                color: '#ef4444',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                borderRadius: '4px',
+                                fontSize: '0.75rem',
+                                fontWeight: 600,
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Revoke
+                            </button>
+                          )}
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}
               </tbody>
             </table>
           </div>
+
         )}
 
         <div className="admin-pagination-bar">

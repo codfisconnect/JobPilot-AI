@@ -14,7 +14,12 @@ import {
   Clock,
   PlusCircle,
   Building,
-  AlertCircle
+  AlertCircle,
+  Globe,
+  Search,
+  UserCheck,
+  Send,
+  ShieldCheck
 } from 'lucide-react';
 import './EmployerPage.css';
 
@@ -23,14 +28,35 @@ interface EmployerPageProps {
 }
 
 export const EmployerPage: React.FC<EmployerPageProps> = () => {
+  const [activeTab, setActiveTab] = useState<'jobs' | 'careers' | 'candidates' | 'team'>('jobs');
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [org, setOrg] = useState<EmployerOrganization | null>(null);
   const [member, setMember] = useState<EmployerMember | null>(null);
   const [metrics, setMetrics] = useState<EmployerDashboardMetrics | null>(null);
   const [jobs, setJobs] = useState<EmployerJob[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
   const [applicants, setApplicants] = useState<EmployerApplicant[]>([]);
+
+  // Careers URL Connection State
+  const [careersUrlInput, setCareersUrlInput] = useState<string>('');
+  const [connectingCareers, setConnectingCareers] = useState<boolean>(false);
+  const [careersConnectionResult, setCareersConnectionResult] = useState<any | null>(null);
+
+  // Candidate Search State
+  const [candidateSearchQuery, setCandidateSearchQuery] = useState<string>('');
+  const [candidateSkillFilter, setCandidateSkillFilter] = useState<string>('');
+  const [candidateLocationFilter, setCandidateLocationFilter] = useState<string>('');
+  const [searchedCandidates, setSearchedCandidates] = useState<any[]>([]);
+  const [searchingCandidates, setSearchingCandidates] = useState<boolean>(false);
+
+  // Team Management State
+  const [teamMembers, setTeamMembers] = useState<any[]>([]);
+  const [inviteEmail, setInviteEmail] = useState<string>('');
+  const [inviteRole, setInviteRole] = useState<string>('RECRUITER');
+  const [inviteTitle, setInviteTitle] = useState<string>('');
+  const [invitingMember, setInvitingMember] = useState<boolean>(false);
 
   // Onboarding Form State
   const [onboardingName, setOnboardingName] = useState<string>('');
@@ -42,6 +68,7 @@ export const EmployerPage: React.FC<EmployerPageProps> = () => {
   const [newJobTitle, setNewJobTitle] = useState<string>('');
   const [newJobDesc, setNewJobDesc] = useState<string>('');
   const [newJobLoc, setNewJobLoc] = useState<string>('');
+
 
   const loadEmployerData = async () => {
     try {
@@ -134,8 +161,95 @@ export const EmployerPage: React.FC<EmployerPageProps> = () => {
     }
   };
 
+  const handleConnectCareers = async (e: React.FormEvent) => {
+
+    e.preventDefault();
+    if (!careersUrlInput.trim()) return;
+    try {
+      setConnectingCareers(true);
+      setError(null);
+      setActionSuccess(null);
+      const res = await apiClient.connectEmployerCareersUrl(careersUrlInput.trim());
+      if (res.success) {
+        setCareersConnectionResult(res.data);
+        setActionSuccess('Careers URL connected successfully. Jobs imported and mapped to your organization.');
+        await loadEmployerData();
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to connect careers URL');
+    } finally {
+      setConnectingCareers(false);
+    }
+  };
+
+  const handleSearchCandidates = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    try {
+      setSearchingCandidates(true);
+      setError(null);
+      const res = await apiClient.searchEmployerCandidates({
+        query: candidateSearchQuery || undefined,
+        skills: candidateSkillFilter || undefined,
+        location: candidateLocationFilter || undefined
+      });
+      if (res.success) {
+        setSearchedCandidates(res.candidates || []);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to search candidate talent pool');
+    } finally {
+      setSearchingCandidates(false);
+    }
+  };
+
+  const handleLoadTeam = async () => {
+    try {
+      const res = await apiClient.getEmployerMembers();
+      if (res.success) {
+        setTeamMembers(res.data || []);
+      }
+    } catch (err: any) {
+      console.error('Failed to load team members:', err);
+    }
+  };
+
+  const handleInviteMember = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteEmail.trim()) return;
+    try {
+      setInvitingMember(true);
+      setError(null);
+      setActionSuccess(null);
+      const res = await apiClient.inviteEmployerMember({
+        email: inviteEmail.trim(),
+        role: inviteRole,
+        title: inviteTitle.trim() || undefined
+      });
+      if (res.success) {
+        setActionSuccess(`Invited ${inviteEmail} to team.`);
+        setInviteEmail('');
+        setInviteTitle('');
+        await handleLoadTeam();
+      }
+    } catch (err: any) {
+      setError(err.message || 'Failed to invite team member');
+    } finally {
+      setInvitingMember(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === 'candidates' && searchedCandidates.length === 0) {
+      handleSearchCandidates();
+    }
+    if (activeTab === 'team') {
+      handleLoadTeam();
+    }
+  }, [activeTab]);
+
   if (loading) {
     return (
+
       <div className="employer-page">
         <div style={{ textAlign: 'center', padding: '4rem' }}>
           <div className="spinner" />
@@ -255,140 +369,456 @@ export const EmployerPage: React.FC<EmployerPageProps> = () => {
         </div>
       )}
 
-      {/* Organization Jobs */}
-      <div className="employer-section">
-        <div className="section-head-bar">
-          <h2 className="section-title">Job Openings ({jobs.length})</h2>
-          <button
-            onClick={() => setShowJobModal(true)}
-            className="action-btn action-primary"
-            style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
-          >
-            <PlusCircle size={16} />
-            Create Role
-          </button>
-        </div>
+      {/* Tab Navigation */}
+      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-subtle)', marginBottom: '1.5rem', overflowX: 'auto', paddingBottom: '4px' }}>
+        <button
+          onClick={() => setActiveTab('jobs')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: 'none',
+            background: activeTab === 'jobs' ? 'var(--accent-primary)' : 'transparent',
+            color: activeTab === 'jobs' ? '#fff' : 'var(--text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <Briefcase size={16} />
+          <span>Job Openings ({jobs.length})</span>
+        </button>
 
-        {jobs.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
-            No jobs posted yet. Create your first role to start accepting candidates.
-          </div>
-        ) : (
-          <div style={{ overflowX: 'auto' }}>
-            <table className="job-table">
-              <thead>
-                <tr>
-                  <th>Job Title</th>
-                  <th>Location</th>
-                  <th>Status</th>
-                  <th>Applicants</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {jobs.map((job) => (
-                  <tr key={job.id}>
-                    <td style={{ fontWeight: 600 }}>{job.title}</td>
-                    <td>{job.location || 'Remote'}</td>
-                    <td>
-                      <span className={`status-badge status-${job.organizationJobStatus.toLowerCase()}`}>
-                        {job.organizationJobStatus}
-                      </span>
-                    </td>
-                    <td>{job.applicantCount || 0}</td>
-                    <td>
-                      <div style={{ display: 'flex', gap: '0.5rem' }}>
-                        <button
-                          onClick={() => handleViewApplicants(job.id)}
-                          className="action-btn action-outline"
-                        >
-                          View Pipeline
-                        </button>
-                        {job.organizationJobStatus === 'DRAFT' && (
-                          <button
-                            onClick={() => handleJobLifecycle(job.id, 'publish')}
-                            className="action-btn action-primary"
-                          >
-                            Publish
-                          </button>
-                        )}
-                        {job.organizationJobStatus === 'PUBLISHED' && (
-                          <button
-                            onClick={() => handleJobLifecycle(job.id, 'pause')}
-                            className="action-btn action-outline"
-                          >
-                            Pause
-                          </button>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+        <button
+          onClick={() => setActiveTab('careers')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: 'none',
+            background: activeTab === 'careers' ? 'var(--accent-primary)' : 'transparent',
+            color: activeTab === 'careers' ? '#fff' : 'var(--text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <Globe size={16} />
+          <span>Connect Careers Page</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('candidates')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: 'none',
+            background: activeTab === 'candidates' ? 'var(--accent-primary)' : 'transparent',
+            color: activeTab === 'candidates' ? '#fff' : 'var(--text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <UserCheck size={16} />
+          <span>Candidate Discovery</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('team')}
+          style={{
+            padding: '8px 16px',
+            borderRadius: '6px',
+            border: 'none',
+            background: activeTab === 'team' ? 'var(--accent-primary)' : 'transparent',
+            color: activeTab === 'team' ? '#fff' : 'var(--text-secondary)',
+            fontWeight: 600,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}
+        >
+          <Users size={16} />
+          <span>Team & Roles</span>
+        </button>
       </div>
 
-      {/* Applicant Detail View */}
-      {selectedJobId && (
-        <div className="employer-section">
-          <div className="section-head-bar">
-            <h2 className="section-title">
-              Candidate Pipeline ({applicants.length} Applicants)
-            </h2>
-            <button
-              onClick={() => setSelectedJobId(null)}
-              className="action-btn action-outline"
-            >
-              Close Pipeline
-            </button>
+      {actionSuccess && (
+        <div style={{ padding: '0.75rem 1rem', background: 'rgba(34, 197, 94, 0.1)', color: '#16a34a', border: '1px solid rgba(34, 197, 94, 0.2)', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <ShieldCheck size={18} />
+          <span>{actionSuccess}</span>
+        </div>
+      )}
+
+      {error && (
+        <div style={{ padding: '0.75rem 1rem', background: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.2)', borderRadius: 'var(--radius-md)', marginBottom: '1.5rem', display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <AlertCircle size={18} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      {/* TAB 1: Organization Jobs & Applicant Pipeline */}
+      {activeTab === 'jobs' && (
+        <>
+          <div className="employer-section">
+            <div className="section-head-bar">
+              <h2 className="section-title">Job Openings ({jobs.length})</h2>
+              <button
+                onClick={() => setShowJobModal(true)}
+                className="action-btn action-primary"
+                style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
+              >
+                <PlusCircle size={16} />
+                Create Role
+              </button>
+            </div>
+
+            {jobs.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+                No jobs posted yet. Connect your careers page or create your first role directly.
+              </div>
+            ) : (
+              <div style={{ overflowX: 'auto' }}>
+                <table className="job-table">
+                  <thead>
+                    <tr>
+                      <th>Job Title</th>
+                      <th>Location</th>
+                      <th>Status</th>
+                      <th>Applicants</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {jobs.map((job) => (
+                      <tr key={job.id}>
+                        <td style={{ fontWeight: 600 }}>{job.title}</td>
+                        <td>{job.location || 'Remote'}</td>
+                        <td>
+                          <span className={`status-badge status-${job.organizationJobStatus?.toLowerCase() || 'published'}`}>
+                            {job.organizationJobStatus || 'PUBLISHED'}
+                          </span>
+                        </td>
+                        <td>{job.applicantCount || 0}</td>
+                        <td>
+                          <div style={{ display: 'flex', gap: '0.5rem' }}>
+                            <button
+                              onClick={() => handleViewApplicants(job.id)}
+                              className="action-btn action-outline"
+                            >
+                              View Pipeline
+                            </button>
+                            {job.organizationJobStatus === 'DRAFT' && (
+                              <button
+                                onClick={() => handleJobLifecycle(job.id, 'publish')}
+                                className="action-btn action-primary"
+                              >
+                                Publish
+                              </button>
+                            )}
+                            {job.organizationJobStatus === 'PUBLISHED' && (
+                              <button
+                                onClick={() => handleJobLifecycle(job.id, 'pause')}
+                                className="action-btn action-outline"
+                              >
+                                Pause
+                              </button>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
           </div>
 
-          {applicants.length === 0 ? (
-            <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
-              No applications received for this job posting yet.
+          {/* Applicant Detail View */}
+          {selectedJobId && (
+            <div className="employer-section">
+              <div className="section-head-bar">
+                <h2 className="section-title">
+                  Candidate Pipeline ({applicants.length} Applicants)
+                </h2>
+                <button
+                  onClick={() => setSelectedJobId(null)}
+                  className="action-btn action-outline"
+                >
+                  Close Pipeline
+                </button>
+              </div>
+
+              {applicants.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '2.5rem', color: 'var(--text-muted)' }}>
+                  No applications received for this job posting yet.
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table className="job-table">
+                    <thead>
+                      <tr>
+                        <th>Candidate</th>
+                        <th>Headline</th>
+                        <th>Submitted Resume</th>
+                        <th>Stage</th>
+                        <th>Applied Date</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {applicants.map((app) => (
+                        <tr key={app.id}>
+                          <td style={{ fontWeight: 600 }}>
+                            {app.candidateProfile.fullName}
+                          </td>
+                          <td style={{ color: 'var(--text-secondary)' }}>
+                            {app.candidateProfile.headline || '—'}
+                          </td>
+                          <td>
+                            {app.resumeVersion?.versionName || 'Standard Version'}
+                          </td>
+                          <td>
+                            <span className="status-badge status-published">
+                              {app.reviews?.[0]?.stage || 'NEW'}
+                            </span>
+                          </td>
+                          <td style={{ color: 'var(--text-muted)' }}>
+                            {app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : 'Recent'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
-          ) : (
-            <div style={{ overflowX: 'auto' }}>
-              <table className="job-table">
-                <thead>
-                  <tr>
-                    <th>Candidate</th>
-                    <th>Headline</th>
-                    <th>Submitted Resume</th>
-                    <th>Stage</th>
-                    <th>Applied Date</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {applicants.map((app) => (
-                    <tr key={app.id}>
-                      <td style={{ fontWeight: 600 }}>
-                        {app.candidateProfile.fullName}
-                      </td>
-                      <td style={{ color: 'var(--text-secondary)' }}>
-                        {app.candidateProfile.headline || '—'}
-                      </td>
-                      <td>
-                        {app.resumeVersion?.versionName || 'Standard Version'}
-                      </td>
-                      <td>
-                        <span className="status-badge status-published">
-                          {app.reviews?.[0]?.stage || 'NEW'}
-                        </span>
-                      </td>
-                      <td style={{ color: 'var(--text-muted)' }}>
-                        {app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : 'Recent'}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+          )}
+        </>
+      )}
+
+      {/* TAB 2: Connect Careers Page */}
+      {activeTab === 'careers' && (
+        <div className="employer-section">
+          <div className="section-head-bar">
+            <div>
+              <h2 className="section-title">Connect Careers Page</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                Pilot Mama analyzes your company careers site, discovers open roles automatically, and synchronizes jobs continuously.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleConnectCareers} style={{ maxWidth: '640px', marginTop: '1rem' }}>
+            <div className="form-field">
+              <label className="form-label">Company Careers URL</label>
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <input
+                  className="form-input"
+                  type="url"
+                  required
+                  placeholder="https://company.com/careers"
+                  value={careersUrlInput}
+                  onChange={(e) => setCareersUrlInput(e.target.value)}
+                />
+                <button
+                  type="submit"
+                  disabled={connectingCareers}
+                  className="action-btn action-primary"
+                  style={{ whiteSpace: 'nowrap' }}
+                >
+                  {connectingCareers ? 'Analyzing & Syncing...' : 'Connect & Import'}
+                </button>
+              </div>
+            </div>
+          </form>
+
+          {careersConnectionResult && (
+            <div style={{ marginTop: '1.5rem', padding: '1.25rem', background: 'var(--bg-canvas)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-subtle)' }}>
+              <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.5rem' }}>
+                Source Discovery Summary
+              </h3>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                Detected Platform: <strong>{careersConnectionResult.discovery?.atsType || careersConnectionResult.discovery?.detectedType}</strong> • Strategy: <strong>{careersConnectionResult.discovery?.strategy}</strong>
+              </p>
+              <p style={{ fontSize: '0.875rem', color: 'var(--text-secondary)' }}>
+                Jobs Found: <strong>{careersConnectionResult.discovery?.jobCount}</strong> • Sync Status: <strong>Complete</strong>
+              </p>
             </div>
           )}
         </div>
       )}
+
+      {/* TAB 3: Candidate Talent Discovery */}
+      {activeTab === 'candidates' && (
+        <div className="employer-section">
+          <div className="section-head-bar">
+            <div>
+              <h2 className="section-title">Candidate Talent Discovery</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                Search verified candidate profiles who have opted into employer discovery.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleSearchCandidates} style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', flexWrap: 'wrap' }}>
+            <input
+              className="form-input"
+              style={{ flex: 1, minWidth: '200px' }}
+              placeholder="Search by role, keyword, or summary..."
+              value={candidateSearchQuery}
+              onChange={(e) => setCandidateSearchQuery(e.target.value)}
+            />
+            <input
+              className="form-input"
+              style={{ width: '180px' }}
+              placeholder="Skills (e.g. React, Python)"
+              value={candidateSkillFilter}
+              onChange={(e) => setCandidateSkillFilter(e.target.value)}
+            />
+            <input
+              className="form-input"
+              style={{ width: '180px' }}
+              placeholder="Location (e.g. Bengaluru)"
+              value={candidateLocationFilter}
+              onChange={(e) => setCandidateLocationFilter(e.target.value)}
+            />
+            <button
+              type="submit"
+              disabled={searchingCandidates}
+              className="action-btn action-primary"
+            >
+              {searchingCandidates ? 'Searching...' : 'Search'}
+            </button>
+          </form>
+
+          {searchedCandidates.length === 0 ? (
+            <div style={{ textAlign: 'center', padding: '3rem', color: 'var(--text-muted)' }}>
+              No candidates found matching filters.
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '1rem' }}>
+              {searchedCandidates.map((c) => (
+                <div
+                  key={c.id}
+                  style={{
+                    padding: '1.25rem',
+                    background: 'var(--bg-canvas)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-md)'
+                  }}
+                >
+                  <h4 style={{ fontWeight: 700, fontSize: '1.05rem', marginBottom: '0.25rem' }}>
+                    {c.fullName}
+                  </h4>
+                  <div style={{ color: 'var(--accent-primary)', fontSize: '0.875rem', fontWeight: 500, marginBottom: '0.5rem' }}>
+                    {c.headline || 'Software Professional'}
+                  </div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '0.8rem', marginBottom: '0.75rem' }}>
+                    {c.location || 'Remote'}
+                  </div>
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '4px' }}>
+                    {c.skills?.map((s: any, idx: number) => (
+                      <span
+                        key={idx}
+                        style={{
+                          fontSize: '0.75rem',
+                          padding: '2px 8px',
+                          background: 'rgba(99, 102, 241, 0.1)',
+                          color: 'var(--accent-primary)',
+                          borderRadius: '4px'
+                        }}
+                      >
+                        {s.skill?.name || s.name}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 4: Team & Roles */}
+      {activeTab === 'team' && (
+        <div className="employer-section">
+          <div className="section-head-bar">
+            <div>
+              <h2 className="section-title">Team Members & Access Control</h2>
+              <p style={{ color: 'var(--text-secondary)', fontSize: '0.875rem' }}>
+                Manage recruitment permissions across recruiters, hiring managers, and administrators.
+              </p>
+            </div>
+          </div>
+
+          <form onSubmit={handleInviteMember} style={{ display: 'flex', gap: '8px', marginBottom: '1.5rem', flexWrap: 'wrap', maxWidth: '720px' }}>
+            <input
+              className="form-input"
+              type="email"
+              required
+              style={{ flex: 1, minWidth: '220px' }}
+              placeholder="Teammate Email..."
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+            />
+            <input
+              className="form-input"
+              style={{ width: '160px' }}
+              placeholder="Title (e.g. Senior Recruiter)"
+              value={inviteTitle}
+              onChange={(e) => setInviteTitle(e.target.value)}
+            />
+            <select
+              className="form-input"
+              style={{ width: '150px' }}
+              value={inviteRole}
+              onChange={(e) => setInviteRole(e.target.value)}
+            >
+              <option value="RECRUITER">Recruiter</option>
+              <option value="HIRING_MANAGER">Hiring Manager</option>
+              <option value="ADMIN">Admin</option>
+            </select>
+            <button
+              type="submit"
+              disabled={invitingMember}
+              className="action-btn action-primary"
+            >
+              {invitingMember ? 'Inviting...' : 'Invite'}
+            </button>
+          </form>
+
+          <table className="job-table">
+            <thead>
+              <tr>
+                <th>Member Email</th>
+                <th>Role</th>
+                <th>Title</th>
+                <th>Joined Date</th>
+              </tr>
+            </thead>
+            <tbody>
+              {teamMembers.map((m) => (
+                <tr key={m.id}>
+                  <td style={{ fontWeight: 600 }}>{m.user?.email}</td>
+                  <td>
+                    <span className="status-badge status-published">{m.role}</span>
+                  </td>
+                  <td>{m.title || m.role}</td>
+                  <td style={{ color: 'var(--text-muted)' }}>
+                    {new Date(m.joinedAt).toLocaleDateString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
 
       {/* Create Job Modal */}
       {showJobModal && (

@@ -43,8 +43,30 @@ export const addApplicationNoteSchema = z.object({
   rating: z.number().min(1).max(5).optional()
 });
 
+export const connectCareersUrlSchema = z.object({
+  careersUrl: z.string().url('A valid careers URL is required')
+});
+
+export const searchCandidatesSchema = z.object({
+  query: z.string().optional(),
+  skills: z.string().optional(),
+  location: z.string().optional(),
+  page: z.coerce.number().min(1).default(1),
+  limit: z.coerce.number().min(1).max(50).default(20)
+});
+
+export const inviteMemberSchema = z.object({
+  email: z.string().email(),
+  role: z.nativeEnum(EmployerRole).default(EmployerRole.RECRUITER),
+  title: z.string().max(100).optional()
+});
+
 export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;
 export type CreateEmployerJobInput = z.input<typeof createEmployerJobSchema>;
 export type UpdateEmployerJobInput = z.input<typeof updateEmployerJobSchema>;
 export type UpdateApplicationStageInput = z.infer<typeof updateApplicationStageSchema>;
 export type AddApplicationNoteInput = z.infer<typeof addApplicationNoteSchema>;
+export type ConnectCareersUrlInput = z.infer<typeof connectCareersUrlSchema>;
+export type SearchCandidatesInput = z.infer<typeof searchCandidatesSchema>;
+export type InviteMemberInput = z.infer<typeof inviteMemberSchema>;
+
