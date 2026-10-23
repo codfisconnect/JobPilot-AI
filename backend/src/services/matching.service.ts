@@ -63,7 +63,12 @@ export class ProductionMatchingService {
       if (/full\s*stack/i.test(t)) return 'Full Stack Development';
       if (/data|analyst|analytics|bi/i.test(t)) return 'Data Analytics';
       if (/devops|cloud|sre/i.test(t)) return 'DevOps / Cloud';
-      return 'Software Engineering';
+      if (/design|ui\/ux|ux|graphic|illustrat/i.test(t)) return 'Design & Creative';
+      if (/sales|account\s*exec|business\s*dev/i.test(t)) return 'Sales & Business Development';
+      if (/hr|human\s*resource|talent|recruit/i.test(t)) return 'Human Resources & Talent';
+      if (/finance|accounting|accountant/i.test(t)) return 'Finance & Accounting';
+      if (/software|engineer|developer|architect/i.test(t)) return 'Software Engineering';
+      return 'General Non-Technical';
     };
 
     const candNormalized = normalize(candRole);

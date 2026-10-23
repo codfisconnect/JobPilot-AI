@@ -45,6 +45,12 @@ export interface CanonicalJob {
   sourceUrl: string;
   applicationUrl?: string;
   skills: CanonicalJobSkill[];
+  recommendation?: {
+    score: number;
+    headline: string;
+    reasons: string[];
+    isStrongMatch: boolean;
+  };
 }
 
 export interface JobSearchParams {

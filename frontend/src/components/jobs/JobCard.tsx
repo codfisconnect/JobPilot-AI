@@ -2,7 +2,7 @@ import React from 'react';
 import { CanonicalJob } from '../../types/job.types';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
-import { MapPin, Briefcase, ExternalLink, Building, DollarSign, Send } from 'lucide-react';
+import { MapPin, Briefcase, ExternalLink, Building, DollarSign, Send, Sparkles } from 'lucide-react';
 
 interface JobCardProps {
   job: CanonicalJob;
@@ -58,6 +58,12 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onApply, onOpen
           <span className="job-company-name">{job.company?.name || 'Company'}</span>
         </div>
         <div className="job-badges-row">
+          {job.recommendation && (
+            <span className={`recommendation-badge ${job.recommendation.isStrongMatch ? 'badge-strong-match' : 'badge-good-match'}`}>
+              <Sparkles size={12} className="inline mr-1" />
+              {job.recommendation.score}% Match
+            </span>
+          )}
           <span className={`remote-badge ${getRemoteBadgeClass(job.remoteType)}`}>
             {job.remoteType ? job.remoteType.replace('_', ' ') : 'Flexible'}
           </span>
@@ -65,6 +71,14 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onApply, onOpen
       </div>
 
       <h3 className="job-title-heading">{job.title}</h3>
+
+      {job.recommendation && job.recommendation.headline && (
+        <div className="job-recommendation-reason">
+          <span className="recommendation-reason-text">
+            💡 {job.recommendation.headline}
+          </span>
+        </div>
+      )}
 
       <div className="job-meta-details">
         <div className="meta-item">

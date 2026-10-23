@@ -59,16 +59,28 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   const [skillGaps, setSkillGaps] = useState<any[]>([]);
   const [secondaryLoading, setSecondaryLoading] = useState<boolean>(true);
 
-  // 1. HIGH-PRIORITY: Load Latest Jobs Immediately
+  // 1. HIGH-PRIORITY: Load Recommended Jobs (or Fallback to Latest if New)
   const loadLatestJobs = useCallback(async () => {
     try {
       setJobsLoading(true);
       setJobsError(null);
-      const res = await apiClient.getCanonicalJobs({ pageSize: 6, sortBy: 'latest' });
-      setLatestJobs(res?.data || []);
+      // Attempt to load personalized recommendations first
+      const recRes = await apiClient.getRecommendedJobs({ pageSize: 6 });
+      if (recRes && recRes.items && recRes.items.length > 0) {
+        setLatestJobs(recRes.items);
+      } else {
+        // Fallback to latest canonical jobs
+        const res = await apiClient.getCanonicalJobs({ pageSize: 6, sortBy: 'latest' });
+        setLatestJobs(res?.data || []);
+      }
     } catch (err: any) {
-      console.warn('Could not load latest jobs directly:', err);
-      setJobsError(err?.message || 'Unable to load latest opportunities');
+      console.warn('Could not load recommended jobs directly, falling back:', err);
+      try {
+        const res = await apiClient.getCanonicalJobs({ pageSize: 6, sortBy: 'latest' });
+        setLatestJobs(res?.data || []);
+      } catch (fallbackErr: any) {
+        setJobsError(fallbackErr?.message || 'Unable to load opportunities');
+      }
     } finally {
       setJobsLoading(false);
     }

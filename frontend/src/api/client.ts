@@ -518,6 +518,42 @@ export class ApiClient {
     return promise;
   }
 
+  async getRecommendedJobs(params: Record<string, any> = {}, options: { bypassCache?: boolean } = {}): Promise<any> {
+    const query = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => {
+      if (v !== undefined && v !== null && v !== '') {
+        query.append(k, String(v));
+      }
+    });
+    const qs = query.toString();
+    const endpoint = `/jobs/recommended${qs ? `?${qs}` : ''}`;
+    const cacheKey = `recommended_jobs_${qs}`;
+
+    if (!options.bypassCache) {
+      const cached = this.memoryCache.get(cacheKey);
+      if (cached && cached.expiry > Date.now()) {
+        return cached.data;
+      }
+      const inflight = this.inflightRequests.get(cacheKey);
+      if (inflight) {
+        return inflight;
+      }
+    }
+
+    const promise = this.request<any>(endpoint)
+      .then(res => {
+        // Cache recommended jobs for 30s
+        this.memoryCache.set(cacheKey, { data: res, expiry: Date.now() + 30000 });
+        return res;
+      })
+      .finally(() => {
+        this.inflightRequests.delete(cacheKey);
+      });
+
+    this.inflightRequests.set(cacheKey, promise);
+    return promise;
+  }
+
   async getCanonicalJobById(id: string): Promise<any> {
     return this.request<any>(`/jobs/${id}`);
   }
