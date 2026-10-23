@@ -49,6 +49,20 @@ export class ApiClient {
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<T> {
+    // If a refresh is currently inflight, await it so this request sends the freshest token
+    if (this.refreshPromise && endpoint !== '/auth/refresh' && endpoint !== '/auth/login') {
+      try {
+        await this.refreshPromise;
+      } catch {
+        // Refresh failed, proceed to try request or handle 401
+      }
+    }
+
+    // Sync latest token from storage if not in memory
+    if (!this.accessToken && typeof window !== 'undefined') {
+      this.accessToken = localStorage.getItem('pilotmama_access_token');
+    }
+
     const headers = new Headers(options.headers || {});
     headers.set('Content-Type', 'application/json');
 
@@ -79,9 +93,12 @@ export class ApiClient {
     const json = await res.json().catch(() => ({}));
 
     if (!res.ok || json.success === false) {
-      const error: ApiError = json.error || {
-        code: `HTTP_${res.status}`,
-        message: json.message || 'An unexpected error occurred'
+      const error: ApiError = {
+        ...(json.error || {
+          code: `HTTP_${res.status}`,
+          message: json.message || 'An unexpected error occurred'
+        }),
+        status: res.status
       };
       throw error;
     }
@@ -90,6 +107,20 @@ export class ApiClient {
   }
 
   private async requestPaginated<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<PaginatedResponse<T>> {
+    // If a refresh is currently inflight, await it so this request sends the freshest token
+    if (this.refreshPromise && endpoint !== '/auth/refresh' && endpoint !== '/auth/login') {
+      try {
+        await this.refreshPromise;
+      } catch {
+        // Refresh failed, proceed to try request or handle 401
+      }
+    }
+
+    // Sync latest token from storage if not in memory
+    if (!this.accessToken && typeof window !== 'undefined') {
+      this.accessToken = localStorage.getItem('pilotmama_access_token');
+    }
+
     const headers = new Headers(options.headers || {});
     headers.set('Content-Type', 'application/json');
 
@@ -120,9 +151,12 @@ export class ApiClient {
     const json = await res.json().catch(() => ({}));
 
     if (!res.ok || json.success === false) {
-      const error: ApiError = json.error || {
-        code: `HTTP_${res.status}`,
-        message: json.message || 'An unexpected error occurred'
+      const error: ApiError = {
+        ...(json.error || {
+          code: `HTTP_${res.status}`,
+          message: json.message || 'An unexpected error occurred'
+        }),
+        status: res.status
       };
       throw error;
     }

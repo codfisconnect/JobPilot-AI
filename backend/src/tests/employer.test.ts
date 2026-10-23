@@ -100,10 +100,23 @@ test('Sprint 8: Employer Platform & Tenant Isolation Test Suite', async (t) => {
     orgBId = resB.organization.id;
   });
 
+  await t.test('1b. Unonboarded user /employer/me returns null organization without error', async () => {
+    const unonboardedUser = await db.user.create({
+      data: {
+        email: `unonboarded.${timestamp}@pilotmama.test`,
+        passwordHash: 'dummy-hash',
+        role: UserRole.CANDIDATE
+      }
+    });
+    const result = await service.getMyOrganization(unonboardedUser.id);
+    assert.equal(result.organization, null);
+    assert.equal(result.currentMember, null);
+  });
+
   await t.test('2. My Organization retrieves context correctly', async () => {
     const myOrg = await service.getMyOrganization(userOrgA.id);
-    assert.equal(myOrg.organization.id, orgAId);
-    assert.equal(myOrg.currentMember.role, EmployerRole.OWNER);
+    assert.equal(myOrg.organization!.id, orgAId);
+    assert.equal(myOrg.currentMember!.role, EmployerRole.OWNER);
   });
 
   await t.test('3. Job Creation by Organization A assigns ownership and draft status', async () => {

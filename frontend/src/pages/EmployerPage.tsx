@@ -83,22 +83,36 @@ export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSel
       setLoading(true);
       setError(null);
       const res = await apiClient.getEmployerOrg();
-      if (res.success && res.data) {
-        setOrg(res.data.organization);
-        setMember(res.data.currentMember);
+      // Handle both unwrapped { organization, currentMember } and envelope { success, data }
+      const orgData = (res as any)?.data !== undefined ? (res as any).data : res;
+      if (orgData && orgData.organization) {
+        setOrg(orgData.organization);
+        setMember(orgData.currentMember);
 
         // Fetch metrics and jobs
-        const [metricRes, jobsRes] = await Promise.all([
-          apiClient.getEmployerDashboard(),
-          apiClient.getEmployerJobs()
-        ]);
+        try {
+          const [metricRes, jobsRes] = await Promise.all([
+            apiClient.getEmployerDashboard(),
+            apiClient.getEmployerJobs()
+          ]);
 
-        if (metricRes.success) setMetrics(metricRes.data);
-        if (jobsRes.success) setJobs(jobsRes.data);
+          const mData = (metricRes as any)?.data !== undefined ? (metricRes as any).data : metricRes;
+          const jData = (jobsRes as any)?.data !== undefined ? (jobsRes as any).data : jobsRes;
+          if (mData) setMetrics(mData);
+          if (Array.isArray(jData)) setJobs(jData);
+        } catch (secondaryErr: any) {
+          console.warn('Could not load secondary employer metrics/jobs:', secondaryErr);
+        }
+      } else {
+        // Authenticated user with no employer organization yet
+        setOrg(null);
+        setMember(null);
       }
     } catch (err: any) {
-      if (err.status === 403 || err.status === 404) {
+      if (err.status === 403 || err.status === 404 || err.code === 'FORBIDDEN' || err.code === 'NOT_FOUND') {
+        // No employer organization exists for this user -> show onboarding
         setOrg(null);
+        setMember(null);
       } else {
         setError(err.message || 'Failed to load employer workspace');
       }
@@ -161,8 +175,9 @@ export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSel
     try {
       setSelectedJobId(jobId);
       const res = await apiClient.getJobApplicants(jobId);
-      if (res.success) {
-        setApplicants(res.data);
+      const appData = (res as any)?.data !== undefined ? (res as any).data : res;
+      if (Array.isArray(appData)) {
+        setApplicants(appData);
       }
     } catch (err: any) {
       alert(err.message || 'Failed to fetch applicants');
@@ -170,7 +185,6 @@ export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSel
   };
 
   const handleConnectCareers = async (e: React.FormEvent) => {
-
     e.preventDefault();
     if (!careersUrlInput.trim()) return;
     try {
@@ -178,11 +192,10 @@ export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSel
       setError(null);
       setActionSuccess(null);
       const res = await apiClient.connectEmployerCareersUrl(careersUrlInput.trim());
-      if (res.success) {
-        setCareersConnectionResult(res.data);
-        setActionSuccess('Careers URL connected successfully. Jobs imported and mapped to your organization.');
-        await loadEmployerData();
-      }
+      const connData = (res as any)?.data !== undefined ? (res as any).data : res;
+      setCareersConnectionResult(connData);
+      setActionSuccess('Careers URL connected successfully. Jobs imported and mapped to your organization.');
+      await loadEmployerData();
     } catch (err: any) {
       setError(err.message || 'Failed to connect careers URL');
     } finally {
@@ -200,9 +213,8 @@ export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSel
         skills: candidateSkillFilter || undefined,
         location: candidateLocationFilter || undefined
       });
-      if (res.success) {
-        setSearchedCandidates(res.candidates || []);
-      }
+      const candList = (res as any)?.candidates || (Array.isArray(res) ? res : (res as any)?.data || []);
+      setSearchedCandidates(candList);
     } catch (err: any) {
       setError(err.message || 'Failed to search candidate talent pool');
     } finally {
@@ -213,8 +225,9 @@ export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSel
   const handleLoadTeam = async () => {
     try {
       const res = await apiClient.getEmployerMembers();
-      if (res.success) {
-        setTeamMembers(res.data || []);
+      const teamData = (res as any)?.data !== undefined ? (res as any).data : res;
+      if (Array.isArray(teamData)) {
+        setTeamMembers(teamData);
       }
     } catch (err: any) {
       console.error('Failed to load team members:', err);
@@ -228,17 +241,15 @@ export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSel
       setInvitingMember(true);
       setError(null);
       setActionSuccess(null);
-      const res = await apiClient.inviteEmployerMember({
+      await apiClient.inviteEmployerMember({
         email: inviteEmail.trim(),
         role: inviteRole,
         title: inviteTitle.trim() || undefined
       });
-      if (res.success) {
-        setActionSuccess(`Invited ${inviteEmail} to team.`);
-        setInviteEmail('');
-        setInviteTitle('');
-        await handleLoadTeam();
-      }
+      setActionSuccess(`Invited ${inviteEmail} to team.`);
+      setInviteEmail('');
+      setInviteTitle('');
+      await handleLoadTeam();
     } catch (err: any) {
       setError(err.message || 'Failed to invite team member');
     } finally {
