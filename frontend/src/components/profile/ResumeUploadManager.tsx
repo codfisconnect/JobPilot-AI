@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import { useAuth } from '../../context/AuthContext';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
 import { Badge } from '../common/Badge';
@@ -46,15 +47,19 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
   const [editingEducationIndex, setEditingEducationIndex] = useState<number | null>(null);
   const [expandedExpIndex, setExpandedExpIndex] = useState<number | null>(0);
   const [newSkillInput, setNewSkillInput] = useState('');
+  const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replaceFileInputRef = useRef<HTMLInputElement>(null);
 
-  // Load existing resumes on mount
+  // Load existing resumes when auth bootstrap completes
   React.useEffect(() => {
-    loadResumes();
-  }, []);
+    if (!isAuthLoading && isAuthenticated) {
+      loadResumes();
+    }
+  }, [isAuthLoading, isAuthenticated]);
 
   const loadResumes = async () => {
+    if (isAuthLoading) return;
     try {
       setLoading(true);
       setError(null);

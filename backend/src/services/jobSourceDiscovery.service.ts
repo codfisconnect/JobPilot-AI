@@ -14,6 +14,7 @@ import { EmbeddedDataDiscoveryService } from './embeddedDataDiscovery.service.js
 import { UniversalDiscoveryOrchestrator } from '../universalDiscovery/universalDiscoveryOrchestrator.js';
 import { CompletenessStatus } from '../universalDiscovery/types.js';
 import { CompletenessEstimatorService } from '../universalDiscovery/completenessEstimator.service.js';
+import { GenericBrowserDiscoveryService } from '../universalDiscovery/services/genericBrowserDiscovery.service.js';
 import { safeParseJson } from '../utils/safeJson.js';
 
 export interface DiscoveryResult {
@@ -271,6 +272,17 @@ export class JobSourceDiscoveryService {
     if (discovery.allDiscoveredJobs && discovery.allDiscoveredJobs.length > 0) {
       // Use jobs discovered through universal orchestrator / adapters (e.g. RippleHire, Workday, etc.)
       rawRecords = discovery.allDiscoveredJobs;
+    } else if (discovery.detectedType === 'SPECIALIZED_ATS' || discovery.sourceType === 'SPECIALIZED_ATS') {
+      try {
+        const universalRes = await UniversalDiscoveryOrchestrator.discover(discovery.sourceUrl);
+        if (universalRes && universalRes.allDiscoveredJobs && universalRes.allDiscoveredJobs.length > 0) {
+          rawRecords = universalRes.allDiscoveredJobs;
+          discovery.expectedJobCount = universalRes.expectedJobCount;
+          discovery.completeness = universalRes.completeness;
+        }
+      } catch (atsErr: any) {
+        logger.warn(`[JobSourceDiscoveryService] Universal orchestrator for SPECIALIZED_ATS warning: ${atsErr.message}`);
+      }
     } else {
       // 1. Fetch live jobs payload with pagination support
       let endpointToFetch = discovery.jobsEndpoint;
@@ -283,97 +295,112 @@ export class JobSourceDiscoveryService {
         }
       } catch {}
 
-      const res = await safeFetchUrl(endpointToFetch, { timeoutMs: 15000 });
-      if (res.status !== 200) {
-        throw new Error(`Endpoint returned status ${res.status}`);
-      }
-
-      if (discovery.detectedType === 'EMBEDDED_DATA') {
-        const embeddedResult = EmbeddedDataDiscoveryService.extractEmbeddedJobsFromHtml(res.text);
-        if (embeddedResult && embeddedResult.jobs.length > 0) {
-          rawRecords = embeddedResult.jobs;
-        }
-      } else if (discovery.detectedType === 'HTML') {
-        const htmlResult = await HtmlJobDiscoveryService.extractJobsFromHtml(discovery.jobsEndpoint, res.text);
-        if (htmlResult && htmlResult.jobs.length > 0) {
-          rawRecords = htmlResult.jobs;
-        }
-      } else if (discovery.detectedType === 'JSON_LD') {
-        const $ = cheerio.load(res.text);
-        $('script[type="application/ld+json"]').each((_, el) => {
-          try {
-            const parsed = JSON.parse($(el).html() || '{}');
-            if (parsed['@type'] === 'JobPosting') rawRecords.push(parsed);
-            else if (Array.isArray(parsed['@graph'])) {
-              parsed['@graph'].forEach((item: any) => {
-                if (item['@type'] === 'JobPosting') rawRecords.push(item);
-              });
-            }
-          } catch {}
-        });
+      if (discovery.detectedType === 'BROWSER_RENDERED') {
+        const browserRes = await GenericBrowserDiscoveryService.discoverRenderedJobs(
+          discovery.sourceUrl || discovery.jobsEndpoint,
+          discovery.companyName,
+          { timeoutMs: 30000, maxPages: 10 }
+        );
+        rawRecords = browserRes.jobs;
+        discovery.expectedJobCount = browserRes.sourceTotal;
+        discovery.completeness = browserRes.completeness;
       } else {
-        const jsonResult = safeParseJson(res.text, res.contentType || res.headers?.['content-type']);
-        if (jsonResult.success && jsonResult.data) {
-          const payload = jsonResult.data;
-          const { jobs } = FieldMapperService.extractJobsArray(payload);
-          rawRecords = [...jobs];
+        const res = await safeFetchUrl(endpointToFetch, { timeoutMs: 15000 });
+        if (res.status !== 200) {
+          throw new Error(`Endpoint returned status ${res.status}`);
+        }
 
-          // Universal pagination: Check if source reports more total jobs than returned in page 1
-          const reportedTotal = CompletenessEstimatorService.extractReportedTotal(payload);
-          if (reportedTotal !== null && reportedTotal !== undefined) {
-            discovery.expectedJobCount = reportedTotal;
+        if (discovery.detectedType === 'EMBEDDED_DATA') {
+          const embeddedResult = EmbeddedDataDiscoveryService.extractEmbeddedJobsFromHtml(res.text);
+          if (embeddedResult && embeddedResult.jobs.length > 0) {
+            rawRecords = embeddedResult.jobs;
           }
-
-          if (reportedTotal && reportedTotal > rawRecords.length) {
-            try {
-              const paginatedUrlObj = new URL(discovery.jobsEndpoint);
-              const rowsParam = paginatedUrlObj.searchParams.get('rows');
-              const pageSize = rowsParam ? parseInt(rowsParam, 10) : (jobs.length || 20);
-              let currentOffset = rawRecords.length;
-              let pageCount = 0;
-              const maxPages = 50;
-
-              while (rawRecords.length < reportedTotal && pageCount < maxPages) {
-                if (paginatedUrlObj.searchParams.has('start')) {
-                  paginatedUrlObj.searchParams.set('start', String(currentOffset));
-                } else if (paginatedUrlObj.searchParams.has('offset')) {
-                  paginatedUrlObj.searchParams.set('offset', String(currentOffset));
-                } else if (paginatedUrlObj.searchParams.has('page')) {
-                  const currentPage = Math.floor(currentOffset / pageSize) + 1;
-                  paginatedUrlObj.searchParams.set('page', String(currentPage));
-                } else {
-                  paginatedUrlObj.searchParams.set('start', String(currentOffset));
-                }
-
-                const nextRes = await safeFetchUrl(paginatedUrlObj.toString(), { timeoutMs: 12000 });
-                if (nextRes.status !== 200 || !nextRes.text.trim()) break;
-                const nextJsonResult = safeParseJson(nextRes.text, nextRes.contentType || nextRes.headers?.['content-type']);
-                if (!nextJsonResult.success || !nextJsonResult.data) break;
-                const { jobs: nextJobs } = FieldMapperService.extractJobsArray(nextJsonResult.data);
-                if (!nextJobs || nextJobs.length === 0) break;
-                rawRecords.push(...nextJobs);
-                currentOffset += nextJobs.length;
-                pageCount++;
-              }
-            } catch (pageErr: any) {
-              logger.warn(`[JobSourceDiscoveryService] Pagination loop encountered warning: ${pageErr.message}`);
-            }
-          }
-        } else if (jsonResult.isHtml) {
-          logger.info(`[JobSourceDiscoveryService] Endpoint returned HTML instead of expected JSON. Attempting HTML and embedded state extraction.`);
+        } else if (discovery.detectedType === 'HTML') {
           const htmlResult = await HtmlJobDiscoveryService.extractJobsFromHtml(discovery.jobsEndpoint, res.text);
           if (htmlResult && htmlResult.jobs.length > 0) {
             rawRecords = htmlResult.jobs;
-          } else {
-            const embeddedResult = EmbeddedDataDiscoveryService.extractEmbeddedJobsFromHtml(res.text);
-            if (embeddedResult && embeddedResult.jobs.length > 0) {
-              rawRecords = embeddedResult.jobs;
-            }
           }
+        } else if (discovery.detectedType === 'JSON_LD') {
+          const $ = cheerio.load(res.text);
+          $('script[type="application/ld+json"]').each((_, el) => {
+            try {
+              const parsed = JSON.parse($(el).html() || '{}');
+              if (parsed['@type'] === 'JobPosting') rawRecords.push(parsed);
+              else if (Array.isArray(parsed['@graph'])) {
+                parsed['@graph'].forEach((item: any) => {
+                  if (item['@type'] === 'JobPosting') rawRecords.push(item);
+                });
+              }
+            } catch {}
+          });
         } else {
-          logger.warn(`[JobSourceDiscoveryService] Failed to parse endpoint response safely: ${jsonResult.error}`);
+          const jsonResult = safeParseJson(res.text, res.contentType || res.headers?.['content-type']);
+          if (jsonResult.success && jsonResult.data) {
+            const payload = jsonResult.data;
+            const { jobs } = FieldMapperService.extractJobsArray(payload);
+            rawRecords = [...jobs];
+
+            // Universal pagination: Check if source reports more total jobs than returned in page 1
+            const reportedTotal = CompletenessEstimatorService.extractReportedTotal(payload);
+            if (reportedTotal !== null && reportedTotal !== undefined) {
+              discovery.expectedJobCount = reportedTotal;
+            }
+
+            if (reportedTotal && reportedTotal > rawRecords.length) {
+              try {
+                const paginatedUrlObj = new URL(discovery.jobsEndpoint);
+                const rowsParam = paginatedUrlObj.searchParams.get('rows');
+                const pageSize = rowsParam ? parseInt(rowsParam, 10) : (jobs.length || 20);
+                let currentOffset = rawRecords.length;
+                let pageCount = 0;
+                const maxPages = 50;
+
+                while (rawRecords.length < reportedTotal && pageCount < maxPages) {
+                  if (paginatedUrlObj.searchParams.has('start')) {
+                    paginatedUrlObj.searchParams.set('start', String(currentOffset));
+                  } else if (paginatedUrlObj.searchParams.has('offset')) {
+                    paginatedUrlObj.searchParams.set('offset', String(currentOffset));
+                  } else if (paginatedUrlObj.searchParams.has('page')) {
+                    const currentPage = Math.floor(currentOffset / pageSize) + 1;
+                    paginatedUrlObj.searchParams.set('page', String(currentPage));
+                  } else {
+                    paginatedUrlObj.searchParams.set('start', String(currentOffset));
+                  }
+
+                  const nextRes = await safeFetchUrl(paginatedUrlObj.toString(), { timeoutMs: 12000 });
+                  if (nextRes.status !== 200 || !nextRes.text.trim()) break;
+                  const nextJsonResult = safeParseJson(nextRes.text, nextRes.contentType || nextRes.headers?.['content-type']);
+                  if (!nextJsonResult.success || !nextJsonResult.data) break;
+                  const { jobs: nextJobs } = FieldMapperService.extractJobsArray(nextJsonResult.data);
+                  if (!nextJobs || nextJobs.length === 0) break;
+                  rawRecords.push(...nextJobs);
+                  currentOffset += nextJobs.length;
+                  pageCount++;
+                }
+              } catch (pageErr: any) {
+                logger.warn(`[JobSourceDiscoveryService] Pagination loop encountered warning: ${pageErr.message}`);
+              }
+            }
+          } else if (jsonResult.isHtml) {
+            logger.info(`[JobSourceDiscoveryService] Endpoint returned HTML instead of expected JSON. Attempting HTML and embedded state extraction.`);
+            const htmlResult = await HtmlJobDiscoveryService.extractJobsFromHtml(discovery.jobsEndpoint, res.text);
+            if (htmlResult && htmlResult.jobs.length > 0) {
+              rawRecords = htmlResult.jobs;
+            } else {
+              const embeddedResult = EmbeddedDataDiscoveryService.extractEmbeddedJobsFromHtml(res.text);
+              if (embeddedResult && embeddedResult.jobs.length > 0) {
+                rawRecords = embeddedResult.jobs;
+              }
+            }
+          } else {
+            logger.warn(`[JobSourceDiscoveryService] Failed to parse endpoint response safely: ${jsonResult.error}`);
+          }
         }
       }
+    }
+
+    if (rawRecords.length === 0) {
+      logger.warn(`[JobSourceDiscoveryService] No job records extracted for ${discovery.companyName} at ${discovery.jobsEndpoint}`);
     }
 
     // 2. Resolve Canonical Company
@@ -473,8 +500,8 @@ export class JobSourceDiscoveryService {
     }
 
     // 5. Source-Specific Job Reconciliation (Mark missing jobs checked, expire if past 14-day threshold)
-    // CRITICAL: If discovery is PARTIAL, never expire missing jobs as removed!
-    if (discovery.completeness !== 'PARTIAL') {
+    // CRITICAL: If discovery is PARTIAL or seenJobIds is empty, never expire missing jobs as removed!
+    if (discovery.completeness !== 'PARTIAL' && seenJobIds.length > 0) {
       const { expiredCount } = await JobRepositoryV1.reconcileSourceJobs(
         company.id,
         discovery.detectedType,
@@ -484,7 +511,7 @@ export class JobSourceDiscoveryService {
       outcome.expired = expiredCount;
     } else {
       outcome.expired = 0;
-      logger.info(`[JobSourceDiscoveryService] Discovery is PARTIAL (${rawRecords.length}/${discovery.expectedJobCount}); skipping job expiration reconciliation.`);
+      logger.info(`[JobSourceDiscoveryService] Discovery is ${discovery.completeness || 'EMPTY'} (${seenJobIds.length} seen); skipping job expiration reconciliation to protect existing inventory.`);
     }
 
     // 6. Update health and stats on CompanySource & JobSourceConfiguration

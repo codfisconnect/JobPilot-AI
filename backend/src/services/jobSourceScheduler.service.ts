@@ -203,8 +203,10 @@ export class JobSourceSchedulerService {
         const errorMsg = lastErr?.message || 'Sync failed';
         logger.error(`[JobSourceScheduler] Source sync failed for ${config.company.name}: ${errorMsg}`);
 
-        // Update health status gracefully: mark DEGRADED first, or FAILING if repeated
-        const nextHealth = config.healthStatus === SourceHealth.HEALTHY ? SourceHealth.DEGRADED : SourceHealth.FAILING;
+        const is404 = errorMsg.includes('404') || errorMsg.toLowerCase().includes('not found');
+        // Update health status gracefully: 404 is permanently DISABLED; otherwise mark DEGRADED first, or FAILING if repeated
+        const nextHealth = is404 ? SourceHealth.DISABLED : (config.healthStatus === SourceHealth.HEALTHY ? SourceHealth.DEGRADED : SourceHealth.FAILING);
+        const shouldDisable = is404 || config.healthStatus === SourceHealth.FAILING;
 
         await prisma.jobSourceConfiguration.update({
           where: { id: configId },
@@ -212,6 +214,7 @@ export class JobSourceSchedulerService {
             lastSyncAt: new Date(),
             lastSyncError: errorMsg,
             healthStatus: nextHealth,
+            enabled: shouldDisable ? false : config.enabled,
             syncInProgress: false,
             syncLockToken: null
           }
