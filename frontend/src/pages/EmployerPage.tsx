@@ -25,10 +25,18 @@ import './EmployerPage.css';
 
 interface EmployerPageProps {
   onNavigate?: (tab: string, id?: string) => void;
+  activeSection?: string;
+  onSelectSection?: (section: string) => void;
 }
 
-export const EmployerPage: React.FC<EmployerPageProps> = () => {
-  const [activeTab, setActiveTab] = useState<'jobs' | 'careers' | 'candidates' | 'team'>('jobs');
+export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSelectSection }) => {
+  const [internalTab, setInternalTab] = useState<'jobs' | 'careers' | 'candidates' | 'team'>('jobs');
+  const activeTab = (activeSection as any) || internalTab;
+  const setActiveTab = (tab: 'jobs' | 'careers' | 'candidates' | 'team') => {
+    if (onSelectSection) onSelectSection(tab);
+    setInternalTab(tab);
+  };
+
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
