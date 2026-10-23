@@ -62,7 +62,7 @@ export class ProductionMatchingService {
       if (/backend|java|spring/i.test(t)) return 'Backend Engineering';
       if (/full\s*stack/i.test(t)) return 'Full Stack Development';
       if (/data|analyst|analytics|bi/i.test(t)) return 'Data Analytics';
-      if (/devops|cloud|sre/i.test(t)) return 'DevOps / Cloud';
+      if (/devops|cloud|sre|ci\/?cd|pipeline|sysadmin|infrastructure/i.test(t)) return 'DevOps / Cloud';
       if (/design|ui\/ux|ux|graphic|illustrat/i.test(t)) return 'Design & Creative';
       if (/sales|account\s*exec|business\s*dev/i.test(t)) return 'Sales & Business Development';
       if (/hr|human\s*resource|talent|recruit/i.test(t)) return 'Human Resources & Talent';
@@ -341,9 +341,22 @@ export class ProductionMatchingService {
     const jobRequiredSkills = job.skills.filter(s => s.skillType === 'REQUIRED').map(s => s.skill.name);
     const jobPreferredSkills = job.skills.filter(s => s.skillType === 'PREFERRED').map(s => s.skill.name);
 
-    // Fallback: If job has no tagged skills yet, extract from requirements
-    const effectiveRequired = jobRequiredSkills.length > 0 ? jobRequiredSkills : job.requirements.slice(0, 8);
+    // Fallback: If job has no tagged skills yet, extract from requirements, title, or description
+    let effectiveRequired = jobRequiredSkills.length > 0 ? jobRequiredSkills : job.requirements.slice(0, 8);
     const effectivePreferred = jobPreferredSkills.length > 0 ? jobPreferredSkills : job.preferredQualifications.slice(0, 5);
+
+    if (effectiveRequired.length === 0) {
+      const textToScan = `${job.title} ${job.description || ''}`.toLowerCase();
+      const commonTechKeywords = [
+        'ci/cd', 'jenkins', 'gitlab', 'github actions', 'docker', 'kubernetes',
+        'ansible', 'terraform', 'aws', 'azure', 'linux', 'python', 'bash', 'shell',
+        'java', 'spring boot', 'selenium', 'playwright', 'sql', 'postgresql', 'react', 'node.js'
+      ];
+      const detected = commonTechKeywords.filter(k => textToScan.includes(k));
+      if (detected.length > 0) {
+        effectiveRequired = detected;
+      }
+    }
 
     // Compute input cache key
     const inputHash = this.computeInputHash(
