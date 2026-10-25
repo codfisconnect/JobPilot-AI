@@ -81,12 +81,12 @@ export class RippleHireAdapter implements IJobSourceStrategy {
           break;
         }
 
-        const data = jsonResult.data;
-        if (expectedCount === null && data.totalJobCount !== undefined) {
-          expectedCount = data.totalJobCount;
+        const payload = jsonResult.data || jsonResult;
+        if (expectedCount === null && payload.totalJobCount !== undefined) {
+          expectedCount = payload.totalJobCount;
         }
 
-        const rawList = data.jobVoList || [];
+        const rawList = payload.jobVoList || [];
         if (!Array.isArray(rawList) || rawList.length === 0) {
           break;
         }
@@ -95,12 +95,29 @@ export class RippleHireAdapter implements IJobSourceStrategy {
           const jobSeq = item.jobSeq || item.jobId;
           const appUrl = `${baseUrl}/candidate/?token=${token}&source=${source}#detail/job/${jobSeq}`;
           
+          const reqId = item.jobCode || jobSeq || '';
+          const locStr = item.locations || item.jobLocation || '';
+          const expStr = item.jobReqExp || (item.jobMinExp ? `${item.jobMinExp} - ${item.jobMaxExp || ''} Years` : '');
+          
+          let description = item.jobDesc;
+          if (!description || description.trim().toLowerCase() === (item.jobTitle || '').trim().toLowerCase()) {
+            const descParts = [
+              `${item.jobTitle || 'Opportunity'} at Bahwan CyberTek.`,
+              reqId ? `Requisition ID: ${reqId}.` : '',
+              expStr ? `Required Experience: ${expStr}.` : '',
+              locStr ? `Location: ${locStr}.` : '',
+              item.department ? `Department: ${item.department}.` : '',
+              'Review responsibilities, qualifications, and submit your application via the employer portal.'
+            ].filter(Boolean);
+            description = descParts.join(' ');
+          }
+
           allJobs.push({
             externalJobId: String(jobSeq || item.jobCode || ''),
             title: item.jobTitle || 'Job Opening',
-            location: item.locations || item.jobLocation || undefined,
-            experience: item.jobReqExp || (item.jobMinExp ? `${item.jobMinExp} - ${item.jobMaxExp || ''} Years` : undefined),
-            description: item.jobDesc || `${item.jobTitle || 'Role'} - Requisition ${item.jobCode || jobSeq || ''}`,
+            location: locStr || undefined,
+            experience: expStr || undefined,
+            description,
             employmentType: item.jobType || 'FULL_TIME',
             applicationUrl: appUrl,
             rawPayload: item

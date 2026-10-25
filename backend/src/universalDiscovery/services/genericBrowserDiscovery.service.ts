@@ -320,11 +320,20 @@ export class GenericBrowserDiscoveryService {
             continue;
           }
           seenJobIds.add(canonicalKey);
+          let description = item.description || item.snippet;
+          if (!description || description.trim().toLowerCase() === item.title.trim().toLowerCase()) {
+            const descParts = [
+              `${item.title} at ${companyName}.`,
+              item.location ? `Location: ${item.location}.` : '',
+              'Review full requirements and submit your application on the employer careers site.'
+            ].filter(Boolean);
+            description = descParts.join(' ');
+          }
           allJobs.push({
             externalJobId: item.id || undefined,
             title: item.title,
             location: item.location || undefined,
-            description: item.description || item.snippet || (item.location ? `${item.title} based in ${item.location}` : item.title),
+            description,
             applicationUrl: item.href,
             url: item.href
           });

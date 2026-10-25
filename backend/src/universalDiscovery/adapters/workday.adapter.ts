@@ -76,12 +76,22 @@ export class WorkdayAdapter implements IJobSourceStrategy {
         for (const item of postings) {
           const path = item.externalPath || '';
           const appUrl = path ? `${normalizedUrl.baseUrl}${path}` : undefined;
+          let description = item.jobDescription || item.description;
+          if (!description || description.trim().toLowerCase() === (item.title || '').trim().toLowerCase()) {
+            const descParts = [
+              `${item.title || 'Role'} opportunity at ${companyName}.`,
+              item.bulletFields && item.bulletFields.length > 0 ? `Details: ${item.bulletFields.join(' • ')}.` : '',
+              item.locationsText ? `Location: ${item.locationsText}.` : '',
+              'Apply directly via the official Workday employer portal.'
+            ].filter(Boolean);
+            description = descParts.join(' ');
+          }
           allJobs.push({
             externalJobId: item.bulletFields?.[0] || item.jobReqId || item.id || undefined,
             title: item.title || 'Job Opening',
             location: item.locationsText || undefined,
             postedAt: item.postedOn ? new Date(item.postedOn) : undefined,
-            description: item.jobDescription || item.description || (item.bulletFields && item.bulletFields.length > 1 ? item.bulletFields.slice(1).join(' • ') : undefined) || (item.locationsText ? `${item.title || 'Role'} based in ${item.locationsText}` : undefined),
+            description,
             applicationUrl: appUrl,
             rawPayload: item
           });
