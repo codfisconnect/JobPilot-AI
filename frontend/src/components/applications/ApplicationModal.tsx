@@ -103,6 +103,7 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   
   // Selection state: 'master' or tailored version id
   const [selectedResumeId, setSelectedResumeId] = useState<string>('master');
+  const [userResumes, setUserResumes] = useState<any[]>([]);
   const [activePreviewResumeId, setActivePreviewResumeId] = useState<string | null>(null);
   const [showDiffView, setShowDiffView] = useState<boolean>(false);
   const [isTailoringInline, setIsTailoringInline] = useState<boolean>(false);
@@ -280,6 +281,15 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
         console.warn('Notice restoring application draft:', err);
       }
     }
+
+    // Load all active candidate-owned resumes for selection
+    apiClient.listResumes()
+      .then(res => {
+        if (Array.isArray(res)) {
+          setUserResumes(res.filter(r => r.status !== 'ARCHIVED'));
+        }
+      })
+      .catch(() => {});
 
     // Default initialization when no draft exists
     if (candidate) {
@@ -555,14 +565,43 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
   const usableResumes: UsableResumeItem[] = [
     {
       id: 'master',
-      name: 'Master Profile Resume',
+      name: 'Master Profile Resume (Preferred)',
       type: 'master',
       version: 'v1.0 (Canonical)',
       atsScore: originalAts,
       lastUpdated: candidate?.updatedAt || 'Recent',
-      status: 'Active'
+      status: 'Preferred'
     }
   ];
+
+  // Add all candidate-owned active uploaded resumes
+  if (Array.isArray(userResumes)) {
+    userResumes.forEach(ur => {
+      usableResumes.push({
+        id: ur.id,
+        name: ur.title || ur.originalFileName || 'Uploaded Resume',
+        type: 'uploaded',
+        version: ur.isMaster ? 'Preferred' : 'Active',
+        atsScore: originalAts,
+        lastUpdated: ur.uploadedAt ? new Date(ur.uploadedAt).toLocaleDateString() : 'Recent',
+        status: ur.isMaster ? 'Preferred' : 'Active'
+      });
+      // Also expose any immutable versions saved under this resume
+      if (Array.isArray(ur.versions)) {
+        ur.versions.forEach((ver: any) => {
+          usableResumes.push({
+            id: ver.id,
+            name: `${ur.title || 'Resume'} — ${ver.title || `v${ver.versionNumber}`}`,
+            type: 'uploaded',
+            version: `v${ver.versionNumber}.0 (Snapshot)`,
+            atsScore: ver.atsScore !== undefined ? ver.atsScore : originalAts,
+            lastUpdated: ver.createdAt ? new Date(ver.createdAt).toLocaleDateString() : 'Recent',
+            status: 'Snapshot'
+          });
+        });
+      }
+    });
+  }
 
   if (tailoredResume) {
     usableResumes.unshift({

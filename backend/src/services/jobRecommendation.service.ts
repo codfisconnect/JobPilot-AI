@@ -95,30 +95,48 @@ export class JobRecommendationService {
       };
     }
 
+    // Preferred Resume lookup: Give priority to Preferred Resume (isMaster: true)
+    const preferredResume = Array.isArray(profile.resumes)
+      ? profile.resumes.find((r: any) => r.isMaster) || profile.resumes[0]
+      : null;
+
     // Extract normalized candidate features from profile skills and uploaded resume data
     const candidateSkillsList: string[] = (profile.skills || []).map((s: any) => s.skill?.name || s.name).filter(Boolean);
 
-    // Also extract skills from uploaded/parsed resumes so resume-first candidates receive accurate recommendations
+    // Prioritize Preferred Resume skills first
+    if (preferredResume) {
+      if (preferredResume.parsedData && Array.isArray((preferredResume.parsedData as any).skills)) {
+        for (const s of (preferredResume.parsedData as any).skills) {
+          const skillName = typeof s === 'string' ? s : s.name;
+          if (skillName && !candidateSkillsList.includes(skillName)) {
+            candidateSkillsList.push(skillName);
+          }
+        }
+      }
+      if (Array.isArray(preferredResume.versions)) {
+        for (const v of preferredResume.versions) {
+          const sc = v.structuredContent as any;
+          if (sc && Array.isArray(sc.skills)) {
+            for (const s of sc.skills) {
+              const skillName = typeof s === 'string' ? s : s.name;
+              if (skillName && !candidateSkillsList.includes(skillName)) {
+                candidateSkillsList.push(skillName);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // Also extract skills from other active/parsed resumes so multi-resume candidates have full coverage
     if (Array.isArray(profile.resumes)) {
       for (const resume of profile.resumes) {
+        if (resume.id === preferredResume?.id) continue;
         if (resume.parsedData && Array.isArray((resume.parsedData as any).skills)) {
           for (const s of (resume.parsedData as any).skills) {
             const skillName = typeof s === 'string' ? s : s.name;
             if (skillName && !candidateSkillsList.includes(skillName)) {
               candidateSkillsList.push(skillName);
-            }
-          }
-        }
-        if (Array.isArray(resume.versions)) {
-          for (const v of resume.versions) {
-            const sc = v.structuredContent as any;
-            if (sc && Array.isArray(sc.skills)) {
-              for (const s of sc.skills) {
-                const skillName = typeof s === 'string' ? s : s.name;
-                if (skillName && !candidateSkillsList.includes(skillName)) {
-                  candidateSkillsList.push(skillName);
-                }
-              }
             }
           }
         }
@@ -137,6 +155,11 @@ export class JobRecommendationService {
       if (!str || !str.trim()) return [];
       return str.split(/[/|,;]|(?:\s+or\s+)/i).map(r => r.trim()).filter(Boolean);
     };
+
+    // If Preferred Resume has headline/target role, prioritize it
+    if (preferredResume?.parsedData && (preferredResume.parsedData as any).personalInfo?.headline) {
+      candidateRoleCandidates.push(...splitRoles((preferredResume.parsedData as any).personalInfo.headline));
+    }
 
     if (rawTargetRoles.length > 0) {
       for (const tr of rawTargetRoles) {
@@ -352,13 +375,27 @@ export class JobRecommendationService {
       }
     });
 
-    // Also check requirements text if tagged skills are sparse
-    if (matchedSkills.length === 0 && Array.isArray(job.requirements)) {
-      candidate.candidateSkillsLower.forEach(sk => {
-        if (sk.length > 2 && job.requirements.some((r: string) => r.toLowerCase().includes(sk))) {
-          matchedSkills.push(sk);
-        }
-      });
+    // Also check requirements, responsibilities, and description text if tagged skills are sparse
+    if (matchedSkills.length === 0) {
+      const combinedText = [
+        ...(Array.isArray(job.requirements) ? job.requirements : []),
+        ...(Array.isArray(job.responsibilities) ? job.responsibilities : []),
+        ...(Array.isArray(job.preferredQualifications) ? job.preferredQualifications : []),
+        job.description || ''
+      ].join(' ').toLowerCase();
+
+      if (combinedText.trim().length > 0) {
+        candidate.candidateSkillsLower.forEach(sk => {
+          if (sk.length > 2) {
+            // Match whole word or exact token within job text
+            const escaped = sk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+            if (regex.test(combinedText)) {
+              matchedSkills.push(sk);
+            }
+          }
+        });
+      }
     }
 
     let skillScore = 30;

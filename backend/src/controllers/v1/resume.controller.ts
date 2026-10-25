@@ -38,8 +38,25 @@ export class ResumeControllerV1 {
     try {
       const userId = req.user!.userId;
       const id = String(req.params.id);
-      await ResumeService.archiveResume(userId, id);
-      res.json({ success: true, message: 'Resume archived successfully' });
+      const isPermanent = req.query.permanent === 'true';
+      if (isPermanent) {
+        await ResumeService.deleteResumePermanently(userId, id);
+        res.json({ success: true, message: 'Resume permanently deleted' });
+      } else {
+        await ResumeService.archiveResume(userId, id);
+        res.json({ success: true, message: 'Resume archived successfully' });
+      }
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  public static async setPreferredResume(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const id = String(req.params.id);
+      const updated = await ResumeService.setPreferredResume(userId, id);
+      res.json({ success: true, data: updated, message: 'Preferred resume updated successfully' });
     } catch (err) {
       next(err);
     }

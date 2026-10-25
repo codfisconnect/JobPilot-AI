@@ -1,3 +1,4 @@
+import { prisma } from '../database/prisma.js';
 import { ResumeRepository } from '../repositories/resume.repository.js';
 import { CandidateProfileRepository } from '../repositories/candidateProfile.repository.js';
 import { resumeStorage } from '../storage/index.js';
@@ -17,6 +18,12 @@ export class ResumeService {
       throw new NotFoundError('Candidate profile not found');
     }
 
+    // 0. Enforce Active Resumes Limit: Maximum 5 active resumes per candidate
+    const existingActiveResumes = await ResumeRepository.findByCandidateId(profile.id);
+    if (existingActiveResumes.length >= 5) {
+      throw new BadRequestError('Maximum limit of 5 active resumes reached. Please archive or delete an existing resume before uploading a new one.');
+    }
+
     // 1. File Validation (magic number, size, extension)
     const validation = FileValidationService.validateUpload(file);
 
@@ -34,6 +41,9 @@ export class ResumeService {
       throw new Error('Storage verification failed: Object was not confirmed in persistent storage');
     }
 
+    // Exactly one active resume must be Preferred. If candidate has no active resumes, first one becomes preferred.
+    const isFirstActive = existingActiveResumes.length === 0;
+
     // 4. Create Resume record
     const resume = await ResumeRepository.createResume({
       candidateProfileId: profile.id,
@@ -45,7 +55,7 @@ export class ResumeService {
       storageKey: storageResult.storageKey,
       checksum: storageResult.checksum,
       status: 'UPLOADED',
-      isMaster: false
+      isMaster: isFirstActive
     });
 
     return resume;
@@ -423,11 +433,95 @@ export class ResumeService {
   }
 
   /**
-   * Archive / Soft delete resume
+   * Set Preferred (Master) Resume for Candidate
+   * Strictly enforces: Exactly ONE active resume is Preferred.
+   */
+  public static async setPreferredResume(userId: string, resumeId: string) {
+    const resume = await this.getResumeById(userId, resumeId);
+    if (resume.status === 'ARCHIVED') {
+      throw new BadRequestError('Cannot set an archived resume as Preferred.');
+    }
+
+    const profile = await CandidateProfileRepository.findByUserId(userId);
+    if (!profile) {
+      throw new NotFoundError('Candidate profile not found');
+    }
+
+    // Unset current master for all candidate resumes
+    await prisma.resume.updateMany({
+      where: { candidateProfileId: profile.id, isMaster: true },
+      data: { isMaster: false }
+    });
+
+    // Set target resume as master
+    const updated = await ResumeRepository.updateResume(resume.id, { isMaster: true });
+
+    // Touch candidate profile timestamp to trigger downstream recommendation & match cache invalidation
+    await prisma.candidateProfile.update({
+      where: { id: profile.id },
+      data: { updatedAt: new Date() }
+    });
+
+    return updated;
+  }
+
+  /**
+   * Archive / Soft delete resume (retains physical file in storage)
    */
   public static async archiveResume(userId: string, resumeId: string) {
     const resume = await this.getResumeById(userId, resumeId);
-    return ResumeRepository.archiveResume(resume.id);
+    const profile = await CandidateProfileRepository.findByUserId(userId);
+    const archived = await ResumeRepository.archiveResume(resume.id);
+
+    // If archived resume was preferred, promote the newest remaining active resume to Preferred
+    if (resume.isMaster && profile) {
+      const remainingActive = await ResumeRepository.findByCandidateId(profile.id);
+      if (remainingActive.length > 0) {
+        await ResumeRepository.updateResume(remainingActive[0].id, { isMaster: true });
+      }
+      await prisma.candidateProfile.update({
+        where: { id: profile.id },
+        data: { updatedAt: new Date() }
+      });
+    }
+
+    return archived;
+  }
+
+  /**
+   * Explicit Permanent Deletion of Resume and its Physical Storage Object
+   */
+  public static async deleteResumePermanently(userId: string, resumeId: string) {
+    const resume = await this.getResumeById(userId, resumeId);
+    const profile = await CandidateProfileRepository.findByUserId(userId);
+
+    // 1. Delete physical file from storage if present
+    if (resume.storageKey) {
+      try {
+        await resumeStorage.delete(resume.storageKey);
+      } catch (storageErr: any) {
+        logger.warn(`Storage delete notice for key ${resume.storageKey}: ${storageErr?.message || storageErr}`);
+      }
+    }
+
+    // 2. Delete database resume record (and cascading versions)
+    await prisma.resume.delete({
+      where: { id: resume.id }
+    });
+
+    // 3. If deleted resume was preferred, re-assign preferred status to next active
+    if (resume.isMaster && profile) {
+      const remainingActive = await ResumeRepository.findByCandidateId(profile.id);
+      if (remainingActive.length > 0) {
+        await ResumeRepository.updateResume(remainingActive[0].id, { isMaster: true });
+      }
+      await prisma.candidateProfile.update({
+        where: { id: profile.id },
+        data: { updatedAt: new Date() }
+      });
+    }
+
+    return { success: true, message: 'Resume permanently deleted' };
   }
 
   /**

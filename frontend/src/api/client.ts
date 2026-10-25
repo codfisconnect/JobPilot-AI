@@ -48,6 +48,10 @@ export class ApiClient {
     return this.accessToken;
   }
 
+  getApiUrl(): string {
+    return API_V1_BASE;
+  }
+
   private async request<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<T> {
     // If a refresh is currently inflight, await it so this request sends the freshest token
     if (this.refreshPromise && endpoint !== '/auth/refresh' && endpoint !== '/auth/login') {
@@ -381,9 +385,17 @@ export class ApiClient {
     return this.request<any[]>('/resumes');
   }
 
-  async deleteResume(id: string): Promise<any> {
-    return this.request<any>(`/resumes/${id}`, {
+  async deleteResume(id: string, permanent: boolean = false): Promise<any> {
+    this.memoryCache.delete('candidate_profile_me');
+    return this.request<any>(`/resumes/${id}${permanent ? '?permanent=true' : ''}`, {
       method: 'DELETE'
+    });
+  }
+
+  async setPreferredResume(id: string): Promise<any> {
+    this.memoryCache.delete('candidate_profile_me');
+    return this.request<any>(`/resumes/${id}/preferred`, {
+      method: 'PUT'
     });
   }
 
