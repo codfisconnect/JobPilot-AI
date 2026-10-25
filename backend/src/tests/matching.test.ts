@@ -391,10 +391,12 @@ describe('Sprint 4 Production Job Matching, Skill Gap & AI Tailoring Suite', () 
     });
 
     it('IDOR: Candidate B cannot view Candidate A tailored resumes', async () => {
-      // Create Candidate B
+      // Create Candidate B with unique email to ensure idempotency across test runs
+      const testEmail = `cand.b.${Date.now()}@pilotmama.com`;
+      await prisma.user.deleteMany({ where: { email: { startsWith: 'cand.b.' } } }).catch(() => {});
       const candB = await prisma.user.create({
         data: {
-          email: 'cand.b.sprint4@pilotmama.com',
+          email: testEmail,
           passwordHash: '$argon2id$mockhashB',
           role: UserRole.CANDIDATE,
           candidateProfile: {
