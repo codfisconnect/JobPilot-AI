@@ -277,9 +277,15 @@
 .flow-step-bar {
   display: flex;
   align-items: center;
-  padding: 14px 24px;
+  padding: 12px 20px;
   background: rgba(15, 23, 42, 0.95);
   border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.flow-step-bar::-webkit-scrollbar {
+  display: none;
 }
 
 .step-item {
@@ -289,6 +295,8 @@
   color: #64748b;
   font-size: 0.8rem;
   font-weight: 600;
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .step-item.active {
@@ -308,6 +316,7 @@
   justify-content: center;
   background: rgba(255, 255, 255, 0.06);
   font-size: 0.75rem;
+  flex-shrink: 0;
 }
 
 .step-item.active .step-num {
@@ -323,13 +332,31 @@
 
 .step-separator {
   flex: 1;
+  min-width: 12px;
   height: 2px;
   background: rgba(255, 255, 255, 0.08);
-  margin: 0 10px;
+  margin: 0 8px;
 }
 
 .step-separator.active {
   background: #6366f1;
+}
+
+@media (max-width: 540px) {
+  .flow-step-bar {
+    padding: 10px 14px;
+    gap: 4px;
+  }
+  .step-lbl {
+    display: none;
+  }
+  .step-item.active .step-lbl {
+    display: inline;
+    font-size: 0.75rem;
+    max-width: 110px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
 }
 
 /* Modal Body */
@@ -1089,14 +1116,19 @@
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-top: 14px;
+  padding: 14px 0 4px 0;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
   margin-top: auto;
+  gap: 12px;
+  flex-wrap: wrap;
+  width: 100%;
 }
 
 .action-right-group {
   display: flex;
   gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
 }
 
 /* Responsive adjustments */
@@ -1116,16 +1148,21 @@
   .modal-actions-bar {
     flex-direction: column-reverse;
     gap: 10px;
+    padding-top: 12px;
   }
 
   .action-right-group {
     width: 100%;
     flex-direction: column;
+    gap: 8px;
   }
 
   .action-right-group button,
   .modal-actions-bar button {
     width: 100%;
+    justify-content: center;
+    white-space: normal;
+    text-align: center;
   }
 }
 

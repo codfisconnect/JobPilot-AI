@@ -20,6 +20,7 @@ import {
   ReadinessBlocker,
   MANDATORY_ATS_THRESHOLD
 } from '../../utils/readiness';
+import { resolveApplicationTarget } from '../../utils/targetUrlResolver';
 import {
   CheckCircle,
   AlertTriangle,
@@ -832,11 +833,22 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
         console.warn('Backend automation notice:', norm.message);
       }
 
-      // Open external employer application URL in new tab safely
-      const targetUrl = job.applicationUrl || job.sourceUrl || '';
-      if (targetUrl) {
-        window.open(targetUrl, '_blank', 'noopener,noreferrer');
+      // Resolve authoritative application target using centralized resolver
+      const resolvedTarget = resolveApplicationTarget({
+        applicationUrl: job.applicationUrl,
+        jobDetailUrl: (job as any).jobDetailUrl,
+        sourceUrl: job.sourceUrl,
+        companyCareersUrl: (job as any).companyCareersUrl
+      });
+
+      if (!resolvedTarget.url || (!resolvedTarget.isExact && !window.confirm('Exact application link is unavailable for this job. Do you want to open the employer careers portal as fallback?'))) {
+        setErrorBanner('Exact application link could not be resolved for this job.');
+        setIsSubmitting(false);
+        return;
       }
+
+      const targetUrl = resolvedTarget.url;
+      window.open(targetUrl, '_blank', 'noopener,noreferrer');
 
       // Record prepared state without claiming automatic completion
       const appData: Partial<ApplicationRecord> = {
@@ -2149,6 +2161,40 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                           <ApplicationModeBadge mode={effectiveMode} isCodewalla={isCodewalla} size="sm" />
                         </span>
                       </div>
+                      <div className="summary-row" style={{ alignItems: 'flex-start' }}>
+                        <span className="row-key">Application Target:</span>
+                        <div className="row-val" style={{ textAlign: 'right', maxWidth: '65%', wordBreak: 'break-all' }}>
+                          {effectiveMode === 'demo' ? (
+                            <span className="text-muted">Local Demo Simulation</span>
+                          ) : (() => {
+                            const step4Target = resolveApplicationTarget({
+                              applicationUrl: job.applicationUrl,
+                              jobDetailUrl: (job as any).jobDetailUrl,
+                              sourceUrl: job.sourceUrl,
+                              companyCareersUrl: (job as any).companyCareersUrl
+                            });
+                            return step4Target.isExact ? (
+                              <div>
+                                <span style={{ color: '#34d399', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                                  <CheckCircle size={13} /> Exact Job Target
+                                </span>
+                                <div style={{ fontSize: '0.74rem', color: '#94a3b8', marginTop: '2px' }}>
+                                  {step4Target.url}
+                                </div>
+                              </div>
+                            ) : (
+                              <div style={{ background: 'rgba(245, 158, 11, 0.08)', border: '1px solid rgba(245, 158, 11, 0.25)', padding: '6px 8px', borderRadius: '4px', textAlign: 'left' }}>
+                                <span style={{ color: '#fbbf24', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.78rem' }}>
+                                  <AlertTriangle size={13} /> Exact application link unavailable for this job
+                                </span>
+                                <div style={{ fontSize: '0.72rem', color: '#cbd5e1', marginTop: '2px' }}>
+                                  Target will open employer careers portal as fallback.
+                                </div>
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      </div>
                     </div>
 
                     {/* Application Answers Summary */}
@@ -2184,17 +2230,25 @@ export const ApplicationModal: React.FC<ApplicationModalProps> = ({
                         >
                           Submit Application
                         </Button>
-                      ) : (
-                        <Button
-                          variant="primary"
-                          icon={<ExternalLink size={16} />}
-                          loading={isSubmitting}
-                          disabled={!allChecklistItemsPassed}
-                          onClick={handleStartExternalApplication}
-                        >
-                          Continue to Employer Application
-                        </Button>
-                      )}
+                      ) : (() => {
+                        const step4Target = resolveApplicationTarget({
+                          applicationUrl: job.applicationUrl,
+                          jobDetailUrl: (job as any).jobDetailUrl,
+                          sourceUrl: job.sourceUrl,
+                          companyCareersUrl: (job as any).companyCareersUrl
+                        });
+                        return (
+                          <Button
+                            variant={step4Target.isExact ? 'primary' : 'outline'}
+                            icon={<ExternalLink size={16} />}
+                            loading={isSubmitting}
+                            disabled={!allChecklistItemsPassed || !step4Target.url}
+                            onClick={handleStartExternalApplication}
+                          >
+                            {step4Target.isExact ? 'Continue to Employer Application' : 'Open Employer Careers Page'}
+                          </Button>
+                        );
+                      })()}
                     </div>
                   </div>
                 </div>

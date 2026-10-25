@@ -479,8 +479,26 @@ export class JobSourceDiscoveryService {
           if (!mapped.location && (rawItem.location || rawItem.displayLocation || (rawItem.rawPayload && (rawItem.rawPayload.displayLocation || rawItem.rawPayload.location)))) {
             mapped.location = rawItem.location || rawItem.displayLocation || rawItem.rawPayload.displayLocation || rawItem.rawPayload.location;
           }
-          if (!mapped.applicationUrl && (rawItem.jobUrl || rawItem.applicationUrl || (rawItem.rawPayload && (rawItem.rawPayload.jobUrl || rawItem.rawPayload.applicationUrl)))) {
-            mapped.applicationUrl = rawItem.jobUrl || rawItem.applicationUrl || rawItem.rawPayload.jobUrl || rawItem.rawPayload.applicationUrl;
+          // Exact application URL preservation: adapter-produced applicationUrl/jobUrl MUST take precedence over generic careersUrl
+          const exactTargetUrl = rawItem.applicationUrl || rawItem.jobUrl || (rawItem.rawPayload && (rawItem.rawPayload.jobUrl || rawItem.rawPayload.applicationUrl));
+          if (exactTargetUrl && (!mapped.applicationUrl || mapped.applicationUrl === defaults.careersUrl)) {
+            mapped.applicationUrl = exactTargetUrl;
+          }
+          const exactSourceUrl = rawItem.sourceUrl || rawItem.url || exactTargetUrl;
+          if (exactSourceUrl && (!mapped.sourceUrl || mapped.sourceUrl === defaults.careersUrl)) {
+            mapped.sourceUrl = exactSourceUrl;
+          }
+          if (rawItem.description && (!mapped.descriptionText || mapped.descriptionText === mapped.title)) {
+            mapped.descriptionText = rawItem.description;
+          }
+          if (rawItem.responsibilities && Array.isArray(rawItem.responsibilities) && rawItem.responsibilities.length > 0 && (!mapped.responsibilities || mapped.responsibilities.length === 0)) {
+            mapped.responsibilities = rawItem.responsibilities;
+          }
+          if (rawItem.requirements && Array.isArray(rawItem.requirements) && rawItem.requirements.length > 0 && (!mapped.requirements || mapped.requirements.length === 0)) {
+            mapped.requirements = rawItem.requirements;
+          }
+          if (rawItem.skills && Array.isArray(rawItem.skills) && rawItem.skills.length > 0 && (!mapped.skills || mapped.skills.length === 0)) {
+            mapped.skills = rawItem.skills;
           }
         }
 

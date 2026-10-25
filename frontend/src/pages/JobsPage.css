@@ -565,6 +565,8 @@
   border-top: 1px solid var(--border-subtle);
   padding-top: 16px;
   margin-top: 10px;
+  gap: 12px;
+  flex-wrap: wrap;
 }
 
 .source-disclaimer {
@@ -576,6 +578,35 @@
 .detail-actions {
   display: flex;
   gap: 12px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .job-highlights-grid {
+    grid-template-columns: repeat(2, 1fr) !important;
+  }
+  .job-detail-footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+  .source-disclaimer {
+    max-width: 100%;
+    text-align: center;
+  }
+  .detail-actions {
+    width: 100%;
+    flex-direction: column;
+  }
+  .detail-actions button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (max-width: 400px) {
+  .job-highlights-grid {
+    grid-template-columns: 1fr !important;
+  }
 }
 
 /* Modal Tab Styling */

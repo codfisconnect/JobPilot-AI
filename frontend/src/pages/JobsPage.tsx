@@ -75,37 +75,51 @@ export const JobsPage: React.FC<JobsPageProps> = ({
   // Detail Modal state
   const [selectedJob, setSelectedJob] = useState<CanonicalJob | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [jobDetailLoading, setJobDetailLoading] = useState(false);
 
   // Application Agent Modal state
   const { activeCandidate, showToast } = useApp();
   const [applyingJob, setApplyingJob] = useState<JobDescription | null>(null);
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
 
-  const handleDirectApply = (job: CanonicalJob) => {
-    const canonicalCompany = getCanonicalCompanyName(job.company?.name, job.sourceUrl, job.applicationUrl);
+  const handleDirectApply = async (job: CanonicalJob) => {
+    let fullJob = job;
+    // Ensure we have authoritative job fields (applicationUrl, description, requirements, responsibilities)
+    if (!job.description || !job.applicationUrl || (!job.responsibilities && !job.requirements)) {
+      try {
+        const res = await apiClient.getCanonicalJobById(job.id);
+        if (res?.data || res?.title) {
+          fullJob = res.data || res;
+        }
+      } catch {
+        // Fallback to currently passed job object
+      }
+    }
+
+    const canonicalCompany = getCanonicalCompanyName(fullJob.company?.name, fullJob.sourceUrl, fullJob.applicationUrl);
     // Adapt CanonicalJob to JobDescription
     const adapted: JobDescription = {
-      id: job.id,
-      role: job.title,
+      id: fullJob.id,
+      role: fullJob.title,
       company: canonicalCompany,
-      location: job.location || job.city || 'Remote',
-      sourceType: (job.sourceType as any) || 'external',
-      source: job.sourceName || job.sourceType,
-      sourceUrl: job.sourceUrl || job.applicationUrl,
-      applicationUrl: job.applicationUrl || job.sourceUrl,
+      location: fullJob.location || fullJob.city || 'Remote',
+      sourceType: (fullJob.sourceType as any) || 'external',
+      source: fullJob.sourceName || fullJob.sourceType,
+      sourceUrl: fullJob.sourceUrl || fullJob.applicationUrl,
+      applicationUrl: fullJob.applicationUrl || fullJob.sourceUrl,
       applicationMode: 'external',
-      employmentType: job.employmentType,
-      workMode: job.remoteType,
-      publishedDate: job.postedAt || job.firstSeenAt,
-      careerTrack: job.title,
-      experienceRequired: job.experienceMin ? `${job.experienceMin}+ years` : '3+ years',
-      salary: job.salaryMin ? `$${Number(job.salaryMin).toLocaleString()}` : 'Competitive',
-      mustHaveSkills: job.requirements || [],
-      niceToHaveSkills: job.preferredQualifications || [],
-      responsibilities: job.responsibilities || [],
-      qualifications: job.requirements || [],
-      rawText: job.description,
-      createdAt: job.firstSeenAt || new Date().toISOString()
+      employmentType: fullJob.employmentType,
+      workMode: fullJob.remoteType,
+      publishedDate: fullJob.postedAt || fullJob.firstSeenAt,
+      careerTrack: fullJob.title,
+      experienceRequired: fullJob.experienceMin ? `${fullJob.experienceMin}+ years` : '3+ years',
+      salary: fullJob.salaryMin ? `$${Number(fullJob.salaryMin).toLocaleString()}` : 'Competitive',
+      mustHaveSkills: fullJob.requirements || [],
+      niceToHaveSkills: fullJob.preferredQualifications || [],
+      responsibilities: fullJob.responsibilities || [],
+      qualifications: fullJob.requirements || [],
+      rawText: fullJob.description,
+      createdAt: fullJob.firstSeenAt || new Date().toISOString()
     };
     setApplyingJob(adapted);
     setIsApplyModalOpen(true);
@@ -239,9 +253,22 @@ export const JobsPage: React.FC<JobsPageProps> = ({
     locationFilter
   ].filter(Boolean).length;
 
-  const handleOpenJobDetail = (job: CanonicalJob) => {
-    setSelectedJob(job);
-    setIsDetailOpen(true);
+  const handleOpenJobDetail = async (job: CanonicalJob) => {
+    try {
+      setJobDetailLoading(true);
+      setModalError(null);
+
+      const response = await apiClient.getCanonicalJobById(job.id);
+      const fullJob = response?.data ?? response;
+
+      setSelectedJob(fullJob);
+      setIsDetailOpen(true);
+    } catch (error) {
+      console.error('Failed to load full job details:', error);
+      setModalError('Unable to load the full job details. Please try again.');
+    } finally {
+      setJobDetailLoading(false);
+    }
   };
 
   const handleAddJob = async () => {

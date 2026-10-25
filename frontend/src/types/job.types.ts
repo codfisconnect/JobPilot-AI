@@ -43,6 +43,7 @@ export interface CanonicalJob {
   sourceType: string;
   sourceName: string;
   sourceUrl: string;
+  jobDetailUrl?: string;
   applicationUrl?: string;
   skills: CanonicalJobSkill[];
   recommendation?: {
