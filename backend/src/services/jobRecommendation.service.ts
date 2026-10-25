@@ -17,7 +17,15 @@ export interface RecommendedJobItem {
   explanation: RecommendationExplanation;
 }
 
+export type RecommendationStatus =
+  | 'RECOMMENDATIONS_AVAILABLE'
+  | 'NO_ELIGIBLE_RECOMMENDATIONS'
+  | 'PROFILE_INCOMPLETE'
+  | 'RESUME_UNAVAILABLE'
+  | 'SYSTEM_ERROR';
+
 export interface RecommendationResult {
+  status: RecommendationStatus;
   items: any[];
   pagination: {
     page: number;
@@ -83,6 +91,7 @@ export class JobRecommendationService {
     // If new candidate has no profile and no resume, return transparent onboarding signal
     if (profileState === 'EMPTY' || !profile) {
       return {
+        status: 'PROFILE_INCOMPLETE',
         items: [],
         pagination: {
           page: 1,
@@ -299,7 +308,10 @@ export class JobRecommendationService {
     const skip = (page - 1) * pageSize;
     const paginatedItems = scoredJobs.slice(skip, skip + pageSize).map(item => item.job);
 
+    const status: RecommendationStatus = total > 0 ? 'RECOMMENDATIONS_AVAILABLE' : 'NO_ELIGIBLE_RECOMMENDATIONS';
+
     return {
+      status,
       items: paginatedItems,
       pagination: {
         page,
@@ -375,35 +387,33 @@ export class JobRecommendationService {
       }
     });
 
-    // Also check requirements, responsibilities, and description text if tagged skills are sparse
-    if (matchedSkills.length === 0) {
-      const combinedText = [
-        ...(Array.isArray(job.requirements) ? job.requirements : []),
-        ...(Array.isArray(job.responsibilities) ? job.responsibilities : []),
-        ...(Array.isArray(job.preferredQualifications) ? job.preferredQualifications : []),
-        job.description || ''
-      ].join(' ').toLowerCase();
+    // Also extract skills from requirements, responsibilities, description, and title text
+    const combinedText = [
+      job.title || '',
+      ...(Array.isArray(job.requirements) ? job.requirements : []),
+      ...(Array.isArray(job.responsibilities) ? job.responsibilities : []),
+      ...(Array.isArray(job.preferredQualifications) ? job.preferredQualifications : []),
+      job.description || ''
+    ].join(' ').toLowerCase();
 
-      if (combinedText.trim().length > 0) {
-        candidate.candidateSkillsLower.forEach(sk => {
-          if (sk.length > 2) {
-            // Match whole word or exact token within job text
-            const escaped = sk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-            const regex = new RegExp(`\\b${escaped}\\b`, 'i');
-            if (regex.test(combinedText)) {
-              matchedSkills.push(sk);
-            }
+    if (combinedText.trim().length > 0) {
+      candidate.candidateSkillsLower.forEach(sk => {
+        if (sk.length > 1 && !matchedSkills.includes(sk)) {
+          const escaped = sk.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          const regex = new RegExp(`\\b${escaped}\\b`, 'i');
+          if (regex.test(combinedText)) {
+            matchedSkills.push(sk);
           }
-        });
-      }
+        }
+      });
     }
 
-    let skillScore = 30;
+    let skillScore = 20;
     if (jobSkills.length > 0) {
       const ratio = matchedSkills.length / jobSkills.length;
       skillScore = Math.min(100, Math.round(ratio * 100));
     } else if (matchedSkills.length > 0) {
-      skillScore = Math.min(100, 50 + matchedSkills.length * 15);
+      skillScore = Math.min(100, 40 + matchedSkills.length * 15);
     }
 
     if (matchedSkills.length > 0) {

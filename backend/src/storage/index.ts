@@ -5,9 +5,10 @@ import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 
 export function createResumeStorage(): IResumeStorage {
-  const provider = env.STORAGE_PROVIDER || 'local';
+  const configuredProvider = process.env.RESUME_STORAGE_PROVIDER || env.STORAGE_PROVIDER || 'local';
+  const provider = configuredProvider === 'durable' ? (process.env.STORAGE_PROVIDER || 's3') : configuredProvider;
 
-  if (provider === 's3' || provider === 'r2') {
+  if (provider === 's3' || provider === 'r2' || configuredProvider === 'durable') {
     if (!env.STORAGE_BUCKET || !env.STORAGE_ACCESS_KEY || !env.STORAGE_SECRET_KEY) {
       if (env.NODE_ENV === 'production') {
         logger.error('CRITICAL: STORAGE_PROVIDER is set to persistent object storage (' + provider + ') but required credentials (STORAGE_BUCKET, STORAGE_ACCESS_KEY, STORAGE_SECRET_KEY) are missing!');

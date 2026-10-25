@@ -324,7 +324,7 @@ export class GenericBrowserDiscoveryService {
             externalJobId: item.id || undefined,
             title: item.title,
             location: item.location || undefined,
-            description: item.title,
+            description: item.description || item.snippet || (item.location ? `${item.title} based in ${item.location}` : item.title),
             applicationUrl: item.href,
             url: item.href
           });

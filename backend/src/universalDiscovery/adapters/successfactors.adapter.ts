@@ -205,11 +205,12 @@ export class SuccessFactorsAdapter implements IJobSourceStrategy {
         if (!seenIds.has(id)) {
           seenIds.add(id);
           const appUrl = jobUrl || `${baseUrl}/career?company=${encodeURIComponent(company)}&career_job_req_id=${reqId}&career_ns=job_listing`;
+          const rowSnippet = $(el).find('.jobDescription, .jobSummary, .fieldContent').text().trim();
           allJobs.push({
             externalJobId: reqId || undefined,
             title,
             location: location || undefined,
-            description: title,
+            description: rowSnippet || (location ? `${title} (${location})` : title),
             applicationUrl: appUrl,
             url: appUrl
           });

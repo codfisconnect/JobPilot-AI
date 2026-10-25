@@ -81,7 +81,7 @@ export class WorkdayAdapter implements IJobSourceStrategy {
             title: item.title || 'Job Opening',
             location: item.locationsText || undefined,
             postedAt: item.postedOn ? new Date(item.postedOn) : undefined,
-            description: item.title || undefined,
+            description: item.jobDescription || item.description || (item.bulletFields && item.bulletFields.length > 1 ? item.bulletFields.slice(1).join(' • ') : undefined) || (item.locationsText ? `${item.title || 'Role'} based in ${item.locationsText}` : undefined),
             applicationUrl: appUrl,
             rawPayload: item
           });

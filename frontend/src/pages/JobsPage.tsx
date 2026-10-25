@@ -198,7 +198,8 @@ export const JobsPage: React.FC<JobsPageProps> = ({
           setProfileState(res.profileState);
         }
 
-        setJobs(res.items || []);
+        const jobList = Array.isArray(res.data) ? res.data : (Array.isArray(res.items) ? res.items : (Array.isArray(res) ? res : []));
+        setJobs(jobList);
         if (res.pagination) {
           setPage(res.pagination.page);
           setTotalPages(res.pagination.totalPages);

@@ -22,6 +22,7 @@ resumeRouter.get('/:id/download', ResumeControllerV1.downloadResume);
 resumeRouter.delete('/:id', ResumeControllerV1.deleteResume);
 resumeRouter.put('/:id/master', ResumeControllerV1.setPreferredResume);
 resumeRouter.put('/:id/preferred', ResumeControllerV1.setPreferredResume);
+resumeRouter.put('/:id/replace', upload.single('resume'), ResumeControllerV1.replaceResume);
 
 // Parsing & Confirmation pipeline
 resumeRouter.post('/:id/parse', ResumeControllerV1.parseResume);

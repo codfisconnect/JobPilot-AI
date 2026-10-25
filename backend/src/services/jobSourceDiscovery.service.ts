@@ -488,8 +488,10 @@ export class JobSourceDiscoveryService {
           if (exactSourceUrl && (!mapped.sourceUrl || mapped.sourceUrl === defaults.careersUrl)) {
             mapped.sourceUrl = exactSourceUrl;
           }
-          if (rawItem.description && (!mapped.descriptionText || mapped.descriptionText === mapped.title)) {
-            mapped.descriptionText = rawItem.description;
+          const richRawDesc = rawItem.description ||
+            (rawItem.rawPayload && (rawItem.rawPayload.jobDesc || rawItem.rawPayload.jobDescription || rawItem.rawPayload.jobDescriptionHtml || rawItem.rawPayload.descriptionPlain || rawItem.rawPayload.content || rawItem.rawPayload.descriptionText || rawItem.rawPayload.details));
+          if (richRawDesc && (!mapped.descriptionText || mapped.descriptionText === mapped.title || mapped.descriptionText.length < richRawDesc.length)) {
+            mapped.descriptionText = richRawDesc;
           }
           if (rawItem.responsibilities && Array.isArray(rawItem.responsibilities) && rawItem.responsibilities.length > 0 && (!mapped.responsibilities || mapped.responsibilities.length === 0)) {
             mapped.responsibilities = rawItem.responsibilities;
@@ -499,6 +501,19 @@ export class JobSourceDiscoveryService {
           }
           if (rawItem.skills && Array.isArray(rawItem.skills) && rawItem.skills.length > 0 && (!mapped.skills || mapped.skills.length === 0)) {
             mapped.skills = rawItem.skills;
+          }
+
+          // If descriptionText is still equal to title, attempt to build from responsibilities/requirements
+          if ((!mapped.descriptionText || mapped.descriptionText.trim().toLowerCase() === mapped.title.trim().toLowerCase()) &&
+              ((mapped.responsibilities && mapped.responsibilities.length > 0) || (mapped.requirements && mapped.requirements.length > 0))) {
+            const parts: string[] = [];
+            if (mapped.responsibilities && mapped.responsibilities.length > 0) {
+              parts.push(`Key Responsibilities:\n${mapped.responsibilities.map((r: string) => `• ${r}`).join('\n')}`);
+            }
+            if (mapped.requirements && mapped.requirements.length > 0) {
+              parts.push(`Qualifications & Requirements:\n${mapped.requirements.map((req: string) => `• ${req}`).join('\n')}`);
+            }
+            mapped.descriptionText = parts.join('\n\n');
           }
         }
 

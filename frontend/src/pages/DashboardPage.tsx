@@ -66,8 +66,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       setJobsError(null);
       // Attempt to load personalized recommendations first
       const recRes = await apiClient.getRecommendedJobs({ pageSize: 6 });
-      if (recRes && recRes.items && recRes.items.length > 0) {
-        setLatestJobs(recRes.items);
+      const recItems = Array.isArray(recRes?.data) ? recRes.data : (Array.isArray(recRes?.items) ? recRes.items : []);
+      if (recItems.length > 0) {
+        setLatestJobs(recItems);
       } else {
         // Fallback to latest canonical jobs
         const res = await apiClient.getCanonicalJobs({ pageSize: 6, sortBy: 'latest' });

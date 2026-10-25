@@ -117,6 +117,7 @@ export class JobControllerV1 {
 
       res.status(200).json({
         success: true,
+        status: result.status,
         data: result.items,
         pagination: result.pagination,
         hasProfileData: result.hasProfileData,

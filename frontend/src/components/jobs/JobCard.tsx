@@ -72,6 +72,14 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onApply, onOpen
 
       <h3 className="job-title-heading">{job.title}</h3>
 
+      <p className="job-card-description-excerpt">
+        {job.description && job.description.trim()
+          ? job.description.length > 160
+            ? `${job.description.slice(0, 157)}...`
+            : job.description
+          : 'Job description unavailable'}
+      </p>
+
       {job.recommendation && job.recommendation.headline && (
         <div className="job-recommendation-reason">
           <span className="recommendation-reason-text">
