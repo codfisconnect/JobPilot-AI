@@ -109,6 +109,61 @@ export class ApiClient {
 
     return json.data as T;
   }
+  private async requestRaw<T = any>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<T> {
+    if (this.refreshPromise && endpoint !== '/auth/refresh' && endpoint !== '/auth/login') {
+      try {
+        await this.refreshPromise;
+      } catch {
+        // Refresh failed, proceed
+      }
+    }
+
+    if (!this.accessToken && typeof window !== 'undefined') {
+      this.accessToken = localStorage.getItem('pilotmama_access_token');
+    }
+
+    const headers = new Headers(options.headers || {});
+    headers.set('Content-Type', 'application/json');
+
+    if (this.accessToken) {
+      headers.set('Authorization', `Bearer ${this.accessToken}`);
+    }
+
+    const res = await fetch(`${API_V1_BASE}${endpoint}`, {
+      ...options,
+      headers,
+      credentials: 'include'
+    });
+
+    if (res.status === 401 && !isRetry && endpoint !== '/auth/refresh' && endpoint !== '/auth/login') {
+      try {
+        await this.refresh();
+        const retryHeaders = new Headers(options.headers || {});
+        retryHeaders.set('Content-Type', 'application/json');
+        if (this.accessToken) {
+          retryHeaders.set('Authorization', `Bearer ${this.accessToken}`);
+        }
+        return this.requestRaw<T>(endpoint, { ...options, headers: retryHeaders }, true);
+      } catch (refreshErr) {
+        // Refresh failed
+      }
+    }
+
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok || json.success === false) {
+      const error: ApiError = {
+        ...(json.error || {
+          code: `HTTP_${res.status}`,
+          message: json.message || 'An unexpected error occurred'
+        }),
+        status: res.status
+      };
+      throw error;
+    }
+
+    return json as T;
+  }
 
   private async requestPaginated<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<PaginatedResponse<T>> {
     // If a refresh is currently inflight, await it so this request sends the freshest token
@@ -590,11 +645,21 @@ export class ApiClient {
       }
     }
 
-    const promise = this.request<any>(endpoint)
-      .then(res => {
-        // Cache recommended jobs for 30s
-        this.memoryCache.set(cacheKey, { data: res, expiry: Date.now() + 30000 });
-        return res;
+    const promise = this.requestRaw<any>(endpoint)
+      .then(json => {
+        const result = {
+          data: (Array.isArray(json.data) ? json.data : []) as any[],
+          pagination: json.pagination,
+          status: json.status,
+          hasProfileData: json.hasProfileData,
+          profileState: json.profileState,
+          profileSummary: json.profileSummary
+        };
+        // Cache recommended jobs for 30s only if results are populated
+        if (result.data.length > 0) {
+          this.memoryCache.set(cacheKey, { data: result, expiry: Date.now() + 30000 });
+        }
+        return result;
       })
       .finally(() => {
         this.inflightRequests.delete(cacheKey);

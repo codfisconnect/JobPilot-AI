@@ -25,9 +25,7 @@ describe('Job Alert Outbox, Email OTP & Social Auth Suite', () => {
 
   before(async () => {
     // 1. Clean existing test artifacts if any
-    await prisma.jobAlertOutbox.deleteMany({
-      where: { email: { contains: 'testpilotmama.com' } }
-    });
+    await prisma.jobAlertOutbox.deleteMany({});
     await prisma.emailOtp.deleteMany({
       where: { email: { contains: 'testpilotmama.com' } }
     });
@@ -304,7 +302,15 @@ describe('Job Alert Outbox, Email OTP & Social Auth Suite', () => {
 
       // Process the outbox batch
       const processResult = await JobAlertService.processOutboxBatch(10);
-      assert.strictEqual(processResult.sent, 2, 'Should mark 2 outbox entries as sent');
+      assert.ok(processResult.sent >= 2, 'Should mark outbox entries as sent');
+
+      const candidateSentEntries = await prisma.jobAlertOutbox.findMany({
+        where: {
+          candidateId: testCandidateProfile.id,
+          status: JobAlertStatus.SENT
+        }
+      });
+      assert.strictEqual(candidateSentEntries.length, 2, 'Should mark exactly 2 outbox entries as sent for this candidate');
 
       // Inspect sent emails
       const sentEmails = EmailService.getSentEmails().filter(e => e.to === testCandidateEmail);

@@ -183,6 +183,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
           setTotalPages(res.pagination.totalPages);
           setTotalCount(res.pagination.total);
         }
+        console.log('TAB SWITCH TO ALL JOBS:', res.data.length);
       } else {
         // 2. Recommended for You tab: fetch personalized recommendations
         const res = await apiClient.getRecommendedJobs({
@@ -194,17 +195,37 @@ export const JobsPage: React.FC<JobsPageProps> = ({
           employmentType: employmentFilter || undefined
         });
 
-        if (res.profileState) {
+        console.log('RECOMMENDATION API RESPONSE:', {
+          hasData: Boolean(res?.data),
+          dataLength: Array.isArray(res?.data) ? res.data.length : 0,
+          pagination: res?.pagination,
+          profileState: res?.profileState,
+          status: res?.status
+        });
+
+        if (res?.profileState) {
           setProfileState(res.profileState);
         }
 
-        const jobList = Array.isArray(res.data) ? res.data : (Array.isArray(res.items) ? res.items : (Array.isArray(res) ? res : []));
+        const jobList = Array.isArray(res?.data) ? res.data : (Array.isArray(res?.items) ? res.items : (Array.isArray(res) ? res : []));
+        console.log('FRONTEND PARSED JOBS COUNT:', jobList.length);
+
+        console.log('BEFORE MEMORY FILTERS:', jobList.length);
+        console.log('AFTER MEMORY FILTERS:', jobList.length);
+
         setJobs(jobList);
-        if (res.pagination) {
+        console.log('RECOMMENDED STATE SET:', jobList.length);
+
+        if (res?.pagination) {
           setPage(res.pagination.page);
           setTotalPages(res.pagination.totalPages);
           setTotalCount(res.pagination.total);
+        } else {
+          setPage(1);
+          setTotalPages(Math.max(1, Math.ceil(jobList.length / 12)));
+          setTotalCount(jobList.length);
         }
+        console.log('TAB SWITCH TO RECOMMENDED:', jobList.length);
       }
     } catch (err: any) {
       console.error('Failed to load opportunities:', err);
@@ -228,6 +249,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
   const handleTabSwitch = (tab: 'recommended' | 'all') => {
     setActiveTab(tab);
     setPage(1);
+    setTotalCount(0); // Clear previous count to prevent bleed between tabs
     loadJobs(1, tab);
   };
 
