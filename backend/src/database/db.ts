@@ -223,6 +223,13 @@ function initSchema(db: Database): void {
       applicationDate TEXT,
       notes TEXT,
       customAnswers TEXT,
+      applicationMode TEXT DEFAULT 'demo',
+      applicationUrl TEXT,
+      atsScore REAL,
+      appliedAt TEXT,
+      skillGaps TEXT,
+      timeline TEXT,
+      coverLetter TEXT,
       createdAt TEXT,
       updatedAt TEXT,
       FOREIGN KEY(candidateId) REFERENCES candidates(id),
@@ -316,3 +323,4 @@ function initSchema(db: Database): void {
     );
   `);
 }
+

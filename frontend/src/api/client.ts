@@ -1192,6 +1192,35 @@ export class ApiClient {
       method: 'POST'
     });
   }
+
+  // One-Click Application Orchestrator
+  async startApplicationOrchestration(data: {
+    jobId: string;
+    resumeChoice?: 'master' | 'tailored';
+    resumeId?: string;
+  }): Promise<any> {
+    return this.request<any>('/applications/orchestrate/start', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async getApplicationOrchestrationStatus(attemptId: string): Promise<any> {
+    return this.request<any>(`/applications/orchestrate/${attemptId}/status`);
+  }
+
+  async respondMissingField(attemptId: string, fieldKey: string, value: any): Promise<any> {
+    return this.request<any>(`/applications/orchestrate/${attemptId}/respond`, {
+      method: 'POST',
+      body: JSON.stringify({ fieldKey, value })
+    });
+  }
+
+  async cancelApplicationOrchestration(attemptId: string): Promise<any> {
+    return this.request<any>(`/applications/orchestrate/${attemptId}/cancel`, {
+      method: 'POST'
+    });
+  }
 }
 
 export const apiClient = new ApiClient();

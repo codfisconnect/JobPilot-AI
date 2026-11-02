@@ -10,7 +10,13 @@ applicationRouter.use(authenticateJwt);
 // Analytics
 applicationRouter.get('/stats', ApplicationController.getStats);
 
-// Application Automation Agent Start & Status
+// One-Click Application Orchestrator Endpoints
+applicationRouter.post('/orchestrate/start', ApplicationController.startOrchestration);
+applicationRouter.get('/orchestrate/:attemptId/status', ApplicationController.getOrchestrationStatus);
+applicationRouter.post('/orchestrate/:attemptId/respond', ApplicationController.respondMissingField);
+applicationRouter.post('/orchestrate/:attemptId/cancel', ApplicationController.cancelOrchestration);
+
+// Application Automation Agent Start & Status (legacy bridge)
 applicationRouter.post('/start', ApplicationController.startApplication);
 applicationRouter.get('/tasks/:taskId', ApplicationController.getTaskStatus);
 
