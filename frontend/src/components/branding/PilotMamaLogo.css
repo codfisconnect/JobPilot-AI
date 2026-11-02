@@ -1,45 +1,60 @@
+:root {
+  --pm-logo-height-sm: 28px;
+  --pm-logo-height-md: 38px;
+  --pm-logo-height-lg: 52px;
+  --pm-logo-aspect-ratio: 1024 / 239;
+  --pm-icon-size-sm: 28px;
+  --pm-icon-size-md: 38px;
+  --pm-icon-size-lg: 48px;
+}
+
 .pilot-mama-logo-wrap {
   display: inline-flex;
   align-items: center;
+  justify-content: flex-start;
   user-select: none;
+  flex-shrink: 0;
+  vertical-align: middle;
 }
 
 .pilot-mama-logo-img {
   height: 100%;
   width: auto;
+  aspect-ratio: var(--pm-logo-aspect-ratio);
   object-fit: contain;
   display: block;
   transition: opacity 0.2s ease;
 }
 
 .pilot-mama-logo-wrap.size-sm {
-  height: 28px;
+  height: var(--pm-logo-height-sm);
 }
 
 .pilot-mama-logo-wrap.size-md {
-  height: 38px;
+  height: var(--pm-logo-height-md);
 }
 
 .pilot-mama-logo-wrap.size-lg {
-  height: 52px;
+  height: var(--pm-logo-height-lg);
 }
 
 .pilot-mama-icon {
   object-fit: contain;
   display: block;
+  flex-shrink: 0;
 }
 
 .pilot-mama-icon.size-sm {
-  width: 28px;
-  height: 28px;
+  width: var(--pm-icon-size-sm);
+  height: var(--pm-icon-size-sm);
 }
 
 .pilot-mama-icon.size-md {
-  width: 38px;
-  height: 38px;
+  width: var(--pm-icon-size-md);
+  height: var(--pm-icon-size-md);
 }
 
 .pilot-mama-icon.size-lg {
-  width: 48px;
-  height: 48px;
+  width: var(--pm-icon-size-lg);
+  height: var(--pm-icon-size-lg);
 }

@@ -151,6 +151,28 @@ export class UserRepository {
     });
   }
 
+  async markEmailVerified(userId: string): Promise<User & { candidateProfile: CandidateProfile | null }> {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { emailVerified: true, isActive: true },
+      include: { candidateProfile: true }
+    });
+  }
+
+  async updatePasswordHash(userId: string, passwordHash: string): Promise<User> {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { passwordHash, emailVerified: true }
+    });
+  }
+
+  async updateEmail(userId: string, email: string): Promise<User> {
+    return prisma.user.update({
+      where: { id: userId },
+      data: { email: email.toLowerCase().trim() }
+    });
+  }
+
   async deleteRefreshTokensForUser(userId: string): Promise<void> {
     await prisma.refreshToken.deleteMany({
       where: { userId }

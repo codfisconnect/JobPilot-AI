@@ -1,6 +1,7 @@
 import { prisma } from '../database/prisma.js';
 import { Job, JobStatus, RemoteType, EmploymentType, Prisma } from '@prisma/client';
 import { NormalizedJobData } from '../services/jobNormalization.service.js';
+import { logger } from '../utils/logger.js';
 
 export interface JobFilterParams {
   query?: string;
@@ -179,6 +180,13 @@ export class JobRepositoryV1 {
         }
       }
     }
+
+    // Trigger asynchronous job alert relevance evaluation for genuinely new job
+    import('../services/jobAlert.service.js')
+      .then(({ JobAlertService }) => JobAlertService.evaluateAndEnqueue(created))
+      .catch(err => {
+        logger.warn(`[JobRepository] Background job alert evaluation skipped: ${err.message}`);
+      });
 
     return { job: created, isNew: true };
   }

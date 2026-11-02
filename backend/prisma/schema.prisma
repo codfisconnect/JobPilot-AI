@@ -150,6 +150,7 @@ model CandidateProfile {
   careerAssessments CareerTrackAssessment[]
   applications      Application[]
   savedJobs         SavedJob[]
+  jobAlerts         JobAlertOutbox[]
   agentSessions     AgentSession[]
 
   @@map("candidate_profiles")
@@ -169,6 +170,7 @@ model CandidatePreference {
   currency                 String     @default("USD")
   noticePeriod             String?    @map("notice_period")
   willingToRelocate        Boolean    @default(false) @map("willing_to_relocate")
+  jobAlertsEnabled         Boolean    @default(true) @map("job_alerts_enabled")
   preferredWorkArrangement String?    @map("preferred_work_arrangement")
   workModes                WorkMode[] @map("work_modes")
   createdAt                DateTime   @default(now()) @map("created_at")
@@ -563,6 +565,7 @@ model Job {
   learningPlans     LearningPlan[]
   applications      Application[]
   savedJobs         SavedJob[]
+  jobAlerts         JobAlertOutbox[]
 
   @@index([companyId])
   @@index([organizationId])
@@ -1377,3 +1380,70 @@ model BulkSourceItem {
 }
 
 
+
+
+enum JobAlertStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+  CANCELLED
+}
+
+enum JobAlertTier {
+  HIGHLY_RELEVANT
+  RELEVANT
+  NOT_RELEVANT
+}
+
+enum OtpPurpose {
+  SIGNUP
+  LOGIN
+  PASSWORD_RESET
+  EMAIL_CHANGE
+}
+
+model JobAlertOutbox {
+  id                String         @id @default(uuid())
+  candidateId       String         @map("candidate_id")
+  jobId             String         @map("job_id")
+  email             String
+  status            JobAlertStatus @default(PENDING)
+  relevanceScore    Float          @map("relevance_score")
+  relevanceTier     JobAlertTier   @default(RELEVANT) @map("relevance_tier")
+  reasonEvidence    Json?          @map("reason_evidence")
+  retryCount        Int            @default(0) @map("retry_count")
+  providerMessageId String?        @map("provider_message_id")
+  failedReason      String?        @map("failed_reason")
+  sentAt            DateTime?      @map("sent_at")
+  failedAt          DateTime?      @map("failed_at")
+  createdAt         DateTime       @default(now()) @map("created_at")
+  updatedAt         DateTime       @updatedAt @map("updated_at")
+
+  candidate CandidateProfile @relation(fields: [candidateId], references: [id], onDelete: Cascade)
+  job       Job              @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([candidateId, jobId])
+  @@index([status, createdAt])
+  @@index([email])
+  @@map("job_alert_outbox")
+}
+
+model EmailOtp {
+  id          String     @id @default(uuid())
+  email       String
+  otpHash     String     @map("otp_hash")
+  purpose     OtpPurpose @default(SIGNUP)
+  expiresAt   DateTime   @map("expires_at")
+  attempts    Int        @default(0)
+  maxAttempts Int        @default(5) @map("max_attempts")
+  resendAfter DateTime   @map("resend_after")
+  verified    Boolean    @default(false)
+  metadata    Json?
+  createdAt   DateTime   @default(now()) @map("created_at")
+  updatedAt   DateTime   @updatedAt @map("updated_at")
+
+  @@index([email, purpose])
+  @@index([expiresAt])
+  @@map("email_otps")
+}

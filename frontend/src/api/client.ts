@@ -1,4 +1,4 @@
-import type { User, AuthResponse, ApiError } from '../types/auth';
+import type { User, AuthResponse, RegisterResponse, OtpResponse, ApiError } from '../types/auth';
 import type { CanonicalJob } from '../types/job.types';
 import type {
   AdminCandidateItem,
@@ -172,37 +172,75 @@ export class ApiClient {
   }
 
   // Authentication API methods
-  async register(data: { email: string; password: string; fullName?: string; role?: string }): Promise<AuthResponse> {
-    const res = await this.request<AuthResponse>('/auth/register', {
+  async register(data: { email: string; password: string; fullName?: string; role?: string }): Promise<RegisterResponse> {
+    const res = await this.request<RegisterResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data)
     });
-    this.setToken(res.accessToken);
+    if (res.accessToken) {
+      this.setToken(res.accessToken);
+    }
     return res;
   }
 
-  async login(data: { email: string; password: string }): Promise<AuthResponse> {
-    const res = await this.request<AuthResponse>('/auth/login', {
+  async verifyOtp(data: { email: string; code: string; purpose?: string; newPassword?: string }): Promise<AuthResponse> {
+    const res = await this.request<AuthResponse>('/auth/verify-otp', {
       method: 'POST',
       body: JSON.stringify(data)
     });
-    this.setToken(res.accessToken);
+    if (res.accessToken) {
+      this.setToken(res.accessToken);
+    }
     return res;
   }
 
-  async loginWithGoogle(credential: string): Promise<AuthResponse> {
+  async requestOtp(data: { email: string; purpose?: string }): Promise<OtpResponse> {
+    return this.request<OtpResponse>('/auth/request-otp', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async resendOtp(data: { email: string; purpose?: string }): Promise<OtpResponse> {
+    return this.request<OtpResponse>('/auth/resend-otp', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async login(data: { email: string; password?: string; code?: string }): Promise<any> {
+    const res = await this.request<any>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    if (res?.accessToken) {
+      this.setToken(res.accessToken);
+    }
+    return res;
+  }
+
+  async resetPassword(data: { email: string; code: string; newPassword: string }): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async loginWithGoogle(payload: string | { credential?: string; code?: string; redirectUri?: string }): Promise<AuthResponse> {
+    const body = typeof payload === 'string' ? { credential: payload } : payload;
     const res = await this.request<AuthResponse>('/auth/google', {
       method: 'POST',
-      body: JSON.stringify({ credential })
+      body: JSON.stringify(body)
     });
     this.setToken(res.accessToken);
     return res;
   }
 
-  async loginWithLinkedIn(token: string): Promise<AuthResponse> {
+  async loginWithLinkedIn(payload: string | { token?: string; code?: string; redirectUri?: string }): Promise<AuthResponse> {
+    const body = typeof payload === 'string' ? { token: payload } : payload;
     const res = await this.request<AuthResponse>('/auth/linkedin', {
       method: 'POST',
-      body: JSON.stringify({ token })
+      body: JSON.stringify(body)
     });
     this.setToken(res.accessToken);
     return res;

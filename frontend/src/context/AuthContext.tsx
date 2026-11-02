@@ -1,21 +1,24 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
-import type { User, ApiError } from '../types/auth';
+import type { User, ApiError, RegisterResponse, OtpResponse } from '../types/auth';
 import { apiClient } from '../api/client';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (credentials: { email: string; password: string }) => Promise<User>;
-  register: (data: { email: string; password: string; fullName?: string }) => Promise<User>;
-  loginWithGoogle: (credential: string) => Promise<User>;
-  loginWithLinkedIn: (token: string) => Promise<User>;
+  login: (credentials: { email: string; password?: string; code?: string }) => Promise<any>;
+  register: (data: { email: string; password: string; fullName?: string }) => Promise<RegisterResponse>;
+  verifyOtp: (data: { email: string; code: string; purpose?: string; newPassword?: string }) => Promise<User>;
+  requestOtp: (data: { email: string; purpose?: string }) => Promise<OtpResponse>;
+  resendOtp: (data: { email: string; purpose?: string }) => Promise<OtpResponse>;
+  resetPassword: (data: { email: string; code: string; newPassword: string }) => Promise<{ message: string }>;
+  loginWithGoogle: (credentialOrCode: string | { credential?: string; code?: string; redirectUri?: string }) => Promise<User>;
+  loginWithLinkedIn: (tokenOrCode: string | { token?: string; code?: string; redirectUri?: string }) => Promise<User>;
   logout: () => Promise<void>;
   updateUserProfile: (updatedFields: { fullName?: string }) => void;
   error: string | null;
   clearError: () => void;
 }
-
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -70,50 +73,86 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
   }, []);
 
-  const login = useCallback(async (credentials: { email: string; password: string }) => {
+  const login = useCallback(async (credentials: { email: string; password?: string; code?: string }) => {
     try {
-      setIsLoading(true);
       setError(null);
       const res = await apiClient.login(credentials);
-      setUser(res.user);
-      return res.user;
+      if (res.user) {
+        setUser(res.user);
+      }
+      return res;
     } catch (err: any) {
       const apiErr = err as ApiError;
       const msg = apiErr.message || 'Invalid email or password';
       setError(msg);
       throw err;
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
   const register = useCallback(async (data: { email: string; password: string; fullName?: string }) => {
     try {
-      setIsLoading(true);
       setError(null);
       const res = await apiClient.register(data);
-      setUser(res.user);
-      return res.user;
+      if (res.user) {
+        setUser(res.user);
+      }
+      return res;
     } catch (err: any) {
       const apiErr = err as ApiError;
       const msg = apiErr.message || 'Registration failed';
       setError(msg);
       throw err;
-    } finally {
-      setIsLoading(false);
     }
   }, []);
 
-  const loginWithGoogle = useCallback(async (credential: string) => {
+  const verifyOtp = useCallback(async (data: { email: string; code: string; purpose?: string; newPassword?: string }) => {
     try {
-      setIsLoading(true);
       setError(null);
-      const res = await apiClient.loginWithGoogle(credential);
-      setUser(res.user);
+      const res = await apiClient.verifyOtp(data);
+      if (res.user) {
+        setUser(res.user);
+      }
       return res.user;
     } catch (err: any) {
       const apiErr = err as ApiError;
-      const msg = apiErr.message || 'Google sign-in failed. Please try again.';
+      const msg = apiErr.message || 'Verification failed';
+      setError(msg);
+      throw err;
+    }
+  }, []);
+
+  const requestOtp = useCallback(async (data: { email: string; purpose?: string }) => {
+    try {
+      setError(null);
+      return await apiClient.requestOtp(data);
+    } catch (err: any) {
+      const apiErr = err as ApiError;
+      const msg = apiErr.message || 'Failed to send verification code';
+      setError(msg);
+      throw err;
+    }
+  }, []);
+
+  const resendOtp = useCallback(async (data: { email: string; purpose?: string }) => {
+    try {
+      setError(null);
+      return await apiClient.resendOtp(data);
+    } catch (err: any) {
+      const apiErr = err as ApiError;
+      const msg = apiErr.message || 'Failed to resend verification code';
+      setError(msg);
+      throw err;
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (data: { email: string; code: string; newPassword: string }) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      return await apiClient.resetPassword(data);
+    } catch (err: any) {
+      const apiErr = err as ApiError;
+      const msg = apiErr.message || 'Password reset failed';
       setError(msg);
       throw err;
     } finally {
@@ -121,16 +160,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const loginWithLinkedIn = useCallback(async (token: string) => {
+  const loginWithGoogle = useCallback(async (payload: string | { credential?: string; code?: string; redirectUri?: string }) => {
     try {
       setIsLoading(true);
       setError(null);
-      const res = await apiClient.loginWithLinkedIn(token);
+      const res = await apiClient.loginWithGoogle(payload);
       setUser(res.user);
       return res.user;
     } catch (err: any) {
       const apiErr = err as ApiError;
-      const msg = apiErr.message || 'LinkedIn sign-in failed. Please try again.';
+      const msg = apiErr.message || 'Google sign-in is temporarily unavailable. Please use email sign-in.';
+      setError(msg);
+      throw err;
+    } finally {
+      setIsLoading(false);
+    }
+  }, []);
+
+  const loginWithLinkedIn = useCallback(async (payload: string | { token?: string; code?: string; redirectUri?: string }) => {
+    try {
+      setIsLoading(true);
+      setError(null);
+      const res = await apiClient.loginWithLinkedIn(payload);
+      setUser(res.user);
+      return res.user;
+    } catch (err: any) {
+      const apiErr = err as ApiError;
+      const msg = apiErr.message || 'LinkedIn sign-in is temporarily unavailable. Please use email sign-in.';
       setError(msg);
       throw err;
     } finally {
@@ -139,7 +195,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const logout = useCallback(async () => {
-
     try {
       setIsLoading(true);
       await apiClient.logout();
@@ -161,6 +216,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isLoading,
         login,
         register,
+        verifyOtp,
+        requestOtp,
+        resendOtp,
+        resetPassword,
         loginWithGoogle,
         loginWithLinkedIn,
         logout,
@@ -168,7 +227,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         error,
         clearError
       }}
-
     >
       {children}
     </AuthContext.Provider>
