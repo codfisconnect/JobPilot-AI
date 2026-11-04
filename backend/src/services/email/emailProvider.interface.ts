@@ -1,4 +1,5 @@
 export interface EmailOptions {
+  from?: string;
   to: string;
   subject: string;
   html: string;
@@ -19,3 +20,4 @@ export interface IEmailProvider {
   isConfigured(): boolean;
   sendEmail(options: EmailOptions): Promise<EmailSendResult>;
 }
+
