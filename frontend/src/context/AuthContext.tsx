@@ -27,19 +27,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Session bootstrap: attempt silent token refresh via HttpOnly cookie
+  // Session bootstrap: check stored token via getMe first; if expired/absent, attempt refresh
   useEffect(() => {
     let mounted = true;
 
     async function bootstrapSession() {
       try {
+        const storedToken = apiClient.getToken();
+        if (storedToken) {
+          try {
+            const currentUser = await apiClient.getMe();
+            if (mounted && currentUser) {
+              setUser(currentUser);
+              return;
+            }
+          } catch {
+            // Stored token is invalid or expired, proceed to refresh
+          }
+        }
+
         const authRes = await apiClient.refresh();
         if (mounted && authRes?.user) {
           setUser(authRes.user);
+          return;
         }
       } catch {
-        // Unauthenticated session - perfectly normal on first visit
+        // Unauthenticated session - clean state
         if (mounted) {
+          apiClient.setToken(null);
           setUser(null);
         }
       } finally {
@@ -51,8 +66,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     bootstrapSession();
 
+    const unsubRefreshed = apiClient.onUserRefreshed((refreshedUser) => {
+      if (mounted) {
+        setUser(refreshedUser);
+      }
+    });
+
+    const unsubCleared = apiClient.onAuthCleared(() => {
+      if (mounted) {
+        setUser(null);
+      }
+    });
+
     return () => {
       mounted = false;
+      unsubRefreshed();
+      unsubCleared();
     };
   }, []);
 
@@ -201,6 +230,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch {
       // Ignore network errors during logout
     } finally {
+      apiClient.setToken(null);
+      if (typeof window !== "undefined") {
+        localStorage.removeItem("jobpilot_active_candidate_id");
+      }
       setUser(null);
       setIsLoading(false);
     }

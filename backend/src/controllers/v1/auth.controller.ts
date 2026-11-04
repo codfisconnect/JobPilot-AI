@@ -48,7 +48,7 @@ export class AuthController {
         res.cookie(REFRESH_COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
         res.status(200).json({
           success: true,
-          data: { user, accessToken }
+          data: { user, accessToken, refreshToken }
         });
         return;
       }
@@ -58,7 +58,7 @@ export class AuthController {
         res.cookie(REFRESH_COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
         res.status(200).json({
           success: true,
-          data: { user, accessToken }
+          data: { user, accessToken, refreshToken }
         });
         return;
       }
@@ -140,7 +140,8 @@ export class AuthController {
         success: true,
         data: {
           user,
-          accessToken
+          accessToken,
+          refreshToken
         },
         meta: {
           requestId: (req as any).id,
@@ -166,7 +167,8 @@ export class AuthController {
         success: true,
         data: {
           user,
-          accessToken
+          accessToken,
+          refreshToken
         },
         meta: {
           requestId: (req as any).id,
@@ -254,7 +256,8 @@ export class AuthController {
         success: true,
         data: {
           user,
-          accessToken
+          accessToken,
+          refreshToken
         },
         meta: {
           requestId: (req as any).id,
@@ -289,7 +292,8 @@ export class AuthController {
         success: true,
         data: {
           user,
-          accessToken
+          accessToken,
+          refreshToken
         },
         meta: {
           requestId: (req as any).id,

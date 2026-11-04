@@ -32,6 +32,7 @@ import {
   Layers,
   ArrowUpDown
 } from 'lucide-react';
+import { JobSearchMultiSelect, SearchChip } from '../components/jobs/JobSearchMultiSelect';
 import './JobsPage.css';
 
 interface JobsPageProps {
@@ -51,6 +52,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Filter params
+  const [searchChips, setSearchChips] = useState<SearchChip[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [countryFilter, setCountryFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
@@ -158,13 +160,27 @@ export const JobsPage: React.FC<JobsPageProps> = ({
     setLoading(true);
     setError(null);
     const currentTab = forceTab || activeTab;
-    const hasSearchQuery = Boolean(searchQuery.trim());
+    const structuredSkills = searchChips.filter(c => c.category === 'SKILL').map(c => c.value);
+    const structuredRoles = searchChips.filter(c => c.category === 'ROLE').map(c => c.value);
+    const structuredLocations = searchChips.filter(c => c.category === 'LOCATION').map(c => c.value);
+    const structuredCompanies = searchChips.filter(c => c.category === 'COMPANY').map(c => c.value);
+    const structuredTechs = searchChips.filter(c => c.category === 'TECHNOLOGY').map(c => c.value);
+    const textQueries = searchChips.filter(c => c.category === 'TEXT').map(c => c.value);
+    const combinedQ = textQueries.length > 0 ? textQueries.join(' ') : (searchQuery.trim() || undefined);
+
+    const hasSearchQuery = searchChips.length > 0 || Boolean(searchQuery.trim());
 
     try {
       // 1. Unrestricted Search mode OR All Jobs tab: fetch from universal canonical jobs catalogue
       if (hasSearchQuery || currentTab === 'all') {
         const res = await apiClient.getCanonicalJobs({
-          query: searchQuery.trim() || undefined,
+          skills: structuredSkills.length > 0 ? structuredSkills : undefined,
+          roles: structuredRoles.length > 0 ? structuredRoles : undefined,
+          locations: structuredLocations.length > 0 ? structuredLocations : undefined,
+          companies: structuredCompanies.length > 0 ? structuredCompanies : undefined,
+          technologies: structuredTechs.length > 0 ? structuredTechs : undefined,
+          q: combinedQ,
+          query: combinedQ,
           country: countryFilter.trim() || undefined,
           location: locationFilter.trim() || undefined,
           remoteType: remoteFilter || undefined,
@@ -234,12 +250,12 @@ export const JobsPage: React.FC<JobsPageProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [activeTab, searchQuery, countryFilter, locationFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
+  }, [activeTab, searchChips, searchQuery, countryFilter, locationFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
 
   // Initial and reactive fetch upon filter modifications or activeCandidate update
   useEffect(() => {
     loadJobs(1);
-  }, [activeTab, activeCandidate, countryFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
+  }, [activeTab, activeCandidate, searchChips, countryFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,6 +270,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
   };
 
   const handleResetFilters = () => {
+    setSearchChips([]);
     setSearchQuery('');
     setCountryFilter('');
     setLocationFilter('');
@@ -405,15 +422,14 @@ export const JobsPage: React.FC<JobsPageProps> = ({
 
       {/* Filter and Search Bar */}
       <div className="search-filter-bar">
-        <form className="search-input-wrap" onSubmit={handleSearchSubmit}>
-          <Search size={16} className="search-icon" />
-          <input
-            type="text"
-            placeholder="Search roles, skills, or companies..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-        </form>
+        <JobSearchMultiSelect
+          chips={searchChips}
+          onChange={(newChips) => {
+            setSearchChips(newChips);
+          }}
+          onSearch={() => loadJobs(1)}
+          placeholder="Search roles, skills, locations, companies..."
+        />
 
         <div className="filter-controls-row desktop-only-filters">
           {/* Country */}

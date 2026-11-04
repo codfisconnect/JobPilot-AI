@@ -1,0 +1,393 @@
+/* JobSearchMultiSelect.css */
+
+.job-search-multiselect-container {
+  position: relative;
+  flex: 1 1 360px;
+  min-width: 320px;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  background: var(--bg-input, #111827);
+  border: 1px solid var(--border-primary, #334155);
+  border-radius: var(--radius-md, 10px);
+  padding: 4px 10px;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.job-search-multiselect-container:focus-within {
+  border-color: #6366f1;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.18);
+}
+
+.job-search-box-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  flex: 1;
+  min-width: 0;
+}
+
+.search-leading-icon {
+  color: var(--text-muted, #64748b);
+  flex-shrink: 0;
+  margin-right: 4px;
+  display: flex;
+  align-items: center;
+}
+
+.job-search-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: var(--radius-full, 9999px);
+  font-size: 0.775rem;
+  font-weight: 500;
+  line-height: 1.25;
+  user-select: none;
+  animation: fadeInChip 0.15s ease;
+  white-space: nowrap;
+}
+
+@keyframes fadeInChip {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.chip-tag {
+  font-size: 0.625rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  font-weight: 700;
+  opacity: 0.8;
+  padding: 1px 4px;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.15);
+}
+
+.chip-remove-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 1px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: currentColor;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.chip-remove-btn:hover {
+  opacity: 1;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+/* Category Colors - Dark Theme (Default) */
+.chip-category-skill {
+  background: rgba(99, 102, 241, 0.2);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.4);
+}
+.chip-category-skill .chip-tag {
+  background: rgba(99, 102, 241, 0.35);
+  color: #c7d2fe;
+}
+
+.chip-category-role {
+  background: rgba(168, 85, 247, 0.2);
+  color: #d8b4fe;
+  border: 1px solid rgba(168, 85, 247, 0.4);
+}
+.chip-category-role .chip-tag {
+  background: rgba(168, 85, 247, 0.35);
+  color: #e9d5ff;
+}
+
+.chip-category-location {
+  background: rgba(16, 185, 129, 0.2);
+  color: #6ee7b7;
+  border: 1px solid rgba(16, 185, 129, 0.4);
+}
+.chip-category-location .chip-tag {
+  background: rgba(16, 185, 129, 0.35);
+  color: #a7f3d0;
+}
+
+.chip-category-company {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fcd34d;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+.chip-category-company .chip-tag {
+  background: rgba(245, 158, 11, 0.35);
+  color: #fde68a;
+}
+
+.chip-category-technology {
+  background: rgba(20, 184, 166, 0.2);
+  color: #5eead4;
+  border: 1px solid rgba(20, 184, 166, 0.4);
+}
+.chip-category-technology .chip-tag {
+  background: rgba(20, 184, 166, 0.35);
+  color: #99f6e4;
+}
+
+.chip-category-text {
+  background: rgba(148, 163, 184, 0.18);
+  color: var(--text-primary, #f8fafc);
+  border: 1px solid var(--border-primary, #334155);
+}
+.chip-category-text .chip-tag {
+  background: rgba(148, 163, 184, 0.3);
+  color: var(--text-secondary, #94a3b8);
+}
+
+/* Category Colors - Light Theme Overrides */
+[data-theme="light"] .chip-category-skill {
+  background: #eef2ff;
+  color: #3730a3;
+  border-color: #c7d2fe;
+}
+[data-theme="light"] .chip-category-skill .chip-tag {
+  background: #e0e7ff;
+  color: #312e81;
+}
+
+[data-theme="light"] .chip-category-role {
+  background: #faf5ff;
+  color: #6b21a8;
+  border-color: #e9d5ff;
+}
+[data-theme="light"] .chip-category-role .chip-tag {
+  background: #f3e8ff;
+  color: #581c87;
+}
+
+[data-theme="light"] .chip-category-location {
+  background: #ecfdf5;
+  color: #065f46;
+  border-color: #a7f3d0;
+}
+[data-theme="light"] .chip-category-location .chip-tag {
+  background: #d1fae5;
+  color: #064e3b;
+}
+
+[data-theme="light"] .chip-category-company {
+  background: #fffbeb;
+  color: #92400e;
+  border-color: #fde68a;
+}
+[data-theme="light"] .chip-category-company .chip-tag {
+  background: #fef3c7;
+  color: #78350f;
+}
+
+[data-theme="light"] .chip-category-technology {
+  background: #f0fdfa;
+  color: #115e59;
+  border-color: #99f6e4;
+}
+[data-theme="light"] .chip-category-technology .chip-tag {
+  background: #ccfbf1;
+  color: #134e4a;
+}
+
+[data-theme="light"] .chip-category-text {
+  background: #f1f5f9;
+  color: #1e293b;
+  border-color: #cbd5e1;
+}
+[data-theme="light"] .chip-category-text .chip-tag {
+  background: #e2e8f0;
+  color: #334155;
+}
+
+/* Input text */
+.job-search-input {
+  flex: 1 1 140px;
+  min-width: 140px;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: var(--text-primary, #f8fafc);
+  font-size: 0.875rem;
+  padding: 4px 6px;
+  height: 32px;
+  font-family: inherit;
+}
+
+.job-search-input::placeholder {
+  color: var(--text-placeholder, #64748b);
+  opacity: 0.85;
+}
+
+/* Actions */
+.job-search-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+
+.search-clear-all-btn {
+  background: none;
+  border: none;
+  color: var(--text-muted, #64748b);
+  cursor: pointer;
+  padding: 4px;
+  border-radius: var(--radius-sm, 6px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: color 0.15s ease, background-color 0.15s ease;
+}
+
+.search-clear-all-btn:hover {
+  color: var(--text-primary, #f8fafc);
+  background: rgba(255, 255, 255, 0.08);
+}
+
+/* Dropdown Menu */
+.job-suggestions-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-height: 360px;
+  overflow-y: auto;
+  background: var(--bg-surface, #1e293b);
+  border: 1px solid var(--border-primary, #334155);
+  border-radius: var(--radius-md, 10px);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.4), 0 8px 10px -6px rgba(0, 0, 0, 0.3);
+  z-index: 100;
+  padding: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.job-suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  color: var(--text-primary, #f8fafc);
+  font-size: 0.84rem;
+  transition: background-color 0.1s ease;
+}
+
+.job-suggestion-item.active,
+.job-suggestion-item:hover {
+  background: var(--bg-surface-hover, #283548);
+}
+
+[data-theme="light"] .job-suggestion-item.active,
+[data-theme="light"] .job-suggestion-item:hover {
+  background: #f1f5f9;
+}
+
+.suggestion-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestion-label {
+  font-weight: 500;
+  color: var(--text-primary, #f8fafc);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.suggestion-badge {
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  flex-shrink: 0;
+}
+
+.suggestion-badge-SKILL {
+  background: rgba(99, 102, 241, 0.2);
+  color: #818cf8;
+}
+.suggestion-badge-ROLE {
+  background: rgba(168, 85, 247, 0.2);
+  color: #c084fc;
+}
+.suggestion-badge-LOCATION {
+  background: rgba(16, 185, 129, 0.2);
+  color: #34d399;
+}
+.suggestion-badge-COMPANY {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+}
+.suggestion-badge-TECHNOLOGY {
+  background: rgba(20, 184, 166, 0.2);
+  color: #2dd4bf;
+}
+
+[data-theme="light"] .suggestion-badge-SKILL {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+[data-theme="light"] .suggestion-badge-ROLE {
+  background: #ede9fe;
+  color: #6b21a8;
+}
+[data-theme="light"] .suggestion-badge-LOCATION {
+  background: #d1fae5;
+  color: #065f46;
+}
+[data-theme="light"] .suggestion-badge-COMPANY {
+  background: #fef3c7;
+  color: #92400e;
+}
+[data-theme="light"] .suggestion-badge-TECHNOLOGY {
+  background: #ccfbf1;
+  color: #115e59;
+}
+
+.job-suggestions-loading,
+.job-suggestions-empty {
+  padding: 12px;
+  text-align: center;
+  font-size: 0.8125rem;
+  color: var(--text-muted, #64748b);
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .job-search-multiselect-container {
+    width: 100%;
+    min-width: 100%;
+    flex: 1 1 100%;
+  }
+
+  .job-search-input {
+    min-width: 100px;
+  }
+}

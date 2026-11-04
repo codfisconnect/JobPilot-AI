@@ -3,6 +3,7 @@ import assert from 'node:assert';
 import request from 'supertest';
 import { app } from '../server.js';
 import { prisma } from '../database/prisma.js';
+import { EmailService } from '../services/email/email.service.js';
 
 describe('Sprint 1 Full Lifecycle: Register -> Login -> Refresh Rotation -> Replay Defense -> Logout -> Refresh Rejection', () => {
 
@@ -14,8 +15,8 @@ describe('Sprint 1 Full Lifecycle: Register -> Login -> Refresh Rotation -> Repl
   let refreshCookie = '';
   let rotatedRefreshCookie = '';
 
-  it('Step A: Register a unique candidate test user', async () => {
-    const res = await request(app)
+  it('Step A: Register a unique candidate test user and verify OTP', async () => {
+    const regRes = await request(app)
       .post('/api/v1/auth/register')
       .send({
         email: testEmail,
@@ -23,16 +24,37 @@ describe('Sprint 1 Full Lifecycle: Register -> Login -> Refresh Rotation -> Repl
         fullName: testFullName
       });
 
-    assert.strictEqual(res.status, 201, `Expected 201 Created, got ${res.status}`);
-    assert.strictEqual(res.body.success, true);
-    assert.strictEqual(res.body.data.user.email, testEmail.toLowerCase());
-    assert.strictEqual(res.body.data.user.role, 'CANDIDATE');
-    assert.strictEqual(res.body.data.user.passwordHash, undefined, 'passwordHash must never be returned');
-    assert.strictEqual(res.body.data.user.candidateProfile?.fullName, testFullName);
-    assert.ok(res.body.data.accessToken, 'Access token must be returned');
+    assert.strictEqual(regRes.status, 200, `Expected 200 OK from register OTP initiation, got ${regRes.status}`);
+    assert.strictEqual(regRes.body.success, true);
+    assert.strictEqual(regRes.body.data.email, testEmail.toLowerCase());
+    assert.strictEqual(regRes.body.data.requiresVerification, true);
+
+    // Retrieve generated OTP from mock sent emails
+    const sent = EmailService.getSentEmails().find(e => e.to === testEmail.toLowerCase() && e.subject.includes('Verification Code'));
+    assert.ok(sent, 'Verification email should be dispatched');
+    const otpMatch = (sent.text || '').match(/\b(\d{6})\b/) || sent.html.match(/>\s*(\d{6})\s*</);
+    assert.ok(otpMatch, '6-digit OTP code must be present in email');
+    const validCode = otpMatch[1];
+
+    // Complete Step 2: Verify registration OTP
+    const verifyRes = await request(app)
+      .post('/api/v1/auth/verify-otp')
+      .send({
+        email: testEmail,
+        code: validCode,
+        purpose: 'SIGNUP'
+      });
+
+    assert.strictEqual(verifyRes.status, 200, `Expected 200 OK from verify-otp, got ${verifyRes.status}`);
+    assert.strictEqual(verifyRes.body.success, true);
+    assert.strictEqual(verifyRes.body.data.user.email, testEmail.toLowerCase());
+    assert.strictEqual(verifyRes.body.data.user.role, 'CANDIDATE');
+    assert.strictEqual(verifyRes.body.data.user.passwordHash, undefined, 'passwordHash must never be returned');
+    assert.strictEqual(verifyRes.body.data.user.candidateProfile?.fullName, testFullName);
+    assert.ok(verifyRes.body.data.accessToken, 'Access token must be returned');
 
     // Verify Set-Cookie header contains pm_refresh_token
-    const cookies = res.headers['set-cookie'];
+    const cookies = verifyRes.headers['set-cookie'];
     assert.ok(Array.isArray(cookies), 'set-cookie header array expected');
     const cookieHeader = cookies.find((c: string) => c.startsWith('pm_refresh_token='));
     assert.ok(cookieHeader, 'pm_refresh_token cookie must be set');

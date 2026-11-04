@@ -155,16 +155,60 @@ export const App: React.FC = () => {
 
   const { user, isAuthenticated, isLoading: isAuthLoading } = useAuth();
 
+  // Route protection for candidate-only private views
+  const protectedCandidateTabs = [
+    'dashboard',
+    'profile',
+    'resumes',
+    'studio',
+    'analysis',
+    'applications',
+    'saved-jobs',
+    'interview',
+    'career',
+    'learning',
+    'agent',
+    'settings'
+  ];
+
+  // If already authenticated and visiting auth route, forward to primary dashboard
+  React.useEffect(() => {
+    if (!isAuthLoading && isAuthenticated && currentTab === 'auth') {
+      const target = user?.role === 'ADMIN' ? 'admin' : (user?.role === 'EMPLOYER' ? 'employer' : 'dashboard');
+      handleNavigate(target);
+    }
+  }, [isAuthLoading, isAuthenticated, currentTab, user?.role]);
+
   // Initial Full-Viewport Bootstrap Loading Screen
   if (isAuthLoading) {
     return <PilotMamaLoadingScreen fullScreen={true} statusText="Initializing your career workspace…" />;
+  }
+
+  // If unauthenticated and accessing a protected candidate tab, redirect to auth
+  if (!isAuthenticated && protectedCandidateTabs.includes(currentTab)) {
+    return (
+      <AuthLayout onNavigateHome={() => handleNavigate('jobs')}>
+        <Suspense fallback={<RouteLoadingFallback />}>
+          <AuthPage
+            initialMode="login"
+            onSuccess={() => handleNavigate('dashboard')}
+            onNavigateMode={(mode) => {
+              const targetPath = mode === 'register' ? '/register' : '/login';
+              if (window.location.pathname !== targetPath) {
+                window.history.pushState({}, '', targetPath);
+              }
+            }}
+          />
+        </Suspense>
+      </AuthLayout>
+    );
   }
 
   // Dedicated Public Authentication Layout (isolated from candidate AppShell)
   if (currentTab === 'auth') {
     const isRegisterRoute = window.location.pathname.toLowerCase().includes('/register');
     return (
-      <AuthLayout onNavigateHome={() => handleNavigate('dashboard')}>
+      <AuthLayout onNavigateHome={() => handleNavigate('jobs')}>
         <Suspense fallback={<RouteLoadingFallback />}>
           <AuthPage
             initialMode={isRegisterRoute ? 'register' : 'login'}

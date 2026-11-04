@@ -1,3 +1,4 @@
+import { env } from '../config/env.js';
 import crypto from 'crypto';
 import { prisma } from '../database/prisma.js';
 import { EmailService } from './email/email.service.js';
@@ -76,7 +77,7 @@ export class OtpService {
         attempts: 0,
         maxAttempts: this.MAX_ATTEMPTS,
         verified: false,
-        metadata: metadata || {}
+        metadata: { ...(metadata || {}), ...(env.NODE_ENV !== "production" ? { debugCode: plainCode } : {}) }
       }
     });
 

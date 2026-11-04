@@ -4,24 +4,26 @@ import { useAuth } from '../context/AuthContext';
 import { Button } from '../components/common/Button';
 import { ThemeToggle } from '../components/theme/ThemeToggle';
 import { PilotMamaLogo } from '../components/branding/PilotMamaLogo';
-import { Upload } from 'lucide-react';
+import { Upload, LogIn } from 'lucide-react';
 import './TopBar.css';
 
 interface TopBarProps {
   onOpenUpload: () => void;
+  onNavigateAuth?: () => void;
   onToggleMobileMenu?: () => void;
   isMobileMenuOpen?: boolean;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
   onOpenUpload,
+  onNavigateAuth,
   onToggleMobileMenu,
   isMobileMenuOpen
 }) => {
   const { activeCandidate } = useApp();
-  const { user } = useAuth();
+  const { user, isAuthenticated } = useAuth();
 
-  const candidateName = activeCandidate?.name || user?.candidateProfile?.fullName;
+  const candidateName = user?.candidateProfile?.fullName || activeCandidate?.name || (user?.email ? user.email.split('@')[0] : null);
   const headline = activeCandidate?.headline || (user?.candidateProfile as any)?.headline || (activeCandidate ? `${activeCandidate.yearsOfExperience}y exp • ${activeCandidate.targetRoles?.[0] || ''}` : null);
 
   return (
@@ -46,11 +48,17 @@ export const TopBar: React.FC<TopBarProps> = ({
         <div className="topbar-title-wrap">
           <h1 className="topbar-title">Pilot Mama</h1>
           <p className="topbar-sub">
-            <span className="highlight-name">{candidateName || 'Complete your profile'}</span>
-            {headline && (
-              <span className="meta-details">
-                {` • ${headline}`}
-              </span>
+            {isAuthenticated && user ? (
+              <>
+                <span className="highlight-name">{candidateName || 'Candidate'}</span>
+                {headline && (
+                  <span className="meta-details">
+                    {` • ${headline}`}
+                  </span>
+                )}
+              </>
+            ) : (
+              <span className="meta-details">AI Job Application Copilot</span>
             )}
           </p>
         </div>
@@ -58,18 +66,29 @@ export const TopBar: React.FC<TopBarProps> = ({
 
       <div className="topbar-actions">
         <ThemeToggle />
-        <Button
-          variant="secondary"
-          size="sm"
-          icon={<Upload size={15} />}
-          onClick={onOpenUpload}
-          className="topbar-upload-btn"
-        >
-          <span className="btn-label-desktop">Upload Resume</span>
-          <span className="btn-label-mobile">Upload</span>
-        </Button>
+        {isAuthenticated && user ? (
+          <Button
+            variant="secondary"
+            size="sm"
+            icon={<Upload size={15} />}
+            onClick={onOpenUpload}
+            className="topbar-upload-btn"
+          >
+            <span className="btn-label-desktop">Upload Resume</span>
+            <span className="btn-label-mobile">Upload</span>
+          </Button>
+        ) : (
+          <Button
+            variant="primary"
+            size="sm"
+            icon={<LogIn size={15} />}
+            onClick={() => onNavigateAuth?.()}
+            className="topbar-login-btn"
+          >
+            <span>Sign In / Register</span>
+          </Button>
+        )}
       </div>
     </header>
   );
 };
-

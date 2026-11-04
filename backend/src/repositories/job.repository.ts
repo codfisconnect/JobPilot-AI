@@ -3,12 +3,26 @@ import { Job, JobStatus, RemoteType, EmploymentType, Prisma } from '@prisma/clie
 import { NormalizedJobData } from '../services/jobNormalization.service.js';
 import { logger } from '../utils/logger.js';
 
+export interface JobSuggestionItem {
+  label: string;
+  value: string;
+  category: 'SKILL' | 'TECHNOLOGY' | 'ROLE' | 'LOCATION' | 'COMPANY';
+  id?: string;
+  metadata?: any;
+}
+
 export interface JobFilterParams {
   query?: string;
+  q?: string;
   title?: string;
   companyId?: string;
   companyName?: string;
   skill?: string;
+  skills?: string[];
+  roles?: string[];
+  locations?: string[];
+  companies?: string[];
+  technologies?: string[];
   location?: string;
   country?: string;
   city?: string;
@@ -228,6 +242,131 @@ export class JobRepositoryV1 {
   /**
    * Search and filter jobs using PostgreSQL indexes and pagination
    */
+  /**
+   * Fast autocomplete suggestions across Skills, Roles, Locations, and Companies
+   */
+  public static async getSuggestions(query: string, categories?: string[]): Promise<JobSuggestionItem[]> {
+    const q = query.trim();
+    if (!q || q.length < 2) return [];
+
+    const cats = categories && categories.length > 0 ? categories.map(c => c.toUpperCase()) : ['SKILL', 'TECHNOLOGY', 'ROLE', 'LOCATION', 'COMPANY'];
+    const results: JobSuggestionItem[] = [];
+    const seenValues = new Set<string>();
+    const promises: Promise<void>[] = [];
+
+    // 1. SKILLS & TECHNOLOGIES
+    if (cats.includes('SKILL') || cats.includes('TECHNOLOGY')) {
+      promises.push(
+        prisma.skill.findMany({
+          where: { name: { contains: q, mode: 'insensitive' } },
+          select: { id: true, name: true, category: true },
+          take: 8
+        }).then(skills => {
+          for (const s of skills) {
+            const key = `skill:${s.name.toLowerCase()}`;
+            if (!seenValues.has(key)) {
+              seenValues.add(key);
+              const isTech = s.category === 'TOOL';
+              results.push({
+                label: s.name,
+                value: s.name,
+                category: isTech ? 'TECHNOLOGY' : 'SKILL',
+                id: s.id
+              });
+            }
+          }
+        }).catch(() => {})
+      );
+    }
+
+    // 2. ROLES / TITLES
+    if (cats.includes('ROLE')) {
+      promises.push(
+        prisma.job.findMany({
+          where: {
+            title: { contains: q, mode: 'insensitive' },
+            status: JobStatus.ACTIVE
+          },
+          select: { title: true },
+          distinct: ['title'],
+          take: 6
+        }).then(jobs => {
+          for (const j of jobs) {
+            const key = `role:${j.title.toLowerCase()}`;
+            if (!seenValues.has(key)) {
+              seenValues.add(key);
+              results.push({
+                label: j.title,
+                value: j.title,
+                category: 'ROLE'
+              });
+            }
+          }
+        }).catch(() => {})
+      );
+    }
+
+    // 3. LOCATIONS
+    if (cats.includes('LOCATION')) {
+      promises.push(
+        prisma.job.findMany({
+          where: {
+            OR: [
+              { location: { contains: q, mode: 'insensitive' } },
+              { city: { contains: q, mode: 'insensitive' } }
+            ],
+            status: JobStatus.ACTIVE
+          },
+          select: { location: true, city: true },
+          distinct: ['location'],
+          take: 6
+        }).then(jobs => {
+          for (const j of jobs) {
+            const loc = j.location?.trim() || j.city?.trim();
+            if (loc) {
+              const key = `loc:${loc.toLowerCase()}`;
+              if (!seenValues.has(key)) {
+                seenValues.add(key);
+                results.push({
+                  label: loc,
+                  value: loc,
+                  category: 'LOCATION'
+                });
+              }
+            }
+          }
+        }).catch(() => {})
+      );
+    }
+
+    // 4. COMPANIES
+    if (cats.includes('COMPANY')) {
+      promises.push(
+        prisma.company.findMany({
+          where: { name: { contains: q, mode: 'insensitive' } },
+          select: { id: true, name: true },
+          take: 5
+        }).then(companies => {
+          for (const c of companies) {
+            const key = `comp:${c.name.toLowerCase()}`;
+            if (!seenValues.has(key)) {
+              seenValues.add(key);
+              results.push({
+                label: c.name,
+                value: c.name,
+                category: 'COMPANY',
+                id: c.id
+              });
+            }
+          }
+        }).catch(() => {})
+      );
+    }
+
+    await Promise.all(promises);
+    return results.slice(0, 15);
+  }
+
   public static async searchJobs(params: JobFilterParams) {
     const page = Math.max(1, params.page || 1);
     const pageSize = Math.min(100, Math.max(1, params.pageSize || 20));
@@ -237,14 +376,70 @@ export class JobRepositoryV1 {
       status: params.status || JobStatus.ACTIVE
     };
 
-    if (params.query) {
-      const q = params.query.trim();
-      where.OR = [
-        { title: { contains: q, mode: 'insensitive' } },
-        { description: { contains: q, mode: 'insensitive' } },
-        { location: { contains: q, mode: 'insensitive' } },
-        { company: { name: { contains: q, mode: 'insensitive' } } }
-      ];
+    const andConditions: Prisma.JobWhereInput[] = [];
+
+    // Structured Skills/Technologies filter (OR within same category)
+    const allSkills = [...(params.skills || []), ...(params.technologies || [])].filter(Boolean);
+    if (allSkills.length > 0) {
+      andConditions.push({
+        OR: allSkills.map(sk => ({
+          OR: [
+            { skills: { some: { skill: { name: { contains: sk.trim(), mode: 'insensitive' } } } } },
+            { description: { contains: sk.trim(), mode: 'insensitive' } },
+            { title: { contains: sk.trim(), mode: 'insensitive' } }
+          ]
+        }))
+      });
+    }
+
+    // Structured Roles filter (OR within same category)
+    if (params.roles && params.roles.length > 0) {
+      andConditions.push({
+        OR: params.roles.map(r => ({
+          title: { contains: r.trim(), mode: 'insensitive' }
+        }))
+      });
+    }
+
+    // Structured Locations filter (OR within same category)
+    if (params.locations && params.locations.length > 0) {
+      andConditions.push({
+        OR: params.locations.map(loc => ({
+          OR: [
+            { location: { contains: loc.trim(), mode: 'insensitive' } },
+            { city: { contains: loc.trim(), mode: 'insensitive' } },
+            { stateProvince: { contains: loc.trim(), mode: 'insensitive' } },
+            { country: { contains: loc.trim(), mode: 'insensitive' } }
+          ]
+        }))
+      });
+    }
+
+    // Structured Companies filter (OR within same category)
+    if (params.companies && params.companies.length > 0) {
+      andConditions.push({
+        OR: params.companies.map(c => ({
+          company: { name: { contains: c.trim(), mode: 'insensitive' } }
+        }))
+      });
+    }
+
+    // Free text search fallback (OR across fields)
+    const freeText = (params.q || params.query)?.trim();
+    if (freeText) {
+      andConditions.push({
+        OR: [
+          { title: { contains: freeText, mode: 'insensitive' } },
+          { description: { contains: freeText, mode: 'insensitive' } },
+          { location: { contains: freeText, mode: 'insensitive' } },
+          { company: { name: { contains: freeText, mode: 'insensitive' } } },
+          { skills: { some: { skill: { name: { contains: freeText, mode: 'insensitive' } } } } }
+        ]
+      });
+    }
+
+    if (andConditions.length > 0) {
+      where.AND = andConditions;
     }
 
     if (params.title) {

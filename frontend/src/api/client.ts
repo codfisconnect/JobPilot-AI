@@ -27,12 +27,48 @@ const API_V1_BASE = (import.meta.env?.VITE_API_URL) || (import.meta.env?.PROD ? 
 
 export class ApiClient {
   private accessToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('pilotmama_access_token') : null;
+  private refreshTokenVal: string | null = typeof window !== 'undefined' ? localStorage.getItem('pilotmama_refresh_token') : null;
   private memoryCache = new Map<string, { data: any; expiry: number }>();
   private inflightRequests = new Map<string, Promise<any>>();
+  private onUserRefreshedCallbacks: Array<(user: User) => void> = [];
+  private onAuthClearedCallbacks: Array<() => void> = [];
+
+  onUserRefreshed(callback: (user: User) => void): () => void {
+    this.onUserRefreshedCallbacks.push(callback);
+    return () => {
+      this.onUserRefreshedCallbacks = this.onUserRefreshedCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  onAuthCleared(callback: () => void): () => void {
+    this.onAuthClearedCallbacks.push(callback);
+    return () => {
+      this.onAuthClearedCallbacks = this.onAuthClearedCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  private notifyUserRefreshed(user: User): void {
+    for (const cb of this.onUserRefreshedCallbacks) {
+      try {
+        cb(user);
+      } catch (e) {
+        console.error("Error in onUserRefreshed callback", e);
+      }
+    }
+  }
+
+  private notifyAuthCleared(): void {
+    for (const cb of this.onAuthClearedCallbacks) {
+      try {
+        cb();
+      } catch (e) {
+        console.error("Error in onAuthCleared callback", e);
+      }
+    }
+  }
 
   setToken(token: string | null) {
     this.accessToken = token;
-    // Clear user-dependent caches when token changes
     this.memoryCache.clear();
     this.inflightRequests.clear();
     if (typeof window !== 'undefined') {
@@ -40,12 +76,35 @@ export class ApiClient {
         localStorage.setItem('pilotmama_access_token', token);
       } else {
         localStorage.removeItem('pilotmama_access_token');
+        localStorage.removeItem('pilotmama_refresh_token');
+        this.refreshTokenVal = null;
       }
     }
   }
 
   getToken(): string | null {
+    if (!this.accessToken && typeof window !== 'undefined') {
+      this.accessToken = localStorage.getItem('pilotmama_access_token');
+    }
     return this.accessToken;
+  }
+
+  setRefreshToken(token: string | null) {
+    this.refreshTokenVal = token;
+    if (typeof window !== 'undefined') {
+      if (token) {
+        localStorage.setItem('pilotmama_refresh_token', token);
+      } else {
+        localStorage.removeItem('pilotmama_refresh_token');
+      }
+    }
+  }
+
+  getRefreshToken(): string | null {
+    if (!this.refreshTokenVal && typeof window !== 'undefined') {
+      this.refreshTokenVal = localStorage.getItem('pilotmama_refresh_token');
+    }
+    return this.refreshTokenVal;
   }
 
   getApiUrl(): string {
@@ -90,7 +149,8 @@ export class ApiClient {
         }
         return this.request<T>(endpoint, { ...options, headers: retryHeaders }, true);
       } catch (refreshErr) {
-        // Refresh failed; proceed to parse and throw original 401 error
+        this.setToken(null);
+        this.notifyAuthCleared();
       }
     }
 
@@ -145,7 +205,8 @@ export class ApiClient {
         }
         return this.requestRaw<T>(endpoint, { ...options, headers: retryHeaders }, true);
       } catch (refreshErr) {
-        // Refresh failed
+        this.setToken(null);
+        this.notifyAuthCleared();
       }
     }
 
@@ -203,7 +264,8 @@ export class ApiClient {
         }
         return this.requestPaginated<T>(endpoint, { ...options, headers: retryHeaders }, true);
       } catch (refreshErr) {
-        // Refresh failed; proceed to throw 401
+        this.setToken(null);
+        this.notifyAuthCleared();
       }
     }
 
@@ -246,6 +308,9 @@ export class ApiClient {
     if (res.accessToken) {
       this.setToken(res.accessToken);
     }
+    if ((res as any).refreshToken) {
+      this.setRefreshToken((res as any).refreshToken);
+    }
     return res;
   }
 
@@ -271,6 +336,9 @@ export class ApiClient {
     if (res?.accessToken) {
       this.setToken(res.accessToken);
     }
+    if (res?.refreshToken) {
+      this.setRefreshToken(res.refreshToken);
+    }
     return res;
   }
 
@@ -288,6 +356,9 @@ export class ApiClient {
       body: JSON.stringify(body)
     });
     this.setToken(res.accessToken);
+    if ((res as any).refreshToken) {
+      this.setRefreshToken((res as any).refreshToken);
+    }
     return res;
   }
 
@@ -298,6 +369,9 @@ export class ApiClient {
       body: JSON.stringify(body)
     });
     this.setToken(res.accessToken);
+    if ((res as any).refreshToken) {
+      this.setRefreshToken((res as any).refreshToken);
+    }
     return res;
   }
 
@@ -309,12 +383,26 @@ export class ApiClient {
       return this.refreshPromise;
     }
 
-    this.refreshPromise = this.request<AuthResponse>('/auth/refresh', {
-      method: 'POST'
-    })
+    const fallbackRefreshToken = this.getRefreshToken();
+    const reqOptions: RequestInit = { method: 'POST' };
+    if (fallbackRefreshToken) {
+      reqOptions.headers = { 'Content-Type': 'application/json' };
+      reqOptions.body = JSON.stringify({ refreshToken: fallbackRefreshToken });
+    }
+
+    this.refreshPromise = this.request<AuthResponse>('/auth/refresh', reqOptions)
       .then(res => {
-        this.setToken(res.accessToken);
-        return res;
+        const data = (res as any)?.data || res;
+        if (data.accessToken) {
+          this.setToken(data.accessToken);
+        }
+        if ((data as any).refreshToken) {
+          this.setRefreshToken((data as any).refreshToken);
+        }
+        if (data.user) {
+          this.notifyUserRefreshed(data.user);
+        }
+        return data as AuthResponse;
       })
       .finally(() => {
         this.refreshPromise = null;
@@ -330,6 +418,7 @@ export class ApiClient {
       });
     } finally {
       this.setToken(null);
+      this.notifyAuthCleared();
     }
   }
 
@@ -493,6 +582,16 @@ export class ApiClient {
   }
 
   async uploadResume(file: File, title?: string, isRetry: boolean = false): Promise<any> {
+    if (this.refreshPromise) {
+      try {
+        await this.refreshPromise;
+      } catch {}
+    }
+
+    if (!this.accessToken && typeof window !== 'undefined') {
+      this.accessToken = localStorage.getItem('pilotmama_access_token');
+    }
+
     const formData = new FormData();
     formData.append('resume', file);
     if (title) formData.append('title', title);
@@ -514,7 +613,8 @@ export class ApiClient {
         await this.refresh();
         return this.uploadResume(file, title, true);
       } catch (refreshErr) {
-        // Refresh failed; proceed to throw 401
+        this.setToken(null);
+        this.notifyAuthCleared();
       }
     }
 
@@ -526,6 +626,16 @@ export class ApiClient {
   }
 
   async replaceResumeFile(id: string, file: File, isRetry: boolean = false): Promise<any> {
+    if (this.refreshPromise) {
+      try {
+        await this.refreshPromise;
+      } catch {}
+    }
+
+    if (!this.accessToken && typeof window !== 'undefined') {
+      this.accessToken = localStorage.getItem('pilotmama_access_token');
+    }
+
     const formData = new FormData();
     formData.append('resume', file);
 
@@ -546,13 +656,14 @@ export class ApiClient {
         await this.refresh();
         return this.replaceResumeFile(id, file, true);
       } catch (refreshErr) {
-        // Refresh failed; proceed to throw 401
+        this.setToken(null);
+        this.notifyAuthCleared();
       }
     }
 
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
-      throw json.error || { code: `HTTP_${res.status}`, message: json.message || 'Replacement failed' };
+      throw json.error || { code: `HTTP_${res.status}`, message: json.message || 'Replace failed' };
     }
     return json.data;
   }
@@ -586,12 +697,28 @@ export class ApiClient {
     return this.request<any>(`/resume-versions/${versionId}`);
   }
 
+  async getJobSuggestions(query: string, categories?: string[]): Promise<Array<{ label: string; value: string; category: 'SKILL' | 'TECHNOLOGY' | 'ROLE' | 'LOCATION' | 'COMPANY'; id?: string }>> {
+    const qs = new URLSearchParams();
+    if (query) qs.append('q', query);
+    if (categories && categories.length > 0) {
+      categories.forEach(c => qs.append('categories', c));
+    }
+    const res = await this.request<any>(`/jobs/suggestions?${qs.toString()}`);
+    return Array.isArray(res) ? res : (res?.data || []);
+  }
+
   // Sprint 3 Canonical Job Engine Methods
   async getCanonicalJobs(params: Record<string, any> = {}, options: { bypassCache?: boolean } = {}): Promise<PaginatedResponse<CanonicalJob>> {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') {
-        query.append(k, String(v));
+        if (Array.isArray(v)) {
+          v.forEach(item => {
+            if (item) query.append(k, String(item));
+          });
+        } else {
+          query.append(k, String(v));
+        }
       }
     });
     const qs = query.toString();
@@ -627,7 +754,13 @@ export class ApiClient {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') {
-        query.append(k, String(v));
+        if (Array.isArray(v)) {
+          v.forEach(item => {
+            if (item) query.append(k, String(item));
+          });
+        } else {
+          query.append(k, String(v));
+        }
       }
     });
     const qs = query.toString();
@@ -715,7 +848,13 @@ export class ApiClient {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') {
-        query.append(k, String(v));
+        if (Array.isArray(v)) {
+          v.forEach(item => {
+            if (item) query.append(k, String(item));
+          });
+        } else {
+          query.append(k, String(v));
+        }
       }
     });
     const qs = query.toString();

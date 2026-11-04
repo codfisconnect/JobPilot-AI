@@ -8,10 +8,35 @@ export class JobControllerV1 {
   /**
    * GET /api/v1/jobs - Query and filter canonical jobs
    */
+  /**
+   * GET /api/v1/jobs/suggestions - Fast multi-category search suggestions
+   */
+  public static async getSuggestions(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const q = String(req.query.q || req.query.query || '').trim();
+      const rawCats = req.query.categories || req.query['categories[]'];
+      let categories: string[] | undefined = undefined;
+      if (Array.isArray(rawCats)) {
+        categories = rawCats.map(String);
+      } else if (typeof rawCats === 'string') {
+        categories = rawCats.split(',').map(s => s.trim());
+      }
+
+      const suggestions = await JobQueryService.getSuggestions(q, categories);
+      res.status(200).json({
+        success: true,
+        data: suggestions
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
   public static async listJobs(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const {
         query,
+        q,
         title,
         companyId,
         companyName,
@@ -35,6 +60,21 @@ export class JobControllerV1 {
         lightweight
       } = req.query;
 
+      const parseArrayParam = (val: any): string[] => {
+        if (!val) return [];
+        if (Array.isArray(val)) return val.map(String).map(s => s.trim()).filter(Boolean);
+        if (typeof val === 'string') {
+          return val.split(',').map(s => s.trim()).filter(Boolean);
+        }
+        return [];
+      };
+
+      const skills = parseArrayParam(req.query.skills || req.query['skills[]']);
+      const roles = parseArrayParam(req.query.roles || req.query['roles[]']);
+      const locations = parseArrayParam(req.query.locations || req.query['locations[]']);
+      const companies = parseArrayParam(req.query.companies || req.query['companies[]']);
+      const technologies = parseArrayParam(req.query.technologies || req.query['technologies[]']);
+
       const parsedPage = Math.max(1, Math.min(10000, Number(page) || 1));
       const parsedPageSize = Math.max(1, Math.min(100, Number(pageSize) || 20));
       const isLightweight = lightweight === 'true' || lightweight === '1' || parsedPageSize <= 6;
@@ -53,7 +93,13 @@ export class JobControllerV1 {
         : 'latest';
 
       const result = await JobQueryService.searchJobs({
-        query: query ? String(query).slice(0, 200) : undefined,
+        query: (query || q) ? String(query || q).slice(0, 200) : undefined,
+        q: (q || query) ? String(q || query).slice(0, 200) : undefined,
+        skills: skills.length > 0 ? skills : (skill ? [String(skill)] : undefined),
+        roles: roles.length > 0 ? roles : undefined,
+        locations: locations.length > 0 ? locations : undefined,
+        companies: companies.length > 0 ? companies : undefined,
+        technologies: technologies.length > 0 ? technologies : undefined,
         title: title ? String(title).slice(0, 100) : undefined,
         companyId: companyId ? String(companyId) : undefined,
         companyName: companyName ? String(companyName).slice(0, 100) : undefined,

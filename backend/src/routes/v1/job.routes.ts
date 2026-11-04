@@ -8,6 +8,7 @@ export const jobRouter = Router();
 
 // Personalized Recommendations Route (Registered before /:id wildcard)
 jobRouter.get('/recommended', optionalAuthenticateJwt, JobControllerV1.getRecommendedJobs);
+jobRouter.get('/suggestions', optionalAuthenticateJwt, JobControllerV1.getSuggestions);
 
 // Public or Authenticated Job Search and Detail (candidates discover jobs without requiring an admin token)
 jobRouter.get('/', optionalAuthenticateJwt, JobControllerV1.listJobs);

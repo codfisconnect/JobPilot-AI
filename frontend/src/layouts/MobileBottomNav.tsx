@@ -4,8 +4,11 @@ import {
   Briefcase,
   Send,
   GraduationCap,
+  CreditCard,
+  LogIn,
   Menu
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import './MobileBottomNav.css';
 
 interface MobileBottomNavProps {
@@ -21,12 +24,22 @@ export const MobileBottomNav: React.FC<MobileBottomNavProps> = ({
   onOpenMobileMenu,
   isMobileMenuOpen
 }) => {
-  const navItems = [
+  const { user, isAuthenticated } = useAuth();
+
+  const candidateNavItems = [
     { id: 'dashboard', label: 'Home', icon: LayoutDashboard },
     { id: 'jobs', label: 'Jobs', icon: Briefcase },
     { id: 'applications', label: 'Apps', icon: Send },
     { id: 'career', label: 'Career', icon: GraduationCap }
   ];
+
+  const publicNavItems = [
+    { id: 'jobs', label: 'Jobs', icon: Briefcase },
+    { id: 'pricing', label: 'Pricing', icon: CreditCard },
+    { id: 'auth', label: 'Sign In', icon: LogIn }
+  ];
+
+  const navItems = (isAuthenticated && user) ? candidateNavItems : publicNavItems;
 
   return (
     <nav className="mobile-bottom-nav" aria-label="Mobile Bottom Navigation">

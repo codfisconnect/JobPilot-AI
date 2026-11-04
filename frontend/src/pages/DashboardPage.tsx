@@ -187,7 +187,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   if ((profile?.certifications?.length || 0) > 0 || (profile?.projects?.length || 0) > 0) completionPoints += 5;
   const completeness = Math.min(100, completionPoints);
 
-  const candidateName = activeCandidate?.name || profile?.fullName || user?.candidateProfile?.fullName || user?.email?.split('@')[0] || 'Candidate';
+  const candidateName = user?.candidateProfile?.fullName || profile?.fullName || activeCandidate?.name || user?.email?.split('@')[0] || 'Candidate';
   const masterResume = resumes.find(r => r.isMaster) || resumes[0];
 
   const formatRelativeDate = (dateStr?: string) => {

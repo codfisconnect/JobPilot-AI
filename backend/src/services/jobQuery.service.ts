@@ -6,6 +6,13 @@ export class JobQueryService {
   /**
    * Search and filter canonical jobs
    */
+  /**
+   * Autocomplete suggestions across Skills, Roles, Locations, Companies
+   */
+  public static async getSuggestions(query: string, categories?: string[]) {
+    return JobRepositoryV1.getSuggestions(query, categories);
+  }
+
   public static async searchJobs(params: JobFilterParams) {
     return JobRepositoryV1.searchJobs(params);
   }

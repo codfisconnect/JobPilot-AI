@@ -164,9 +164,10 @@
 
 .search-filter-bar {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  gap: 14px;
   background: var(--bg-surface);
   border: 1px solid var(--border-primary);
   border-radius: var(--radius-md);
