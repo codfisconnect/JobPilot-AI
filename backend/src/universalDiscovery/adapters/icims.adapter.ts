@@ -46,12 +46,22 @@ export class IcimsAdapter implements IJobSourceStrategy {
           const href = titleEl.attr('href');
           const location = $(el).find('.iCIMS_JobLocation, .location').text().trim();
 
+          const snippet = $(el).find('.description, .snippet, .iCIMS_JobSummary, .iCIMS_JobDescription').text().trim();
           if (title && title.length > 2) {
+            let description = snippet;
+            if (!description || description.trim().toLowerCase() === title.trim().toLowerCase()) {
+              const descParts = [
+                `${title} opportunity at ${companyName}.`,
+                location ? `Location: ${location}.` : '',
+                'Please review full job requirements and apply directly via the employer career portal.'
+              ].filter(Boolean);
+              description = descParts.join(' ');
+            }
             allJobs.push({
               title,
               location: location || undefined,
               applicationUrl: href ? new URL(href, targetUrl).toString() : undefined,
-              description: title
+              description
             });
           }
         });

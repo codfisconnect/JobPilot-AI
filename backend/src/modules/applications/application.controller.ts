@@ -273,7 +273,70 @@ export class ApplicationController {
     }
   }
 
-  // POST /api/v1/applications/start
+  // POST /api/v1/applications/orchestrate/start
+  public static async startOrchestration(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const { ApplicationOrchestratorService } = await import('./applicationOrchestrator.service.js');
+      const attempt = await ApplicationOrchestratorService.startAttempt(userId, req.body);
+      res.status(201).json({
+        success: true,
+        data: attempt
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // GET /api/v1/applications/orchestrate/:attemptId/status
+  public static async getOrchestrationStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const attemptId = Array.isArray(req.params.attemptId) ? req.params.attemptId[0] : req.params.attemptId;
+      const { ApplicationOrchestratorService } = await import('./applicationOrchestrator.service.js');
+      const attempt = ApplicationOrchestratorService.getAttemptStatus(userId, attemptId);
+      res.json({
+        success: true,
+        data: attempt
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // POST /api/v1/applications/orchestrate/:attemptId/respond
+  public static async respondMissingField(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const attemptId = Array.isArray(req.params.attemptId) ? req.params.attemptId[0] : req.params.attemptId;
+      const { ApplicationOrchestratorService } = await import('./applicationOrchestrator.service.js');
+      const attempt = await ApplicationOrchestratorService.respondMissingField(userId, attemptId, req.body);
+      res.json({
+        success: true,
+        data: attempt
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // POST /api/v1/applications/orchestrate/:attemptId/cancel
+  public static async cancelOrchestration(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const userId = req.user!.userId;
+      const attemptId = Array.isArray(req.params.attemptId) ? req.params.attemptId[0] : req.params.attemptId;
+      const { ApplicationOrchestratorService } = await import('./applicationOrchestrator.service.js');
+      const result = ApplicationOrchestratorService.cancelAttempt(userId, attemptId);
+      res.json({
+        success: true,
+        data: result
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  // POST /api/v1/applications/start (legacy bridge)
   public static async startApplication(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const userId = req.user!.userId;
@@ -294,7 +357,7 @@ export class ApplicationController {
     }
   }
 
-  // GET /api/v1/applications/tasks/:taskId
+  // GET /api/v1/applications/tasks/:taskId (legacy bridge)
   public static async getTaskStatus(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const taskId = Array.isArray(req.params.taskId) ? req.params.taskId[0] : req.params.taskId;
@@ -310,4 +373,5 @@ export class ApplicationController {
     }
   }
 }
+
 

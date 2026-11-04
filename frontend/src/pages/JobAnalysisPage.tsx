@@ -90,8 +90,14 @@ export const JobAnalysisPage: React.FC<JobAnalysisPageProps> = ({
               source: v1Job.sourceName || v1Job.sourceType,
               sourceType: v1Job.sourceType,
               sourceUrl: v1Job.sourceUrl || v1Job.applicationUrl,
+              applicationUrl: v1Job.applicationUrl || v1Job.sourceUrl,
               rawText: v1Job.description,
-              applicationMode: 'external'
+              responsibilities: v1Job.responsibilities || [],
+              qualifications: v1Job.requirements || [],
+              mustHaveSkills: v1Job.requirements || [],
+              niceToHaveSkills: v1Job.preferredQualifications || [],
+              applicationMode: 'external',
+              createdAt: v1Job.firstSeenAt || new Date().toISOString()
             });
           }
 

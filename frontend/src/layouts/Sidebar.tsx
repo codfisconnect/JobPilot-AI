@@ -33,9 +33,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
   onCloseMobile
 }) => {
   const { activeCandidate, candidates, setActiveCandidate } = useApp();
-  const { user, logout } = useAuth();
 
-  const menuItems = [
+
+  const { user, isAuthenticated, logout } = useAuth();
+
+  const candidateMenuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
     { id: 'profile', label: 'My Profile', icon: User },
     { id: 'resumes', label: 'My Resume', icon: FileText },
@@ -45,6 +47,13 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'interview', label: 'Interview Prep', icon: Headphones },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];
+
+  const publicMenuItems = [
+    { id: 'jobs', label: 'Explore Jobs', icon: Briefcase },
+    { id: 'pricing', label: 'Pricing & Plans', icon: CreditCard },
+  ];
+
+  const menuItems = (isAuthenticated && user) ? candidateMenuItems : publicMenuItems;
 
 
   const handleItemClick = (id: string) => {
@@ -106,11 +115,11 @@ export const Sidebar: React.FC<SidebarProps> = ({
           <p className="footer-sub">Candidate & Job Discovery Engine</p>
         </div>
 
-        {user ? (
+        {isAuthenticated && user ? (
           <div className="sidebar-user-section" style={{ marginTop: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
             <div style={{ overflow: 'hidden' }}>
               <div style={{ fontSize: '0.8125rem', fontWeight: 600, color: 'var(--text-primary)', textOverflow: 'ellipsis', overflow: 'hidden', whiteSpace: 'nowrap' }}>
-                {activeCandidate?.name || user.candidateProfile?.fullName || user.email.split('@')[0]}
+                {user.candidateProfile?.fullName || activeCandidate?.name || user.email.split('@')[0]}
               </div>
               <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                 {user.role}

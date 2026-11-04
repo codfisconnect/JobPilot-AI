@@ -43,7 +43,7 @@ export class JobNormalizationService {
     try {
       const $ = cheerio.load(rawHtml);
       // Remove dangerous and non-content elements
-      $('script, style, iframe, object, embed, applet, noscript, link, form, input, button, svg, meta').remove();
+      $('script, style, iframe, object, embed, applet, noscript, link, form, input, button, svg, meta, head').remove();
       // Remove malicious attributes like onload, onclick, javascript: urls
       $('*').each((_, el) => {
         const attribs = (el as any).attribs;
@@ -55,9 +55,26 @@ export class JobNormalizationService {
           });
         }
       });
-      return $.text().trim();
+      // Preserve readable block spacing and list structure
+      $('br').replaceWith('\n');
+      $('li').each((_, el) => {
+        $(el).prepend('• ');
+        $(el).append('\n');
+      });
+      $('p, div, h1, h2, h3, h4, h5, h6, tr').each((_, el) => {
+        $(el).append('\n');
+      });
+      const text = $.text();
+      return text
+        .replace(/\r\n/g, '\n')
+        .replace(/\n{3,}/g, '\n\n')
+        .split('\n')
+        .map(l => l.trim())
+        .filter((l, i, arr) => l.length > 0 || (i > 0 && arr[i - 1].length > 0))
+        .join('\n')
+        .trim();
     } catch {
-      return rawHtml.replace(/<[^>]*>?/gm, '').trim();
+      return rawHtml.replace(/<[^>]*>?/gm, ' ').replace(/\s+/g, ' ').trim();
     }
   }
 

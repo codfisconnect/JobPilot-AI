@@ -479,8 +479,41 @@ export class JobSourceDiscoveryService {
           if (!mapped.location && (rawItem.location || rawItem.displayLocation || (rawItem.rawPayload && (rawItem.rawPayload.displayLocation || rawItem.rawPayload.location)))) {
             mapped.location = rawItem.location || rawItem.displayLocation || rawItem.rawPayload.displayLocation || rawItem.rawPayload.location;
           }
-          if (!mapped.applicationUrl && (rawItem.jobUrl || rawItem.applicationUrl || (rawItem.rawPayload && (rawItem.rawPayload.jobUrl || rawItem.rawPayload.applicationUrl)))) {
-            mapped.applicationUrl = rawItem.jobUrl || rawItem.applicationUrl || rawItem.rawPayload.jobUrl || rawItem.rawPayload.applicationUrl;
+          // Exact application URL preservation: adapter-produced applicationUrl/jobUrl MUST take precedence over generic careersUrl
+          const exactTargetUrl = rawItem.applicationUrl || rawItem.jobUrl || (rawItem.rawPayload && (rawItem.rawPayload.jobUrl || rawItem.rawPayload.applicationUrl));
+          if (exactTargetUrl && (!mapped.applicationUrl || mapped.applicationUrl === defaults.careersUrl)) {
+            mapped.applicationUrl = exactTargetUrl;
+          }
+          const exactSourceUrl = rawItem.sourceUrl || rawItem.url || exactTargetUrl;
+          if (exactSourceUrl && (!mapped.sourceUrl || mapped.sourceUrl === defaults.careersUrl)) {
+            mapped.sourceUrl = exactSourceUrl;
+          }
+          const richRawDesc = rawItem.description ||
+            (rawItem.rawPayload && (rawItem.rawPayload.jobDesc || rawItem.rawPayload.jobDescription || rawItem.rawPayload.jobDescriptionHtml || rawItem.rawPayload.descriptionPlain || rawItem.rawPayload.content || rawItem.rawPayload.descriptionText || rawItem.rawPayload.details));
+          if (richRawDesc && (!mapped.descriptionText || mapped.descriptionText === mapped.title || mapped.descriptionText.length < richRawDesc.length)) {
+            mapped.descriptionText = richRawDesc;
+          }
+          if (rawItem.responsibilities && Array.isArray(rawItem.responsibilities) && rawItem.responsibilities.length > 0 && (!mapped.responsibilities || mapped.responsibilities.length === 0)) {
+            mapped.responsibilities = rawItem.responsibilities;
+          }
+          if (rawItem.requirements && Array.isArray(rawItem.requirements) && rawItem.requirements.length > 0 && (!mapped.requirements || mapped.requirements.length === 0)) {
+            mapped.requirements = rawItem.requirements;
+          }
+          if (rawItem.skills && Array.isArray(rawItem.skills) && rawItem.skills.length > 0 && (!mapped.skills || mapped.skills.length === 0)) {
+            mapped.skills = rawItem.skills;
+          }
+
+          // If descriptionText is still equal to title, attempt to build from responsibilities/requirements
+          if ((!mapped.descriptionText || mapped.descriptionText.trim().toLowerCase() === mapped.title.trim().toLowerCase()) &&
+              ((mapped.responsibilities && mapped.responsibilities.length > 0) || (mapped.requirements && mapped.requirements.length > 0))) {
+            const parts: string[] = [];
+            if (mapped.responsibilities && mapped.responsibilities.length > 0) {
+              parts.push(`Key Responsibilities:\n${mapped.responsibilities.map((r: string) => `• ${r}`).join('\n')}`);
+            }
+            if (mapped.requirements && mapped.requirements.length > 0) {
+              parts.push(`Qualifications & Requirements:\n${mapped.requirements.map((req: string) => `• ${req}`).join('\n')}`);
+            }
+            mapped.descriptionText = parts.join('\n\n');
           }
         }
 

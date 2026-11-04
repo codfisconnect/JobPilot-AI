@@ -205,11 +205,22 @@ export class SuccessFactorsAdapter implements IJobSourceStrategy {
         if (!seenIds.has(id)) {
           seenIds.add(id);
           const appUrl = jobUrl || `${baseUrl}/career?company=${encodeURIComponent(company)}&career_job_req_id=${reqId}&career_ns=job_listing`;
+          const rowSnippet = $(el).find('.jobDescription, .jobSummary, .fieldContent').text().trim();
+          let description = rowSnippet;
+          if (!description || description.trim().toLowerCase() === title.trim().toLowerCase()) {
+            const descParts = [
+              `${title} position at ${company}.`,
+              reqId ? `Requisition ID: ${reqId}.` : '',
+              location ? `Location: ${location}.` : '',
+              'Explore detailed job requirements and submit your application through the SAP SuccessFactors portal.'
+            ].filter(Boolean);
+            description = descParts.join(' ');
+          }
           allJobs.push({
             externalJobId: reqId || undefined,
             title,
             location: location || undefined,
-            description: title,
+            description,
             applicationUrl: appUrl,
             url: appUrl
           });

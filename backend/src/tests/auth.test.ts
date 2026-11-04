@@ -4,7 +4,8 @@ import { hashPassword, verifyPassword } from '../utils/password.js';
 import { signAccessToken, verifyAccessToken, signRefreshToken, verifyRefreshToken } from '../utils/jwt.js';
 import { UserRole } from '@prisma/client';
 import { RegisterSchema, LoginSchema } from '../middleware/validate.middleware.js';
-import { AuthService } from '../services/auth.service.js';
+import { AuthService, AuthSessionResult } from '../services/auth.service.js';
+import { EmailService } from '../services/email/email.service.js';
 import type { UserRepository } from '../repositories/user.repository.js';
 
 describe('Sprint 1 Production Authentication Suite', () => {
@@ -159,16 +160,52 @@ describe('Sprint 1 Production Authentication Suite', () => {
       async getProviderAccounts(userId: string) {
         const u = mockUsers.find(user => user.id === userId);
         return (u as any)?.providerAccounts || [];
+      },
+      async markEmailVerified(userId: string) {
+        const u = mockUsers.find(user => user.id === userId);
+        if (u) {
+          u.emailVerified = true;
+          u.isActive = true;
+        }
+        return u as any;
+      },
+      async updatePasswordHash(userId: string, passwordHash: string) {
+        const u = mockUsers.find(user => user.id === userId);
+        if (u) {
+          u.passwordHash = passwordHash;
+          u.emailVerified = true;
+        }
+        return u as any;
+      },
+      async updateEmail(userId: string, email: string) {
+        const u = mockUsers.find(user => user.id === userId);
+        if (u) {
+          u.email = email;
+        }
+        return u as any;
       }
     } as any;
 
     const auth = new AuthService(mockRepo);
 
-    it('should register a candidate and default to CANDIDATE role', async () => {
-      const result = await auth.register({
+    it('should register a candidate and require OTP email verification', async () => {
+      const regRes = await auth.register({
         email: 'candidate@pilotmama.com',
         password: 'Password123!',
         fullName: 'Alex Candidate'
+      });
+
+      assert.strictEqual(regRes.requiresVerification, true);
+      assert.strictEqual(regRes.email, 'candidate@pilotmama.com');
+
+      const lastEmail = EmailService.getLastEmail('candidate@pilotmama.com');
+      assert.ok(lastEmail, 'Verification email must be dispatched');
+      const otpMatch = lastEmail?.text?.match(/\b\d{6}\b/);
+      assert.ok(otpMatch, 'OTP must be in verification email');
+
+      const result = await auth.verifyRegistrationOtp({
+        email: 'candidate@pilotmama.com',
+        code: otpMatch![0]
       });
 
       assert.strictEqual(result.user.email, 'candidate@pilotmama.com');
@@ -191,10 +228,10 @@ describe('Sprint 1 Production Authentication Suite', () => {
     });
 
     it('should login with valid credentials', async () => {
-      const result = await auth.login({
+      const result = (await auth.login({
         email: 'candidate@pilotmama.com',
         password: 'Password123!'
-      });
+      })) as AuthSessionResult;
 
       assert.strictEqual(result.user.email, 'candidate@pilotmama.com');
       assert.ok(result.accessToken);
@@ -214,10 +251,10 @@ describe('Sprint 1 Production Authentication Suite', () => {
     });
 
     it('should rotate refresh token', async () => {
-      const loginRes = await auth.login({
+      const loginRes = (await auth.login({
         email: 'candidate@pilotmama.com',
         password: 'Password123!'
-      });
+      })) as AuthSessionResult;
 
       const refreshRes = await auth.refreshToken(loginRes.refreshToken);
       assert.ok(refreshRes.accessToken);

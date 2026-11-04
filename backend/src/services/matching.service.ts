@@ -93,6 +93,12 @@ export class ProductionMatchingService {
     } else if (candNormalized === 'Backend Engineering' && jobNormalized === 'Full Stack Development') {
       transitionPossible = true;
       transitionGapExplanation = 'Strong backend architecture competency; frontend reactive UI frameworks gap.';
+    } else if (candNormalized === 'Full Stack Development' && (jobNormalized === 'Backend Engineering' || jobNormalized === 'Software Engineering')) {
+      transitionPossible = true;
+      transitionGapExplanation = 'Strong full stack development background with high transferability to backend and general software engineering.';
+    } else if (candNormalized === 'Software Engineering' && (jobNormalized === 'Full Stack Development' || jobNormalized === 'Backend Engineering' || jobNormalized === 'DevOps / Cloud')) {
+      transitionPossible = true;
+      transitionGapExplanation = 'Core software engineering principles transfer directly across technical engineering disciplines.';
     } else if (candNormalized === 'QA Automation' && jobNormalized === 'Business & Systems Analysis') {
       transitionPossible = true;
       transitionGapExplanation = 'QA test execution and domain knowledge align with requirements verification in Business Analysis.';
@@ -345,24 +351,45 @@ export class ProductionMatchingService {
       throw new NotFoundError('Job opening not found');
     }
 
-    const candidateSkillNames = profile.skills.map(s => s.skill.name);
+    // Gather candidate skills from profile and Preferred/Active Resumes
+    const candidateSkillSet = new Set<string>(profile.skills.map(s => s.skill.name.toLowerCase().trim()));
+    const preferredResume = Array.isArray(profile.resumes)
+      ? profile.resumes.find((r: any) => r.isMaster) || profile.resumes[0]
+      : null;
+
+    if (preferredResume?.parsedData && Array.isArray((preferredResume.parsedData as any).skills)) {
+      for (const s of (preferredResume.parsedData as any).skills) {
+        const skillName = typeof s === 'string' ? s : s.name;
+        if (skillName && skillName.trim()) {
+          candidateSkillSet.add(skillName.toLowerCase().trim());
+        }
+      }
+    }
+
+    const candidateSkillNames = Array.from(candidateSkillSet);
     const jobRequiredSkills = job.skills.filter(s => s.skillType === 'REQUIRED').map(s => s.skill.name);
     const jobPreferredSkills = job.skills.filter(s => s.skillType === 'PREFERRED').map(s => s.skill.name);
 
     // Fallback: If job has no tagged skills yet, extract from requirements, title, or description
-    let effectiveRequired = jobRequiredSkills.length > 0 ? jobRequiredSkills : job.requirements.slice(0, 8);
-    const effectivePreferred = jobPreferredSkills.length > 0 ? jobPreferredSkills : job.preferredQualifications.slice(0, 5);
+    let effectiveRequired = jobRequiredSkills.length > 0 ? jobRequiredSkills : [];
+    const effectivePreferred = jobPreferredSkills.length > 0 ? jobPreferredSkills : [];
 
     if (effectiveRequired.length === 0) {
-      const textToScan = `${job.title} ${job.description || ''}`.toLowerCase();
+      const textToScan = `${job.title} ${job.description || ''} ${(job.requirements || []).join(' ')} ${(job.responsibilities || []).join(' ')}`.toLowerCase();
       const commonTechKeywords = [
-        'ci/cd', 'jenkins', 'gitlab', 'github actions', 'docker', 'kubernetes',
-        'ansible', 'terraform', 'aws', 'azure', 'linux', 'python', 'bash', 'shell',
-        'java', 'spring boot', 'selenium', 'playwright', 'sql', 'postgresql', 'react', 'node.js'
+        'react', 'node.js', 'nodejs', 'typescript', 'javascript', 'sql', 'postgresql', 'mysql',
+        'mongodb', 'ci/cd', 'jenkins', 'gitlab', 'github actions', 'docker', 'kubernetes',
+        'ansible', 'terraform', 'aws', 'azure', 'gcp', 'linux', 'python', 'bash', 'shell',
+        'java', 'spring boot', 'selenium', 'playwright', 'c#', '.net', 'graphql', 'rest api'
       ];
-      const detected = commonTechKeywords.filter(k => textToScan.includes(k));
+      const detected = commonTechKeywords.filter(k => {
+        const regex = new RegExp(`(?:^|[^a-zA-Z0-9_])${k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:$|[^a-zA-Z0-9_])`, 'i');
+        return regex.test(textToScan);
+      });
       if (detected.length > 0) {
         effectiveRequired = detected;
+      } else if (job.requirements.length > 0) {
+        effectiveRequired = job.requirements.slice(0, 8);
       }
     }
 

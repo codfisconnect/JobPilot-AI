@@ -51,6 +51,12 @@ export class ConflictError extends AppError {
   }
 }
 
+export class TooManyRequestsError extends AppError {
+  constructor(message = 'Too many requests. Please try again later.', details?: unknown) {
+    super(message, 429, 'TOO_MANY_REQUESTS', details);
+  }
+}
+
 export class ResumeFileMissingError extends AppError {
   constructor(message = 'Resume file is unavailable. Please upload the resume again.', details?: unknown) {
     super(message, 404, 'RESUME_FILE_MISSING', details);

@@ -1,7 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { z, type AnyZodObject } from 'zod';
 
-export function validateRequest(schema: { body?: AnyZodObject; query?: AnyZodObject; params?: AnyZodObject }) {
+export function validateRequest(schema: { body?: z.ZodTypeAny; query?: z.ZodTypeAny; params?: z.ZodTypeAny }) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       if (schema.body) {
@@ -28,15 +28,34 @@ export const RegisterSchema = z.object({
 
 export const LoginSchema = z.object({
   email: z.string().trim().toLowerCase().email('Please enter a valid email address'),
-  password: z.string().min(1, 'Password is required')
+  password: z.string().min(1, 'Password is required').optional(),
+  code: z.string().optional()
+});
+
+export const VerifyOtpSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Please enter a valid email address'),
+  code: z.string().min(6, 'Verification code must be 6 digits').max(6, 'Verification code must be 6 digits'),
+  purpose: z.enum(['SIGNUP', 'LOGIN', 'PASSWORD_RESET', 'EMAIL_CHANGE']).optional().default('SIGNUP'),
+  newPassword: z.string().min(8, 'New password must be at least 8 characters long').optional()
+});
+
+export const RequestOtpSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Please enter a valid email address'),
+  purpose: z.enum(['SIGNUP', 'LOGIN', 'PASSWORD_RESET', 'EMAIL_CHANGE']).optional().default('LOGIN')
 });
 
 export const GoogleSchema = z.object({
-  credential: z.string().min(1, 'Google credential token is required')
+  credential: z.string().optional(),
+  code: z.string().optional(),
+  redirectUri: z.string().optional()
+}).refine(data => data.credential || data.code, {
+  message: 'Either credential or authorization code must be provided'
 });
 
 export const LinkedInSchema = z.object({
-  token: z.string().min(1, 'LinkedIn access token is required')
+  token: z.string().optional(),
+  code: z.string().optional(),
+  redirectUri: z.string().optional()
+}).refine(data => data.token || data.code, {
+  message: 'Either token or authorization code must be provided'
 });
-
-

@@ -29,6 +29,14 @@ const envSchema = z.object({
   LINKEDIN_CLIENT_ID: z.string().optional().default(''),
   LINKEDIN_CLIENT_SECRET: z.string().optional().default(''),
   APP_BASE_URL: z.string().default('http://localhost:5173'),
+  // Production SMTP / Transactional Email (Brevo)
+  SMTP_HOST: z.string().optional().default(''),
+  SMTP_PORT: z.string().optional().default('587').transform(val => parseInt(val, 10) || 587),
+  SMTP_USER: z.string().optional().default(''),
+  SMTP_PASS: z.string().optional().default(''),
+  SMTP_FROM_EMAIL: z.string().optional().default(''),
+  SMTP_FROM_NAME: z.string().optional().default('Pilot Mama'),
+  BREVO_API_KEY: z.string().optional().default(''),
   // Persistent Object Storage Configuration (S3 / R2 / MinIO)
   STORAGE_PROVIDER: z.enum(['local', 's3', 'r2']).default('local'),
   STORAGE_ENDPOINT: z.string().optional().default(''),

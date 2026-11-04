@@ -258,9 +258,28 @@ export class FieldMapperService {
     // Intelligently derive clean title (e.g. "JR1041997 Database Engineer (Open)" -> "Database Engineer")
     const title = this.cleanTitle(rawTitle, externalJobId);
 
-    // Description text
-    const description = getVal(mapping.descriptionField) || getVal(mapping.summaryField) || title;
-    const descriptionText = typeof description === 'string' ? description : JSON.stringify(description);
+    // Description text resolution: inspect direct field, summary, or fall back to structured responsibilities/requirements
+    let descriptionVal = getVal(mapping.descriptionField) || getVal(mapping.summaryField);
+    if (!descriptionVal) {
+      // Check alternative known keys directly on rawRecord if not mapped
+      descriptionVal = rawRecord.jobDesc ||
+        rawRecord.jobDescriptionHtml ||
+        rawRecord.descriptionPlain ||
+        rawRecord.descriptionHtml ||
+        rawRecord.descriptionText ||
+        rawRecord.content ||
+        rawRecord.details ||
+        rawRecord.shortDescriptionStr ||
+        rawRecord.ShortDescriptionStr ||
+        rawRecord.externalResponsibilitiesStr ||
+        rawRecord.ExternalResponsibilitiesStr ||
+        rawRecord.jobAd?.sections?.jobDescription?.text;
+    }
+
+    let descriptionText = '';
+    if (descriptionVal) {
+      descriptionText = typeof descriptionVal === 'string' ? descriptionVal : JSON.stringify(descriptionVal);
+    }
 
     // Parse array or comma-separated string for list fields
     const toArray = (val: any): string[] => {
@@ -275,10 +294,28 @@ export class FieldMapperService {
       return [];
     };
 
-    const responsibilities = toArray(getVal(mapping.responsibilitiesField));
-    const requirements = toArray(getVal(mapping.requirementsField));
-    const skills = toArray(getVal(mapping.skillsField));
-    const preferredQualifications = toArray(getVal(mapping.preferredSkillsField));
+    const responsibilities = toArray(getVal(mapping.responsibilitiesField) || rawRecord.responsibilities || rawRecord.duties);
+    const requirements = toArray(getVal(mapping.requirementsField) || rawRecord.requirements || rawRecord.qualifications);
+    const skills = toArray(getVal(mapping.skillsField) || rawRecord.skills);
+    const preferredQualifications = toArray(getVal(mapping.preferredSkillsField) || rawRecord.preferredQualifications || rawRecord.goodToHave);
+
+    // If description is missing or empty or simply equals title, build a meaningful overview from responsibilities/requirements if available
+    if (!descriptionText.trim() || descriptionText.trim().toLowerCase() === title.toLowerCase()) {
+      if (responsibilities.length > 0 || requirements.length > 0) {
+        const parts: string[] = [];
+        if (responsibilities.length > 0) {
+          parts.push(`Key Responsibilities:\n${responsibilities.map(r => `• ${r}`).join('\n')}`);
+        }
+        if (requirements.length > 0) {
+          parts.push(`Qualifications & Requirements:\n${requirements.map(r => `• ${r}`).join('\n')}`);
+        }
+        descriptionText = parts.join('\n\n');
+      } else {
+        descriptionText = title;
+      }
+    }
+
+
 
     // Application URL: source-provided URL -> careersUrl
     let applicationUrl = getVal(mapping.applicationUrlField);
@@ -370,7 +407,7 @@ export class FieldMapperService {
       experienceMax,
       education: getVal(mapping.qualificationField) ? String(getVal(mapping.qualificationField)) : undefined,
       postedAt,
-      descriptionHtml: typeof description === 'string' && description.includes('<') ? description : undefined,
+      descriptionHtml: typeof descriptionVal === 'string' && descriptionVal.includes('<') ? descriptionVal : undefined,
       descriptionText,
       responsibilities,
       requirements,

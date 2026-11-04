@@ -161,13 +161,45 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
     if (!confirm('Are you sure you want to archive this resume? Historical versions will remain safe.')) return;
     try {
       setLoading(true);
-      await apiClient.deleteResume(resumeId);
+      await apiClient.deleteResume(resumeId, false);
       await loadResumes();
+      if (onProfileUpdated) onProfileUpdated();
     } catch (err: any) {
       setError(err.message || 'Failed to archive resume');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handlePermanentDeleteResume = async (resumeId: string) => {
+    if (!confirm('Permanently delete this resume and its stored file? This action cannot be undone.')) return;
+    try {
+      setLoading(true);
+      await apiClient.deleteResume(resumeId, true);
+      await loadResumes();
+      if (onProfileUpdated) onProfileUpdated();
+    } catch (err: any) {
+      setError(err.message || 'Failed to permanently delete resume');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSetPreferred = async (resumeId: string) => {
+    try {
+      setLoading(true);
+      await apiClient.setPreferredResume(resumeId);
+      await loadResumes();
+      if (onProfileUpdated) onProfileUpdated();
+    } catch (err: any) {
+      setError(err.message || 'Failed to set Preferred Resume');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownloadResume = (resumeId: string) => {
+    window.open(`${apiClient.getApiUrl()}/resumes/${resumeId}/download`, '_blank');
   };
 
   // Experience manipulation helpers
@@ -370,20 +402,27 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
                       </div>
                     </div>
                   </div>
-                  <Badge
-                    variant={
-                      r.status === 'PARSED'
-                        ? 'emerald'
-                        : r.status === 'PARSE_REVIEW_REQUIRED'
-                        ? 'amber'
-                        : r.status === 'FILE_MISSING' || r.status === 'STORAGE_FAILED'
-                        ? 'rose'
-                        : 'indigo'
-                    }
-                    size="sm"
-                  >
-                    {r.status === 'FILE_MISSING' ? 'File unavailable' : r.status === 'STORAGE_FAILED' ? 'Storage failed' : r.status}
-                  </Badge>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    {r.isMaster && (
+                      <Badge variant="emerald" size="sm">
+                        ★ Preferred Resume
+                      </Badge>
+                    )}
+                    <Badge
+                      variant={
+                        r.status === 'PARSED'
+                          ? 'emerald'
+                          : r.status === 'PARSE_REVIEW_REQUIRED'
+                          ? 'amber'
+                          : r.status === 'FILE_MISSING' || r.status === 'STORAGE_FAILED'
+                          ? 'rose'
+                          : 'indigo'
+                      }
+                      size="sm"
+                    >
+                      {r.status === 'FILE_MISSING' ? 'File unavailable' : r.status === 'STORAGE_FAILED' ? 'Storage failed' : r.status}
+                    </Badge>
+                  </div>
                 </div>
 
                 {/* Storage Recovery Notice if file is missing */}
@@ -433,6 +472,26 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
                 )}
 
                 <div className="resume-item-actions">
+                  {!r.isMaster && r.status !== 'FILE_MISSING' && (
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleSetPreferred(r.id)}
+                    >
+                      Set as Preferred
+                    </Button>
+                  )}
+
+                  {r.status !== 'FILE_MISSING' && (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => handleDownloadResume(r.id)}
+                    >
+                      Download
+                    </Button>
+                  )}
+
                   {r.status === 'FILE_MISSING' || r.status === 'STORAGE_FAILED' ? (
                     <Button
                       size="sm"
@@ -463,16 +522,24 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
                     icon={<Plus size={14} />}
                     onClick={() => setCreatingVersionForId(r.id)}
                   >
-                    Create Snapshot
+                    Snapshot
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => handleArchiveResume(r.id)}
+                  >
+                    Archive
                   </Button>
 
                   <Button
                     size="sm"
                     variant="ghost"
                     icon={<Trash2 size={14} className="text-red" />}
-                    onClick={() => handleArchiveResume(r.id)}
+                    onClick={() => handlePermanentDeleteResume(r.id)}
                   >
-                    Archive
+                    Delete
                   </Button>
                 </div>
 

@@ -97,6 +97,7 @@ export const AppShell: React.FC<AppShellProps> = ({
       <div className="app-main-viewport">
         <TopBar
           onOpenUpload={() => onSelectTab('resumes')}
+          onNavigateAuth={() => onSelectTab('auth')}
           isMobileMenuOpen={isMobileMenuOpen}
           onToggleMobileMenu={() => setIsMobileMenuOpen(prev => !prev)}
         />

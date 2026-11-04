@@ -1,4 +1,4 @@
-import type { User, AuthResponse, ApiError } from '../types/auth';
+import type { User, AuthResponse, RegisterResponse, OtpResponse, ApiError } from '../types/auth';
 import type { CanonicalJob } from '../types/job.types';
 import type {
   AdminCandidateItem,
@@ -27,12 +27,48 @@ const API_V1_BASE = (import.meta.env?.VITE_API_URL) || (import.meta.env?.PROD ? 
 
 export class ApiClient {
   private accessToken: string | null = typeof window !== 'undefined' ? localStorage.getItem('pilotmama_access_token') : null;
+  private refreshTokenVal: string | null = typeof window !== 'undefined' ? localStorage.getItem('pilotmama_refresh_token') : null;
   private memoryCache = new Map<string, { data: any; expiry: number }>();
   private inflightRequests = new Map<string, Promise<any>>();
+  private onUserRefreshedCallbacks: Array<(user: User) => void> = [];
+  private onAuthClearedCallbacks: Array<() => void> = [];
+
+  onUserRefreshed(callback: (user: User) => void): () => void {
+    this.onUserRefreshedCallbacks.push(callback);
+    return () => {
+      this.onUserRefreshedCallbacks = this.onUserRefreshedCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  onAuthCleared(callback: () => void): () => void {
+    this.onAuthClearedCallbacks.push(callback);
+    return () => {
+      this.onAuthClearedCallbacks = this.onAuthClearedCallbacks.filter(cb => cb !== callback);
+    };
+  }
+
+  private notifyUserRefreshed(user: User): void {
+    for (const cb of this.onUserRefreshedCallbacks) {
+      try {
+        cb(user);
+      } catch (e) {
+        console.error("Error in onUserRefreshed callback", e);
+      }
+    }
+  }
+
+  private notifyAuthCleared(): void {
+    for (const cb of this.onAuthClearedCallbacks) {
+      try {
+        cb();
+      } catch (e) {
+        console.error("Error in onAuthCleared callback", e);
+      }
+    }
+  }
 
   setToken(token: string | null) {
     this.accessToken = token;
-    // Clear user-dependent caches when token changes
     this.memoryCache.clear();
     this.inflightRequests.clear();
     if (typeof window !== 'undefined') {
@@ -40,12 +76,39 @@ export class ApiClient {
         localStorage.setItem('pilotmama_access_token', token);
       } else {
         localStorage.removeItem('pilotmama_access_token');
+        localStorage.removeItem('pilotmama_refresh_token');
+        this.refreshTokenVal = null;
       }
     }
   }
 
   getToken(): string | null {
+    if (!this.accessToken && typeof window !== 'undefined') {
+      this.accessToken = localStorage.getItem('pilotmama_access_token');
+    }
     return this.accessToken;
+  }
+
+  setRefreshToken(token: string | null) {
+    this.refreshTokenVal = token;
+    if (typeof window !== 'undefined') {
+      if (token) {
+        localStorage.setItem('pilotmama_refresh_token', token);
+      } else {
+        localStorage.removeItem('pilotmama_refresh_token');
+      }
+    }
+  }
+
+  getRefreshToken(): string | null {
+    if (!this.refreshTokenVal && typeof window !== 'undefined') {
+      this.refreshTokenVal = localStorage.getItem('pilotmama_refresh_token');
+    }
+    return this.refreshTokenVal;
+  }
+
+  getApiUrl(): string {
+    return API_V1_BASE;
   }
 
   private async request<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<T> {
@@ -86,7 +149,8 @@ export class ApiClient {
         }
         return this.request<T>(endpoint, { ...options, headers: retryHeaders }, true);
       } catch (refreshErr) {
-        // Refresh failed; proceed to parse and throw original 401 error
+        this.setToken(null);
+        this.notifyAuthCleared();
       }
     }
 
@@ -104,6 +168,62 @@ export class ApiClient {
     }
 
     return json.data as T;
+  }
+  private async requestRaw<T = any>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<T> {
+    if (this.refreshPromise && endpoint !== '/auth/refresh' && endpoint !== '/auth/login') {
+      try {
+        await this.refreshPromise;
+      } catch {
+        // Refresh failed, proceed
+      }
+    }
+
+    if (!this.accessToken && typeof window !== 'undefined') {
+      this.accessToken = localStorage.getItem('pilotmama_access_token');
+    }
+
+    const headers = new Headers(options.headers || {});
+    headers.set('Content-Type', 'application/json');
+
+    if (this.accessToken) {
+      headers.set('Authorization', `Bearer ${this.accessToken}`);
+    }
+
+    const res = await fetch(`${API_V1_BASE}${endpoint}`, {
+      ...options,
+      headers,
+      credentials: 'include'
+    });
+
+    if (res.status === 401 && !isRetry && endpoint !== '/auth/refresh' && endpoint !== '/auth/login') {
+      try {
+        await this.refresh();
+        const retryHeaders = new Headers(options.headers || {});
+        retryHeaders.set('Content-Type', 'application/json');
+        if (this.accessToken) {
+          retryHeaders.set('Authorization', `Bearer ${this.accessToken}`);
+        }
+        return this.requestRaw<T>(endpoint, { ...options, headers: retryHeaders }, true);
+      } catch (refreshErr) {
+        this.setToken(null);
+        this.notifyAuthCleared();
+      }
+    }
+
+    const json = await res.json().catch(() => ({}));
+
+    if (!res.ok || json.success === false) {
+      const error: ApiError = {
+        ...(json.error || {
+          code: `HTTP_${res.status}`,
+          message: json.message || 'An unexpected error occurred'
+        }),
+        status: res.status
+      };
+      throw error;
+    }
+
+    return json as T;
   }
 
   private async requestPaginated<T>(endpoint: string, options: RequestInit = {}, isRetry: boolean = false): Promise<PaginatedResponse<T>> {
@@ -144,7 +264,8 @@ export class ApiClient {
         }
         return this.requestPaginated<T>(endpoint, { ...options, headers: retryHeaders }, true);
       } catch (refreshErr) {
-        // Refresh failed; proceed to throw 401
+        this.setToken(null);
+        this.notifyAuthCleared();
       }
     }
 
@@ -168,39 +289,89 @@ export class ApiClient {
   }
 
   // Authentication API methods
-  async register(data: { email: string; password: string; fullName?: string; role?: string }): Promise<AuthResponse> {
-    const res = await this.request<AuthResponse>('/auth/register', {
+  async register(data: { email: string; password: string; fullName?: string; role?: string }): Promise<RegisterResponse> {
+    const res = await this.request<RegisterResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data)
     });
-    this.setToken(res.accessToken);
+    if (res.accessToken) {
+      this.setToken(res.accessToken);
+    }
     return res;
   }
 
-  async login(data: { email: string; password: string }): Promise<AuthResponse> {
-    const res = await this.request<AuthResponse>('/auth/login', {
+  async verifyOtp(data: { email: string; code: string; purpose?: string; newPassword?: string }): Promise<AuthResponse> {
+    const res = await this.request<AuthResponse>('/auth/verify-otp', {
       method: 'POST',
       body: JSON.stringify(data)
     });
-    this.setToken(res.accessToken);
+    if (res.accessToken) {
+      this.setToken(res.accessToken);
+    }
+    if ((res as any).refreshToken) {
+      this.setRefreshToken((res as any).refreshToken);
+    }
     return res;
   }
 
-  async loginWithGoogle(credential: string): Promise<AuthResponse> {
+  async requestOtp(data: { email: string; purpose?: string }): Promise<OtpResponse> {
+    return this.request<OtpResponse>('/auth/request-otp', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async resendOtp(data: { email: string; purpose?: string }): Promise<OtpResponse> {
+    return this.request<OtpResponse>('/auth/resend-otp', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async login(data: { email: string; password?: string; code?: string }): Promise<any> {
+    const res = await this.request<any>('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+    if (res?.accessToken) {
+      this.setToken(res.accessToken);
+    }
+    if (res?.refreshToken) {
+      this.setRefreshToken(res.refreshToken);
+    }
+    return res;
+  }
+
+  async resetPassword(data: { email: string; code: string; newPassword: string }): Promise<{ message: string }> {
+    return this.request<{ message: string }>('/auth/reset-password', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async loginWithGoogle(payload: string | { credential?: string; code?: string; redirectUri?: string }): Promise<AuthResponse> {
+    const body = typeof payload === 'string' ? { credential: payload } : payload;
     const res = await this.request<AuthResponse>('/auth/google', {
       method: 'POST',
-      body: JSON.stringify({ credential })
+      body: JSON.stringify(body)
     });
     this.setToken(res.accessToken);
+    if ((res as any).refreshToken) {
+      this.setRefreshToken((res as any).refreshToken);
+    }
     return res;
   }
 
-  async loginWithLinkedIn(token: string): Promise<AuthResponse> {
+  async loginWithLinkedIn(payload: string | { token?: string; code?: string; redirectUri?: string }): Promise<AuthResponse> {
+    const body = typeof payload === 'string' ? { token: payload } : payload;
     const res = await this.request<AuthResponse>('/auth/linkedin', {
       method: 'POST',
-      body: JSON.stringify({ token })
+      body: JSON.stringify(body)
     });
     this.setToken(res.accessToken);
+    if ((res as any).refreshToken) {
+      this.setRefreshToken((res as any).refreshToken);
+    }
     return res;
   }
 
@@ -212,12 +383,26 @@ export class ApiClient {
       return this.refreshPromise;
     }
 
-    this.refreshPromise = this.request<AuthResponse>('/auth/refresh', {
-      method: 'POST'
-    })
+    const fallbackRefreshToken = this.getRefreshToken();
+    const reqOptions: RequestInit = { method: 'POST' };
+    if (fallbackRefreshToken) {
+      reqOptions.headers = { 'Content-Type': 'application/json' };
+      reqOptions.body = JSON.stringify({ refreshToken: fallbackRefreshToken });
+    }
+
+    this.refreshPromise = this.request<AuthResponse>('/auth/refresh', reqOptions)
       .then(res => {
-        this.setToken(res.accessToken);
-        return res;
+        const data = (res as any)?.data || res;
+        if (data.accessToken) {
+          this.setToken(data.accessToken);
+        }
+        if ((data as any).refreshToken) {
+          this.setRefreshToken((data as any).refreshToken);
+        }
+        if (data.user) {
+          this.notifyUserRefreshed(data.user);
+        }
+        return data as AuthResponse;
       })
       .finally(() => {
         this.refreshPromise = null;
@@ -233,6 +418,7 @@ export class ApiClient {
       });
     } finally {
       this.setToken(null);
+      this.notifyAuthCleared();
     }
   }
 
@@ -381,13 +567,31 @@ export class ApiClient {
     return this.request<any[]>('/resumes');
   }
 
-  async deleteResume(id: string): Promise<any> {
-    return this.request<any>(`/resumes/${id}`, {
+  async deleteResume(id: string, permanent: boolean = false): Promise<any> {
+    this.memoryCache.delete('candidate_profile_me');
+    return this.request<any>(`/resumes/${id}${permanent ? '?permanent=true' : ''}`, {
       method: 'DELETE'
     });
   }
 
+  async setPreferredResume(id: string): Promise<any> {
+    this.memoryCache.delete('candidate_profile_me');
+    return this.request<any>(`/resumes/${id}/preferred`, {
+      method: 'PUT'
+    });
+  }
+
   async uploadResume(file: File, title?: string, isRetry: boolean = false): Promise<any> {
+    if (this.refreshPromise) {
+      try {
+        await this.refreshPromise;
+      } catch {}
+    }
+
+    if (!this.accessToken && typeof window !== 'undefined') {
+      this.accessToken = localStorage.getItem('pilotmama_access_token');
+    }
+
     const formData = new FormData();
     formData.append('resume', file);
     if (title) formData.append('title', title);
@@ -409,7 +613,8 @@ export class ApiClient {
         await this.refresh();
         return this.uploadResume(file, title, true);
       } catch (refreshErr) {
-        // Refresh failed; proceed to throw 401
+        this.setToken(null);
+        this.notifyAuthCleared();
       }
     }
 
@@ -421,6 +626,16 @@ export class ApiClient {
   }
 
   async replaceResumeFile(id: string, file: File, isRetry: boolean = false): Promise<any> {
+    if (this.refreshPromise) {
+      try {
+        await this.refreshPromise;
+      } catch {}
+    }
+
+    if (!this.accessToken && typeof window !== 'undefined') {
+      this.accessToken = localStorage.getItem('pilotmama_access_token');
+    }
+
     const formData = new FormData();
     formData.append('resume', file);
 
@@ -441,13 +656,14 @@ export class ApiClient {
         await this.refresh();
         return this.replaceResumeFile(id, file, true);
       } catch (refreshErr) {
-        // Refresh failed; proceed to throw 401
+        this.setToken(null);
+        this.notifyAuthCleared();
       }
     }
 
     const json = await res.json().catch(() => ({}));
     if (!res.ok || json.success === false) {
-      throw json.error || { code: `HTTP_${res.status}`, message: json.message || 'Replacement failed' };
+      throw json.error || { code: `HTTP_${res.status}`, message: json.message || 'Replace failed' };
     }
     return json.data;
   }
@@ -481,12 +697,28 @@ export class ApiClient {
     return this.request<any>(`/resume-versions/${versionId}`);
   }
 
+  async getJobSuggestions(query: string, categories?: string[]): Promise<Array<{ label: string; value: string; category: 'SKILL' | 'TECHNOLOGY' | 'ROLE' | 'LOCATION' | 'COMPANY'; id?: string }>> {
+    const qs = new URLSearchParams();
+    if (query) qs.append('q', query);
+    if (categories && categories.length > 0) {
+      categories.forEach(c => qs.append('categories', c));
+    }
+    const res = await this.request<any>(`/jobs/suggestions?${qs.toString()}`);
+    return Array.isArray(res) ? res : (res?.data || []);
+  }
+
   // Sprint 3 Canonical Job Engine Methods
   async getCanonicalJobs(params: Record<string, any> = {}, options: { bypassCache?: boolean } = {}): Promise<PaginatedResponse<CanonicalJob>> {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') {
-        query.append(k, String(v));
+        if (Array.isArray(v)) {
+          v.forEach(item => {
+            if (item) query.append(k, String(item));
+          });
+        } else {
+          query.append(k, String(v));
+        }
       }
     });
     const qs = query.toString();
@@ -522,7 +754,13 @@ export class ApiClient {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') {
-        query.append(k, String(v));
+        if (Array.isArray(v)) {
+          v.forEach(item => {
+            if (item) query.append(k, String(item));
+          });
+        } else {
+          query.append(k, String(v));
+        }
       }
     });
     const qs = query.toString();
@@ -540,11 +778,21 @@ export class ApiClient {
       }
     }
 
-    const promise = this.request<any>(endpoint)
-      .then(res => {
-        // Cache recommended jobs for 30s
-        this.memoryCache.set(cacheKey, { data: res, expiry: Date.now() + 30000 });
-        return res;
+    const promise = this.requestRaw<any>(endpoint)
+      .then(json => {
+        const result = {
+          data: (Array.isArray(json.data) ? json.data : []) as any[],
+          pagination: json.pagination,
+          status: json.status,
+          hasProfileData: json.hasProfileData,
+          profileState: json.profileState,
+          profileSummary: json.profileSummary
+        };
+        // Cache recommended jobs for 30s only if results are populated
+        if (result.data.length > 0) {
+          this.memoryCache.set(cacheKey, { data: result, expiry: Date.now() + 30000 });
+        }
+        return result;
       })
       .finally(() => {
         this.inflightRequests.delete(cacheKey);
@@ -600,7 +848,13 @@ export class ApiClient {
     const query = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null && v !== '') {
-        query.append(k, String(v));
+        if (Array.isArray(v)) {
+          v.forEach(item => {
+            if (item) query.append(k, String(item));
+          });
+        } else {
+          query.append(k, String(v));
+        }
       }
     });
     const qs = query.toString();
@@ -1177,6 +1431,35 @@ export class ApiClient {
 
   async retryBulkJobSourceItem(jobId: string, itemId: string): Promise<any> {
     return this.request<any>(`/admin/job-sources/bulk/${jobId}/items/${itemId}/retry`, {
+      method: 'POST'
+    });
+  }
+
+  // One-Click Application Orchestrator
+  async startApplicationOrchestration(data: {
+    jobId: string;
+    resumeChoice?: 'master' | 'tailored';
+    resumeId?: string;
+  }): Promise<any> {
+    return this.request<any>('/applications/orchestrate/start', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async getApplicationOrchestrationStatus(attemptId: string): Promise<any> {
+    return this.request<any>(`/applications/orchestrate/${attemptId}/status`);
+  }
+
+  async respondMissingField(attemptId: string, fieldKey: string, value: any): Promise<any> {
+    return this.request<any>(`/applications/orchestrate/${attemptId}/respond`, {
+      method: 'POST',
+      body: JSON.stringify({ fieldKey, value })
+    });
+  }
+
+  async cancelApplicationOrchestration(attemptId: string): Promise<any> {
+    return this.request<any>(`/applications/orchestrate/${attemptId}/cancel`, {
       method: 'POST'
     });
   }

@@ -18,6 +18,7 @@ import { billingRouter } from './modules/billing/billing.routes.js';
 import { employerRouter } from './modules/employer/employer.routes.js';
 import { agentRouter } from './modules/agent/agent.routes.js';
 import { adminRouter } from './modules/admin/admin.routes.js';
+import { jobAlertRouter } from './routes/v1/jobAlert.routes.js';
 import { internalRouter } from './routes/internal.routes.js';
 import { apiRouter as prototypeApiRouter } from './routes/api.routes.js';
 import { checkDatabaseConnection } from './database/prisma.js';
@@ -85,6 +86,7 @@ app.use('/api/v1/billing', billingRouter);
 app.use('/api/v1/employer', employerRouter);
 app.use('/api/v1/agent', agentRouter);
 app.use('/api/v1/admin', adminRouter);
+app.use('/api/v1/alerts', jobAlertRouter);
 app.use('/api/v1/internal', internalRouter);
 app.use('/api/v1', healthRouter);
 

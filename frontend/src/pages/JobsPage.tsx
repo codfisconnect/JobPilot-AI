@@ -32,6 +32,7 @@ import {
   Layers,
   ArrowUpDown
 } from 'lucide-react';
+import { JobSearchMultiSelect, SearchChip } from '../components/jobs/JobSearchMultiSelect';
 import './JobsPage.css';
 
 interface JobsPageProps {
@@ -51,6 +52,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   // Filter params
+  const [searchChips, setSearchChips] = useState<SearchChip[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [countryFilter, setCountryFilter] = useState('');
   const [locationFilter, setLocationFilter] = useState('');
@@ -75,37 +77,51 @@ export const JobsPage: React.FC<JobsPageProps> = ({
   // Detail Modal state
   const [selectedJob, setSelectedJob] = useState<CanonicalJob | null>(null);
   const [isDetailOpen, setIsDetailOpen] = useState(false);
+  const [jobDetailLoading, setJobDetailLoading] = useState(false);
 
   // Application Agent Modal state
   const { activeCandidate, showToast } = useApp();
   const [applyingJob, setApplyingJob] = useState<JobDescription | null>(null);
   const [isApplyModalOpen, setIsApplyModalOpen] = useState(false);
 
-  const handleDirectApply = (job: CanonicalJob) => {
-    const canonicalCompany = getCanonicalCompanyName(job.company?.name, job.sourceUrl, job.applicationUrl);
+  const handleDirectApply = async (job: CanonicalJob) => {
+    let fullJob = job;
+    // Ensure we have authoritative job fields (applicationUrl, description, requirements, responsibilities)
+    if (!job.description || !job.applicationUrl || (!job.responsibilities && !job.requirements)) {
+      try {
+        const res = await apiClient.getCanonicalJobById(job.id);
+        if (res?.data || res?.title) {
+          fullJob = res.data || res;
+        }
+      } catch {
+        // Fallback to currently passed job object
+      }
+    }
+
+    const canonicalCompany = getCanonicalCompanyName(fullJob.company?.name, fullJob.sourceUrl, fullJob.applicationUrl);
     // Adapt CanonicalJob to JobDescription
     const adapted: JobDescription = {
-      id: job.id,
-      role: job.title,
+      id: fullJob.id,
+      role: fullJob.title,
       company: canonicalCompany,
-      location: job.location || job.city || 'Remote',
-      sourceType: (job.sourceType as any) || 'external',
-      source: job.sourceName || job.sourceType,
-      sourceUrl: job.sourceUrl || job.applicationUrl,
-      applicationUrl: job.applicationUrl || job.sourceUrl,
+      location: fullJob.location || fullJob.city || 'Remote',
+      sourceType: (fullJob.sourceType as any) || 'external',
+      source: fullJob.sourceName || fullJob.sourceType,
+      sourceUrl: fullJob.sourceUrl || fullJob.applicationUrl,
+      applicationUrl: fullJob.applicationUrl || fullJob.sourceUrl,
       applicationMode: 'external',
-      employmentType: job.employmentType,
-      workMode: job.remoteType,
-      publishedDate: job.postedAt || job.firstSeenAt,
-      careerTrack: job.title,
-      experienceRequired: job.experienceMin ? `${job.experienceMin}+ years` : '3+ years',
-      salary: job.salaryMin ? `$${Number(job.salaryMin).toLocaleString()}` : 'Competitive',
-      mustHaveSkills: job.requirements || [],
-      niceToHaveSkills: job.preferredQualifications || [],
-      responsibilities: job.responsibilities || [],
-      qualifications: job.requirements || [],
-      rawText: job.description,
-      createdAt: job.firstSeenAt || new Date().toISOString()
+      employmentType: fullJob.employmentType,
+      workMode: fullJob.remoteType,
+      publishedDate: fullJob.postedAt || fullJob.firstSeenAt,
+      careerTrack: fullJob.title,
+      experienceRequired: fullJob.experienceMin ? `${fullJob.experienceMin}+ years` : '3+ years',
+      salary: fullJob.salaryMin ? `$${Number(fullJob.salaryMin).toLocaleString()}` : 'Competitive',
+      mustHaveSkills: fullJob.requirements || [],
+      niceToHaveSkills: fullJob.preferredQualifications || [],
+      responsibilities: fullJob.responsibilities || [],
+      qualifications: fullJob.requirements || [],
+      rawText: fullJob.description,
+      createdAt: fullJob.firstSeenAt || new Date().toISOString()
     };
     setApplyingJob(adapted);
     setIsApplyModalOpen(true);
@@ -144,13 +160,27 @@ export const JobsPage: React.FC<JobsPageProps> = ({
     setLoading(true);
     setError(null);
     const currentTab = forceTab || activeTab;
-    const hasSearchQuery = Boolean(searchQuery.trim());
+    const structuredSkills = searchChips.filter(c => c.category === 'SKILL').map(c => c.value);
+    const structuredRoles = searchChips.filter(c => c.category === 'ROLE').map(c => c.value);
+    const structuredLocations = searchChips.filter(c => c.category === 'LOCATION').map(c => c.value);
+    const structuredCompanies = searchChips.filter(c => c.category === 'COMPANY').map(c => c.value);
+    const structuredTechs = searchChips.filter(c => c.category === 'TECHNOLOGY').map(c => c.value);
+    const textQueries = searchChips.filter(c => c.category === 'TEXT').map(c => c.value);
+    const combinedQ = textQueries.length > 0 ? textQueries.join(' ') : (searchQuery.trim() || undefined);
+
+    const hasSearchQuery = searchChips.length > 0 || Boolean(searchQuery.trim());
 
     try {
       // 1. Unrestricted Search mode OR All Jobs tab: fetch from universal canonical jobs catalogue
       if (hasSearchQuery || currentTab === 'all') {
         const res = await apiClient.getCanonicalJobs({
-          query: searchQuery.trim() || undefined,
+          skills: structuredSkills.length > 0 ? structuredSkills : undefined,
+          roles: structuredRoles.length > 0 ? structuredRoles : undefined,
+          locations: structuredLocations.length > 0 ? structuredLocations : undefined,
+          companies: structuredCompanies.length > 0 ? structuredCompanies : undefined,
+          technologies: structuredTechs.length > 0 ? structuredTechs : undefined,
+          q: combinedQ,
+          query: combinedQ,
           country: countryFilter.trim() || undefined,
           location: locationFilter.trim() || undefined,
           remoteType: remoteFilter || undefined,
@@ -169,6 +199,7 @@ export const JobsPage: React.FC<JobsPageProps> = ({
           setTotalPages(res.pagination.totalPages);
           setTotalCount(res.pagination.total);
         }
+        console.log('TAB SWITCH TO ALL JOBS:', res.data.length);
       } else {
         // 2. Recommended for You tab: fetch personalized recommendations
         const res = await apiClient.getRecommendedJobs({
@@ -180,16 +211,37 @@ export const JobsPage: React.FC<JobsPageProps> = ({
           employmentType: employmentFilter || undefined
         });
 
-        if (res.profileState) {
+        console.log('RECOMMENDATION API RESPONSE:', {
+          hasData: Boolean(res?.data),
+          dataLength: Array.isArray(res?.data) ? res.data.length : 0,
+          pagination: res?.pagination,
+          profileState: res?.profileState,
+          status: res?.status
+        });
+
+        if (res?.profileState) {
           setProfileState(res.profileState);
         }
 
-        setJobs(res.items || []);
-        if (res.pagination) {
+        const jobList = Array.isArray(res?.data) ? res.data : (Array.isArray(res?.items) ? res.items : (Array.isArray(res) ? res : []));
+        console.log('FRONTEND PARSED JOBS COUNT:', jobList.length);
+
+        console.log('BEFORE MEMORY FILTERS:', jobList.length);
+        console.log('AFTER MEMORY FILTERS:', jobList.length);
+
+        setJobs(jobList);
+        console.log('RECOMMENDED STATE SET:', jobList.length);
+
+        if (res?.pagination) {
           setPage(res.pagination.page);
           setTotalPages(res.pagination.totalPages);
           setTotalCount(res.pagination.total);
+        } else {
+          setPage(1);
+          setTotalPages(Math.max(1, Math.ceil(jobList.length / 12)));
+          setTotalCount(jobList.length);
         }
+        console.log('TAB SWITCH TO RECOMMENDED:', jobList.length);
       }
     } catch (err: any) {
       console.error('Failed to load opportunities:', err);
@@ -198,12 +250,12 @@ export const JobsPage: React.FC<JobsPageProps> = ({
     } finally {
       setLoading(false);
     }
-  }, [activeTab, searchQuery, countryFilter, locationFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
+  }, [activeTab, searchChips, searchQuery, countryFilter, locationFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
 
   // Initial and reactive fetch upon filter modifications or activeCandidate update
   useEffect(() => {
     loadJobs(1);
-  }, [activeTab, activeCandidate, countryFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
+  }, [activeTab, activeCandidate, searchChips, countryFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -213,10 +265,12 @@ export const JobsPage: React.FC<JobsPageProps> = ({
   const handleTabSwitch = (tab: 'recommended' | 'all') => {
     setActiveTab(tab);
     setPage(1);
+    setTotalCount(0); // Clear previous count to prevent bleed between tabs
     loadJobs(1, tab);
   };
 
   const handleResetFilters = () => {
+    setSearchChips([]);
     setSearchQuery('');
     setCountryFilter('');
     setLocationFilter('');
@@ -239,9 +293,22 @@ export const JobsPage: React.FC<JobsPageProps> = ({
     locationFilter
   ].filter(Boolean).length;
 
-  const handleOpenJobDetail = (job: CanonicalJob) => {
-    setSelectedJob(job);
-    setIsDetailOpen(true);
+  const handleOpenJobDetail = async (job: CanonicalJob) => {
+    try {
+      setJobDetailLoading(true);
+      setModalError(null);
+
+      const response = await apiClient.getCanonicalJobById(job.id);
+      const fullJob = response?.data ?? response;
+
+      setSelectedJob(fullJob);
+      setIsDetailOpen(true);
+    } catch (error) {
+      console.error('Failed to load full job details:', error);
+      setModalError('Unable to load the full job details. Please try again.');
+    } finally {
+      setJobDetailLoading(false);
+    }
   };
 
   const handleAddJob = async () => {
@@ -355,15 +422,14 @@ export const JobsPage: React.FC<JobsPageProps> = ({
 
       {/* Filter and Search Bar */}
       <div className="search-filter-bar">
-        <form className="search-input-wrap" onSubmit={handleSearchSubmit}>
-          <Search size={16} className="search-icon" />
-          <input
-            type="text"
-            placeholder="Search roles, skills, or companies..."
-            value={searchQuery}
-            onChange={e => setSearchQuery(e.target.value)}
-          />
-        </form>
+        <JobSearchMultiSelect
+          chips={searchChips}
+          onChange={(newChips) => {
+            setSearchChips(newChips);
+          }}
+          onSearch={() => loadJobs(1)}
+          placeholder="Search roles, skills, locations, companies..."
+        />
 
         <div className="filter-controls-row desktop-only-filters">
           {/* Country */}

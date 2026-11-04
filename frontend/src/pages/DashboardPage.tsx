@@ -66,8 +66,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       setJobsError(null);
       // Attempt to load personalized recommendations first
       const recRes = await apiClient.getRecommendedJobs({ pageSize: 6 });
-      if (recRes && recRes.items && recRes.items.length > 0) {
-        setLatestJobs(recRes.items);
+      const recItems = Array.isArray(recRes?.data) ? recRes.data : (Array.isArray(recRes?.items) ? recRes.items : []);
+      if (recItems.length > 0) {
+        setLatestJobs(recItems);
       } else {
         // Fallback to latest canonical jobs
         const res = await apiClient.getCanonicalJobs({ pageSize: 6, sortBy: 'latest' });
@@ -186,7 +187,7 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
   if ((profile?.certifications?.length || 0) > 0 || (profile?.projects?.length || 0) > 0) completionPoints += 5;
   const completeness = Math.min(100, completionPoints);
 
-  const candidateName = activeCandidate?.name || profile?.fullName || user?.candidateProfile?.fullName || user?.email?.split('@')[0] || 'Candidate';
+  const candidateName = user?.candidateProfile?.fullName || profile?.fullName || activeCandidate?.name || user?.email?.split('@')[0] || 'Candidate';
   const masterResume = resumes.find(r => r.isMaster) || resumes[0];
 
   const formatRelativeDate = (dateStr?: string) => {

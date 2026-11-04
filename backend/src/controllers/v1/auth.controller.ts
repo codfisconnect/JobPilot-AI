@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction } from 'express';
 import { authService } from '../../services/auth.service.js';
 import { env } from '../../config/env.js';
+import { OtpPurpose } from '@prisma/client';
 
 const REFRESH_COOKIE_NAME = 'pm_refresh_token';
 
@@ -13,18 +14,17 @@ const COOKIE_OPTIONS = {
 };
 
 export class AuthController {
+  /**
+   * POST /api/v1/auth/register
+   * Candidate initiates signup -> sends 6-digit OTP to verify email ownership
+   */
   static async register(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { user, accessToken, refreshToken } = await authService.register(req.body);
+      const outcome = await authService.register(req.body);
 
-      res.cookie(REFRESH_COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
-
-      res.status(201).json({
+      res.status(200).json({
         success: true,
-        data: {
-          user,
-          accessToken
-        },
+        data: outcome,
         meta: {
           requestId: (req as any).id,
           timestamp: new Date().toISOString()
@@ -35,17 +35,113 @@ export class AuthController {
     }
   }
 
+  /**
+   * POST /api/v1/auth/verify-otp
+   * Verifies 6-digit OTP code for SIGNUP, LOGIN, or PASSWORD_RESET
+   */
+  static async verifyOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email, code, purpose = 'SIGNUP' } = req.body;
+
+      if (purpose === 'SIGNUP') {
+        const { user, accessToken, refreshToken } = await authService.verifyRegistrationOtp({ email, code });
+        res.cookie(REFRESH_COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
+        res.status(200).json({
+          success: true,
+          data: { user, accessToken, refreshToken }
+        });
+        return;
+      }
+
+      if (purpose === 'LOGIN') {
+        const { user, accessToken, refreshToken } = await authService.loginWithOtp({ email, code });
+        res.cookie(REFRESH_COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
+        res.status(200).json({
+          success: true,
+          data: { user, accessToken, refreshToken }
+        });
+        return;
+      }
+
+      if (purpose === 'PASSWORD_RESET') {
+        const { newPassword } = req.body;
+        const outcome = await authService.resetPassword({ email, code, newPassword });
+        res.status(200).json({
+          success: true,
+          data: outcome
+        });
+        return;
+      }
+
+      res.status(400).json({ success: false, message: 'Invalid OTP purpose' });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /api/v1/auth/request-otp
+   * Request OTP for passwordless login, registration verification, or password reset
+   */
+  static async requestOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email, purpose = 'LOGIN' } = req.body;
+      const outcome = await authService.requestOtp(email, purpose as OtpPurpose);
+      res.status(200).json({
+        success: true,
+        data: outcome
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /api/v1/auth/resend-otp
+   * Resend OTP with cooldown guard
+   */
+  static async resendOtp(req: Request, res: Response, next: NextFunction): Promise<void> {
+    try {
+      const { email, purpose = 'SIGNUP' } = req.body;
+      const outcome = await authService.requestOtp(email, purpose as OtpPurpose);
+      res.status(200).json({
+        success: true,
+        data: outcome
+      });
+    } catch (err) {
+      next(err);
+    }
+  }
+
+  /**
+   * POST /api/v1/auth/login
+   * Password login (with unverified-email OTP challenge protection)
+   */
   static async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { user, accessToken, refreshToken } = await authService.login(req.body);
+      const result = await authService.login(req.body);
 
+      if ('requiresOtp' in result) {
+        res.status(200).json({
+          success: true,
+          data: result,
+          meta: {
+            requestId: (req as any).id,
+            timestamp: new Date().toISOString()
+          }
+        });
+        return;
+      }
+
+      const { user, accessToken, refreshToken } = result;
       res.cookie(REFRESH_COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
 
       res.status(200).json({
         success: true,
         data: {
           user,
-          accessToken
+          accessToken,
+          refreshToken
         },
         meta: {
           requestId: (req as any).id,
@@ -57,6 +153,9 @@ export class AuthController {
     }
   }
 
+  /**
+   * POST /api/v1/auth/refresh
+   */
   static async refresh(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const rawRefreshToken = req.cookies?.[REFRESH_COOKIE_NAME] || req.body?.refreshToken;
@@ -68,7 +167,8 @@ export class AuthController {
         success: true,
         data: {
           user,
-          accessToken
+          accessToken,
+          refreshToken
         },
         meta: {
           requestId: (req as any).id,
@@ -80,6 +180,9 @@ export class AuthController {
     }
   }
 
+  /**
+   * POST /api/v1/auth/logout
+   */
   static async logout(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       if (req.user?.userId) {
@@ -108,6 +211,9 @@ export class AuthController {
     }
   }
 
+  /**
+   * GET /api/v1/auth/me
+   */
   static async me(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const user = await authService.getMe(req.user!.userId);
@@ -127,10 +233,13 @@ export class AuthController {
     }
   }
 
+  /**
+   * POST /api/v1/auth/google
+   * Google sign-in with verified identity linking
+   */
   static async googleAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { credential } = req.body;
-      const verified = await authService.verifyGoogleCredential(credential);
+      const verified = await authService.verifyGoogleCredential(req.body);
 
       const { user, accessToken, refreshToken } = await authService.authenticateSocialUser({
         provider: 'GOOGLE',
@@ -147,7 +256,8 @@ export class AuthController {
         success: true,
         data: {
           user,
-          accessToken
+          accessToken,
+          refreshToken
         },
         meta: {
           requestId: (req as any).id,
@@ -159,10 +269,13 @@ export class AuthController {
     }
   }
 
+  /**
+   * POST /api/v1/auth/linkedin
+   * LinkedIn sign-in with verified identity linking
+   */
   static async linkedinAuth(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
-      const { token } = req.body;
-      const verified = await authService.verifyLinkedInToken(token);
+      const verified = await authService.verifyLinkedInToken(req.body);
 
       const { user, accessToken, refreshToken } = await authService.authenticateSocialUser({
         provider: 'LINKEDIN',
@@ -179,7 +292,8 @@ export class AuthController {
         success: true,
         data: {
           user,
-          accessToken
+          accessToken,
+          refreshToken
         },
         meta: {
           requestId: (req as any).id,
@@ -191,4 +305,3 @@ export class AuthController {
     }
   }
 }
-
