@@ -295,3 +295,4 @@ export class EmailTemplates {
     return { subject, html, text };
   }
 }
+

@@ -22,15 +22,6 @@ async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function setInputValue(page, selector, value) {
-  await page.focus(selector);
-  await page.keyboard.down('Control');
-  await page.keyboard.press('A');
-  await page.keyboard.up('Control');
-  await page.keyboard.press('Backspace');
-  await page.type(selector, value);
-}
-
 async function runSignupCooldownUxVerification() {
   console.log('======================================================================');
   console.log('STARTING SIGNUP OTP COOLDOWN UX AND RESPONSIVENESS VERIFICATION');
@@ -50,25 +41,11 @@ async function runSignupCooldownUxVerification() {
   const existingVerifiedEmail = 'testuser@pilotmama.local';
   const testPassword = 'Password123!';
   const testFullName = 'Alex QA Tester';
-  // Ensure existingVerifiedEmail is verified in DB
-  await prisma.user.updateMany({
-    where: { email: existingVerifiedEmail },
-    data: { emailVerified: true }
-  });
 
   page.on('console', msg => {
     const text = msg.text();
     if (!text.includes('Download the React DevTools')) {
       console.log('  [Browser Console]:', text);
-    }
-  });
-
-  page.on('response', async res => {
-    if (res.url().includes('/auth/')) {
-      try {
-        const text = await res.text();
-        console.log('  [Auth Response]:', res.status(), res.url(), text.slice(0, 200));
-      } catch (e) {}
     }
   });
 
@@ -98,8 +75,8 @@ async function runSignupCooldownUxVerification() {
     // Verify ABSOLUTELY NO cooldown text exists on the page
     const pageText = await page.evaluate(() => document.body.innerText);
     const hasCooldownText = pageText.toLowerCase().includes('before requesting a new code') ||
-                            pageText.toLowerCase().includes('please wait') ||
-                            pageText.toLowerCase().includes('resend in');
+      pageText.toLowerCase().includes('please wait') ||
+      pageText.toLowerCase().includes('resend in');
 
     console.log(`  Zero cooldown text on initial signup form: ${!hasCooldownText}`);
     if (hasCooldownText) {
@@ -113,9 +90,9 @@ async function runSignupCooldownUxVerification() {
     // SCENARIO 2: Submit New Registration -> Transition to OTP Screen
     // -------------------------------------------------------------
     console.log('\n--- Scenario 2: Brand New Registration -> Transition to OTP ---');
-    await setInputValue(page, 'input#auth-fullName', testFullName);
-    await setInputValue(page, 'input#auth-email', newEmail);
-    await setInputValue(page, 'input#auth-password', testPassword);
+    await page.type('input#auth-fullName', testFullName);
+    await page.type('input#auth-email', newEmail);
+    await page.type('input#auth-password', testPassword);
 
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '02_signup_form_filled.png') });
     console.log('  Saved screenshot: 02_signup_form_filled.png');
@@ -125,8 +102,8 @@ async function runSignupCooldownUxVerification() {
     // Wait for transition to OTP screen
     await page.waitForFunction(() => {
       return document.querySelector('input.auth-otp-input') !== null ||
-             document.body.innerText.includes('Verify Your Email') ||
-             document.body.innerText.includes('Enter the 6-digit verification code');
+        document.body.innerText.includes('Verify Your Email') ||
+        document.body.innerText.includes('Enter the 6-digit verification code');
     }, { timeout: 10000 });
 
     await sleep(500);
@@ -169,7 +146,7 @@ async function runSignupCooldownUxVerification() {
 
     const backToFormText = await page.evaluate(() => document.body.innerText);
     const backHasCooldown = backToFormText.toLowerCase().includes('before requesting a new code') ||
-                            backToFormText.toLowerCase().includes('please wait');
+      backToFormText.toLowerCase().includes('please wait');
     console.log(`  Returned to signup/signin form`);
     console.log(`  Signup form has zero cooldown error: ${!backHasCooldown}`);
     if (backHasCooldown) {
@@ -196,9 +173,9 @@ async function runSignupCooldownUxVerification() {
     await sleep(300);
 
     // Re-fill form with the SAME unverified email (which is still in OTP cooldown)
-    await setInputValue(page, 'input#auth-fullName', testFullName);
-    await setInputValue(page, 'input#auth-email', newEmail);
-    await setInputValue(page, 'input#auth-password', testPassword);
+    await page.type('input#auth-fullName', testFullName);
+    await page.type('input#auth-email', newEmail);
+    await page.type('input#auth-password', testPassword);
     await page.click('button[type="submit"]');
 
     // MUST NOT remain on signup form showing "Please wait X seconds before requesting a new code"
@@ -236,9 +213,9 @@ async function runSignupCooldownUxVerification() {
     await sleep(300);
 
     // Enter existing verified email
-    await setInputValue(page, 'input#auth-fullName', 'Existing User');
-    await setInputValue(page, 'input#auth-email', existingVerifiedEmail);
-    await setInputValue(page, 'input#auth-password', testPassword);
+    await page.type('input#auth-fullName', 'Existing User');
+    await page.type('input#auth-email', existingVerifiedEmail);
+    await page.type('input#auth-password', testPassword);
     await page.click('button[type="submit"]');
 
     // Wait for conflict error banner
@@ -260,10 +237,12 @@ async function runSignupCooldownUxVerification() {
     if (hasSignInActionBtn) {
       await page.click('.auth-error-action-btn');
       await sleep(500);
-      const activeTitle = await page.$eval('.auth-title', el => el.textContent.trim());
-      const isLoginMode = activeTitle.includes('Welcome Back');
-      console.log(`  Clicking [Sign In] switched directly to Sign In mode: ${isLoginMode} ("${activeTitle}")`);
-      if (!isLoginMode) {
+      const isLoginTabActive = await page.evaluate(() => {
+        const activeTab = document.querySelector('.auth-tab.active');
+        return activeTab?.textContent?.includes('Sign In');
+      });
+      console.log(`  Clicking [Sign In] switched directly to Sign In mode: ${isLoginTabActive}`);
+      if (!isLoginTabActive) {
         throw new Error('FAILED: [Sign In] button did not switch to Sign In mode');
       }
     }
@@ -272,29 +251,33 @@ async function runSignupCooldownUxVerification() {
     // SCENARIO 6: Invalid OTP Submission
     // -------------------------------------------------------------
     console.log('\n--- Scenario 6: Invalid OTP Submission ---');
-    // Switch back to Sign Up using auth-switch-btn
-    const switchBtn = await page.$('button.auth-switch-btn');
-    if (switchBtn) {
-      await switchBtn.click();
-      await sleep(500);
+    // Switch back to Sign Up tab and submit unverified email to get back to OTP screen
+    const tabs3 = await page.$$('button.auth-tab');
+    for (const tab of tabs3) {
+      const text = await (await tab.getProperty('textContent')).jsonValue();
+      if (text.includes('Sign Up')) {
+        await tab.click();
+        break;
+      }
     }
-    await setInputValue(page, 'input#auth-fullName', testFullName);
-    await setInputValue(page, 'input#auth-email', newEmail);
-    await setInputValue(page, 'input#auth-password', testPassword);
+    await sleep(300);
+    await page.type('input#auth-fullName', testFullName);
+    await page.type('input#auth-email', newEmail);
+    await page.type('input#auth-password', testPassword);
     await page.click('button[type="submit"]');
 
     await page.waitForSelector('input.auth-otp-input', { timeout: 10000 });
     await sleep(500);
 
     // Enter wrong OTP: 999999
-    await setInputValue(page, 'input.auth-otp-input', '999999');
+    await page.type('input.auth-otp-input', '999999');
     await page.click('button.auth-submit-btn');
 
     await page.waitForSelector('.auth-error-banner', { timeout: 8000 });
     const invalidOtpError = await page.$eval('.auth-error-banner', el => el.textContent.trim());
     console.log(`  Invalid OTP error text: "${invalidOtpError}"`);
 
-    if (!invalidOtpError.toLowerCase().includes('incorrect') && !invalidOtpError.toLowerCase().includes('invalid')) {
+    if (!invalidOtpError.includes('Incorrect verification code. Please try again.')) {
       throw new Error(`FAILED: Expected incorrect code error, got: ${invalidOtpError}`);
     }
 
@@ -313,7 +296,9 @@ async function runSignupCooldownUxVerification() {
     }
 
     // Clear input and enter valid OTP
-    await setInputValue(page, 'input.auth-otp-input', validOtp);
+    await page.click('input.auth-otp-input', { clickCount: 3 });
+    await page.keyboard.press('Backspace');
+    await page.type('input.auth-otp-input', validOtp);
 
     await page.screenshot({ path: path.join(SCREENSHOT_DIR, '08_valid_otp_entered.png') });
     console.log('  Saved screenshot: 08_valid_otp_entered.png');
@@ -323,8 +308,8 @@ async function runSignupCooldownUxVerification() {
     // Wait for redirect to dashboard
     await page.waitForFunction(() => {
       return window.location.pathname === '/dashboard' ||
-             document.body.innerText.includes('Welcome back') ||
-             document.body.innerText.includes('Active Pipeline');
+        document.body.innerText.includes('Welcome back') ||
+        document.body.innerText.includes('Active Pipeline');
     }, { timeout: 12000 });
 
     await sleep(1000);
@@ -335,15 +320,10 @@ async function runSignupCooldownUxVerification() {
     console.log(`  Dashboard loaded: ${dashboardText.includes('Welcome back') || dashboardText.includes('Active Pipeline')}`);
 
     // Verify authenticated state
-    const authToken = await page.evaluate(() => localStorage.getItem('pilotmama_access_token'));
-    const sidebarText = await page.evaluate(() => {
-      const el = document.querySelector('.app-sidebar');
-      return el ? el.innerText : '';
-    });
-    console.log(`  Stored Auth Token: ${authToken ? `${authToken.slice(0, 15)}...` : 'NONE'}`);
-    console.log(`  Sidebar displays Sign In/Register: ${sidebarText.includes('Sign In / Register')}`);
+    const authStorage = await page.evaluate(() => localStorage.getItem('pilotmama_auth_user'));
+    console.log(`  Stored Auth User: ${authStorage ? JSON.parse(authStorage).email : 'NONE'}`);
 
-    if (!authToken || sidebarText.includes('Sign In / Register')) {
+    if (!authStorage || JSON.parse(authStorage).email !== newEmail.toLowerCase()) {
       throw new Error('FAILED: Authenticated candidate session was not authoritatively persisted');
     }
 
@@ -366,8 +346,8 @@ async function runSignupCooldownUxVerification() {
 
     // Log out first so we can view the signup and OTP screens on various viewports
     await page.evaluate(() => {
-      localStorage.removeItem('pilotmama_access_token');
-      localStorage.removeItem('pilotmama_refresh_token');
+      localStorage.removeItem('pilotmama_auth_token');
+      localStorage.removeItem('pilotmama_auth_user');
     });
 
     for (const vp of viewports) {
@@ -382,7 +362,7 @@ async function runSignupCooldownUxVerification() {
           hasHorizontalOverflow: html.scrollWidth > html.clientWidth,
           clientWidth: html.clientWidth,
           scrollWidth: html.scrollWidth,
-          hasRegisterForm: document.querySelector('.auth-form') !== null
+          hasRegisterForm: document.querySelector('#register-form') !== null
         };
       });
 
@@ -406,10 +386,10 @@ async function runSignupCooldownUxVerification() {
     // Cleanup created test records
     await prisma.emailOtp.deleteMany({
       where: { email: { contains: 'cooldown_test_' } }
-    }).catch(() => {});
+    }).catch(() => { });
     await prisma.user.deleteMany({
       where: { email: { contains: 'cooldown_test_' } }
-    }).catch(() => {});
+    }).catch(() => { });
     await prisma.$disconnect();
     await browser.close();
   }

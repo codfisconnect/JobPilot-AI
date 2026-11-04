@@ -60,3 +60,4 @@ runRecommendationDiagnostics().catch(err => {
   console.error('Recommendation diagnostic error:', err);
   process.exit(1);
 });
+

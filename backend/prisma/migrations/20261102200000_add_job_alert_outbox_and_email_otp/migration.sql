@@ -81,3 +81,4 @@ DO $$ BEGIN
         ALTER TABLE "job_alert_outbox" ADD CONSTRAINT "job_alert_outbox_job_id_fkey" FOREIGN KEY ("job_id") REFERENCES "jobs"("id") ON DELETE CASCADE ON UPDATE CASCADE;
     END IF;
 END $$;
+

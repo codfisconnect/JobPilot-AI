@@ -13,3 +13,4 @@ jobAlertRouter.put('/preferences', authenticateJwt, JobAlertController.updatePre
 
 // Outbox batch process
 jobAlertRouter.post('/process', JobAlertController.processQueue);
+

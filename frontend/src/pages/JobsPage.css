@@ -1,11 +1,13 @@
 .jobs-page {
   display: flex;
+  flex-wrap: wrap;
   flex-direction: column;
   gap: 24px;
 }
 
 .jobs-header-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
 }
@@ -24,12 +26,14 @@
 
 .jobs-actions-group {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
 }
 
 /* Mode Navigation Tabs */
 .jobs-nav-tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   background: rgba(255, 255, 255, 0.03);
   padding: 4px;
@@ -67,6 +71,7 @@
 /* Onboarding Guidance Card */
 .jobs-onboarding-card {
   display: flex;
+  flex-wrap: wrap;
   flex-direction: column;
   align-items: center;
   text-align: center;
@@ -110,6 +115,7 @@
 
 .onboarding-actions-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   margin-top: 8px;
@@ -119,6 +125,7 @@
 
 .empty-actions-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   margin-top: 12px;
@@ -176,6 +183,7 @@
 
 .search-input-wrap {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   flex: 1;
@@ -197,6 +205,7 @@
 
 .filter-controls-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   flex-wrap: wrap;
@@ -219,6 +228,7 @@
 
 .jobs-results-meta {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   font-size: 0.875rem;
   color: var(--text-muted);
@@ -233,6 +243,7 @@
 /* Canonical Job Card */
 .canonical-job-card {
   display: flex;
+  flex-wrap: wrap;
   flex-direction: column;
   gap: 12px;
   padding: 20px;
@@ -241,12 +252,14 @@
 
 .job-card-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
 }
 
 .job-company-info {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   color: var(--text-muted);
@@ -256,6 +269,7 @@
 
 .job-badges-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
@@ -345,6 +359,7 @@
 
 .job-meta-details {
   display: flex;
+  flex-wrap: wrap;
   flex-direction: column;
   gap: 6px;
   font-size: 0.8125rem;
@@ -353,6 +368,7 @@
 
 .meta-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
@@ -364,6 +380,7 @@
 
 .job-skills-container {
   display: flex;
+  flex-wrap: wrap;
   flex-wrap: wrap;
   gap: 6px;
   min-height: 48px;
@@ -391,6 +408,7 @@
 
 .job-card-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   margin-top: 8px;
@@ -401,6 +419,7 @@
 /* Pagination Bar */
 .jobs-pagination-bar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: center;
   align-items: center;
   gap: 16px;
@@ -417,6 +436,7 @@
 .jobs-loading-state,
 .jobs-empty-state {
   display: flex;
+  flex-wrap: wrap;
   flex-direction: column;
   align-items: center;
   justify-content: center;
@@ -436,6 +456,7 @@
 
 .jobs-error-banner {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 14px 18px;
@@ -448,12 +469,14 @@
 /* Canonical Job Detail Modal */
 .canonical-job-detail-modal {
   display: flex;
+  flex-wrap: wrap;
   flex-direction: column;
   gap: 20px;
 }
 
 .job-detail-company-strip {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   border-bottom: 1px solid var(--border-subtle);
@@ -474,6 +497,7 @@
 
 .source-transparency-pill {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
@@ -496,6 +520,7 @@
 
 .highlight-item {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   color: var(--text-secondary);
@@ -517,6 +542,7 @@
 
 .job-detail-section {
   display: flex;
+  flex-wrap: wrap;
   flex-direction: column;
   gap: 8px;
 }
@@ -531,11 +557,13 @@
 .skills-badge-list {
   display: flex;
   flex-wrap: wrap;
+  flex-wrap: wrap;
   gap: 8px;
 }
 
 .detail-skill-tag {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
   padding: 4px 10px;
@@ -573,6 +601,7 @@
 
 .job-detail-footer {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   border-top: 1px solid var(--border-subtle);
@@ -590,6 +619,7 @@
 
 .detail-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   flex-wrap: wrap;
 }
@@ -625,18 +655,21 @@
 /* Modal Tab Styling */
 .add-job-modal-flow {
   display: flex;
+  flex-wrap: wrap;
   flex-direction: column;
   gap: 20px;
 }
 
 .tab-switcher {
   display: flex;
+  flex-wrap: wrap;
   border-bottom: 1px solid var(--border-primary);
 }
 
 .tab-btn {
   flex: 1;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   gap: 8px;
@@ -657,6 +690,7 @@
 
 .input-group-area {
   display: flex;
+  flex-wrap: wrap;
   flex-direction: column;
   gap: 8px;
 }
@@ -696,12 +730,14 @@
   border-radius: var(--radius-md);
   font-size: 0.8125rem;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
 }
 
 .modal-action-row {
   display: flex;
+  flex-wrap: wrap;
   justify-content: flex-end;
   gap: 12px;
 }
@@ -843,6 +879,7 @@
   backdrop-filter: blur(4px);
   z-index: 1000;
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: center;
   animation: fadeInOverlay 0.2s ease-out;
@@ -856,6 +893,7 @@
   max-width: 560px;
   max-height: 85vh;
   display: flex;
+  flex-wrap: wrap;
   flex-direction: column;
   animation: slideUpDrawer 0.25s cubic-bezier(0.16, 1, 0.3, 1);
   box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
@@ -863,6 +901,7 @@
 
 .mobile-filter-drawer-header {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   padding: 18px 24px;
@@ -871,6 +910,7 @@
 
 .drawer-title-wrap {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 10px;
   color: var(--text-primary);
@@ -889,6 +929,7 @@
   cursor: pointer;
   padding: 4px;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
   border-radius: var(--radius-sm);
@@ -902,12 +943,14 @@
   padding: 20px 24px;
   overflow-y: auto;
   display: flex;
+  flex-wrap: wrap;
   flex-direction: column;
   gap: 18px;
 }
 
 .drawer-filter-group {
   display: flex;
+  flex-wrap: wrap;
   flex-direction: column;
   gap: 8px;
 }
@@ -917,6 +960,7 @@
   font-weight: 600;
   color: var(--text-secondary);
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 6px;
 }
@@ -934,6 +978,7 @@
 
 .mobile-filter-drawer-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   padding: 16px 24px;
   border-top: 1px solid var(--border-subtle);
@@ -959,6 +1004,7 @@
    ========================================================================== */
 .active-filter-chips-row {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
@@ -1029,6 +1075,7 @@
   height: 18px;
   border-radius: 50%;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: center;
 }

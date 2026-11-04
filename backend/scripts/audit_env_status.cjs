@@ -50,3 +50,4 @@ for (const v of auditedVars) {
   }
   console.log(`| ${v.name} | ${status} | ${v.purpose} |`);
 }
+

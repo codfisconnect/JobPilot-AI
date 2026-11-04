@@ -274,3 +274,4 @@ export const JobSearchMultiSelect: React.FC<JobSearchMultiSelectProps> = ({
     </div>
   );
 };
+
