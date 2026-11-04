@@ -2,7 +2,7 @@ import { env } from '../config/env.js';
 import crypto from 'crypto';
 import { prisma } from '../database/prisma.js';
 import { EmailService } from './email/email.service.js';
-import { BadRequestError, UnauthorizedError } from '../utils/errors.js';
+import { BadRequestError, UnauthorizedError, TooManyRequestsError, AppError } from '../utils/errors.js';
 import { logger } from '../utils/logger.js';
 import { OtpPurpose } from '@prisma/client';
 
@@ -50,7 +50,10 @@ export class OtpService {
     const now = new Date();
     if (recentOtp && recentOtp.resendAfter > now) {
       const waitSeconds = Math.ceil((recentOtp.resendAfter.getTime() - now.getTime()) / 1000);
-      throw new BadRequestError(`Please wait ${waitSeconds} seconds before requesting a new code.`);
+      throw new TooManyRequestsError(`Please wait ${waitSeconds} seconds before requesting a new code.`, {
+        remainingSeconds: waitSeconds,
+        cooldownSeconds: waitSeconds
+      });
     }
 
     // Invalidate previous OTPs for this email and purpose
@@ -84,14 +87,23 @@ export class OtpService {
     logger.info(`[OtpService] Generated new OTP for email <${normalizedEmail}> (Purpose: ${purpose}, Expires in ${this.EXPIRATION_MINUTES}m)`);
 
     // Dispatch corresponding email template
-    if (purpose === 'SIGNUP') {
-      await EmailService.sendVerificationEmail(normalizedEmail, plainCode);
-    } else if (purpose === 'LOGIN') {
-      await EmailService.sendLoginOtpEmail(normalizedEmail, plainCode);
-    } else if (purpose === 'PASSWORD_RESET') {
-      await EmailService.sendPasswordResetEmail(normalizedEmail, plainCode);
-    } else {
-      await EmailService.sendVerificationEmail(normalizedEmail, plainCode);
+    try {
+      if (purpose === 'SIGNUP') {
+        await EmailService.sendVerificationEmail(normalizedEmail, plainCode);
+      } else if (purpose === 'LOGIN') {
+        await EmailService.sendLoginOtpEmail(normalizedEmail, plainCode);
+      } else if (purpose === 'PASSWORD_RESET') {
+        await EmailService.sendPasswordResetEmail(normalizedEmail, plainCode);
+      } else {
+        await EmailService.sendVerificationEmail(normalizedEmail, plainCode);
+      }
+    } catch (sendErr) {
+      // If email sending failed, purge the created OTP record so no fake cooldown/active OTP remains
+      await prisma.emailOtp.deleteMany({
+        where: { email: normalizedEmail, purpose }
+      }).catch(() => {});
+      logger.error(`[OtpService] Email dispatch failed for <${normalizedEmail}>:`, sendErr);
+      throw new AppError("We couldn't send the verification code. Please try again.", 500, 'EMAIL_SEND_FAILED');
     }
 
     return {

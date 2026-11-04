@@ -49,9 +49,9 @@ export class AuthService {
     const existing = await this.userRepo.findByEmail(normalizedEmail);
     if (existing) {
       if (existing.emailVerified) {
-        throw new ConflictError('A user with this email address already exists. Please sign in instead.');
+        throw new ConflictError('An account already exists with this email. Please sign in.');
       }
-      // If user exists but is unverified, update their password hash and resend OTP
+      // If user exists but is unverified, update their password hash and candidate profile
       const passwordHash = await hashPassword(data.password);
       await prisma.user.update({
         where: { id: existing.id },
@@ -67,6 +67,26 @@ export class AuthService {
             : undefined
         }
       });
+
+      // Check if an OTP was recently sent and is still in cooldown
+      const recentOtp = await prisma.emailOtp.findFirst({
+        where: {
+          email: normalizedEmail,
+          purpose: OtpPurpose.SIGNUP,
+          verified: false
+        },
+        orderBy: { createdAt: 'desc' }
+      });
+      const now = new Date();
+      if (recentOtp && recentOtp.expiresAt > now && recentOtp.resendAfter > now) {
+        const waitSeconds = Math.ceil((recentOtp.resendAfter.getTime() - now.getTime()) / 1000);
+        return {
+          requiresVerification: true,
+          email: normalizedEmail,
+          message: 'Verification code already sent. Please enter the 6-digit code sent to your email.',
+          cooldownSeconds: waitSeconds
+        };
+      }
     } else {
       // Create pending unverified user
       const passwordHash = await hashPassword(data.password);

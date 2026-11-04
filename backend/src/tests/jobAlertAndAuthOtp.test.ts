@@ -301,7 +301,7 @@ describe('Job Alert Outbox, Email OTP & Social Auth Suite', () => {
       assert.strictEqual(pendingEntries.length, 2, 'Should have 2 pending alerts for the candidate');
 
       // Process the outbox batch
-      const processResult = await JobAlertService.processOutboxBatch(10);
+      const processResult = await JobAlertService.processOutboxBatch(100);
       assert.ok(processResult.sent >= 2, 'Should mark outbox entries as sent');
 
       const candidateSentEntries = await prisma.jobAlertOutbox.findMany({

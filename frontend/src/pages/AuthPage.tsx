@@ -110,7 +110,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
         setOtpPurpose('SIGNUP');
         setOtpCode('');
         setCooldown(res.cooldownSeconds || 60);
-        setSuccessNotice('Verification code sent to your email.');
+        setSuccessNotice(res.message || 'Verification code sent to your email.');
         setMode('otp_verification');
       } else if (onSuccess) {
         onSuccess();
@@ -119,8 +119,26 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       const normalized = normalizeApiError(err);
       let userMsg = normalized.message;
       if (normalized.code === 'CONFLICT' || userMsg.toLowerCase().includes('already exists')) {
-        userMsg = 'An account with this email already exists. Please sign in instead.';
+        userMsg = 'An account already exists with this email. Please sign in.';
+        setLocalError(userMsg);
+        return;
       }
+
+      // If an existing unverified account already had an active OTP in cooldown:
+      if (
+        normalized.code === 'TOO_MANY_REQUESTS' ||
+        userMsg.toLowerCase().includes('before requesting a new code') ||
+        userMsg.toLowerCase().includes('wait')
+      ) {
+        const remaining = (err as any).details?.remainingSeconds || (err as any).details?.cooldownSeconds || 60;
+        setOtpPurpose('SIGNUP');
+        setOtpCode('');
+        setCooldown(remaining);
+        setSuccessNotice('A verification code was recently sent. Please enter the 6-digit code sent to your email.');
+        setMode('otp_verification');
+        return;
+      }
+
       setLocalError(userMsg);
     } finally {
       setIsSubmitting(false);
@@ -148,11 +166,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       setOtpPurpose('LOGIN');
       setOtpCode('');
       setCooldown(res.cooldownSeconds || 60);
-      setSuccessNotice('Verification code sent to your email.');
+      setSuccessNotice(res.message || 'Verification code sent to your email.');
       setMode('otp_verification');
     } catch (err: any) {
       const normalized = normalizeApiError(err);
-      setLocalError(normalized.message || 'Unable to send verification code. Please try again.');
+      let userMsg = normalized.message;
+      if (
+        normalized.code === 'TOO_MANY_REQUESTS' ||
+        userMsg.toLowerCase().includes('before requesting a new code') ||
+        userMsg.toLowerCase().includes('wait')
+      ) {
+        const remaining = (err as any).details?.remainingSeconds || (err as any).details?.cooldownSeconds || 60;
+        setOtpPurpose('LOGIN');
+        setOtpCode('');
+        setCooldown(remaining);
+        setSuccessNotice('A login code was recently sent. Please enter the 6-digit code sent to your email.');
+        setMode('otp_verification');
+        return;
+      }
+      setLocalError(userMsg || 'Unable to send verification code. Please try again.');
     } finally {
       setIsSubmitting(false);
     }
@@ -289,7 +321,16 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       setSuccessNotice('Verification code sent to your email.');
     } catch (err: any) {
       const normalized = normalizeApiError(err);
-      setLocalError(normalized.message || 'Unable to resend code. Please try again.');
+      if (
+        normalized.code === 'TOO_MANY_REQUESTS' ||
+        normalized.message.toLowerCase().includes('wait')
+      ) {
+        const remaining = (err as any).details?.remainingSeconds || (err as any).details?.cooldownSeconds || 60;
+        setCooldown(remaining);
+        setSuccessNotice(normalized.message);
+      } else {
+        setLocalError(normalized.message || 'Unable to resend code. Please try again.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -387,6 +428,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
   const switchMode = (newMode: 'login' | 'register') => {
     setMode(newMode);
+    setCooldown(0);
     setLocalError(null);
     setSuccessNotice(null);
     clearError();
@@ -395,7 +437,9 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     }
   };
 
-  const activeError = localError || error;
+  const rawError = localError || error;
+  const isCooldownMsg = Boolean(rawError && (rawError.toLowerCase().includes('before requesting a new code') || rawError.toLowerCase().includes('wait')));
+  const activeError = (isCooldownMsg && (mode === 'register' || mode === 'login')) ? null : rawError;
 
   return (
     <div className="auth-card" role="region" aria-label="Pilot Mama Authentication">
@@ -428,7 +472,21 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       {activeError && (
         <div className="auth-error-banner" role="alert">
           <AlertCircle size={18} className="auth-error-icon" />
-          <span className="auth-error-text">{activeError}</span>
+          <div className="auth-error-content">
+            <span className="auth-error-text">{activeError}</span>
+            {activeError.includes('already exists') && (
+              <button
+                type="button"
+                className="auth-error-action-btn"
+                onClick={() => {
+                  switchMode('login');
+                  setLoginMethod('password');
+                }}
+              >
+                Sign In
+              </button>
+            )}
+          </div>
         </div>
       )}
 
@@ -464,20 +522,17 @@ export const AuthPage: React.FC<AuthPageProps> = ({
               />
             </div>
             <div className="auth-resend-row">
-              <span className="auth-resend-text">
-                {cooldown > 0 ? (
-                  `Resend code in ${cooldown}s`
-                ) : (
-                  <button
-                    type="button"
-                    className="auth-link-btn"
-                    onClick={handleResendOtp}
-                    disabled={isSubmitting}
-                  >
-                    <RotateCw size={12} /> Resend verification code
-                  </button>
-                )}
-              </span>
+              <span className="auth-resend-text">Didn't receive the code?</span>
+              <button
+                type="button"
+                className="auth-link-btn"
+                onClick={handleResendOtp}
+                disabled={isSubmitting || cooldown > 0}
+                aria-disabled={isSubmitting || cooldown > 0}
+              >
+                <RotateCw size={13} className={isSubmitting ? 'spinning' : ''} />
+                <span>{cooldown > 0 ? `Resend in ${cooldown}s` : 'Resend Code'}</span>
+              </button>
             </div>
           </div>
 
@@ -533,11 +588,14 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             type="button"
             className="auth-back-btn"
             onClick={() => {
-              setMode('login');
+              setMode(otpPurpose === 'SIGNUP' ? 'register' : 'login');
+              setCooldown(0);
               setLocalError(null);
+              setSuccessNotice(null);
+              setOtpCode('');
             }}
           >
-            <ArrowLeft size={14} /> Back to Sign In
+            <ArrowLeft size={14} /> Back to {otpPurpose === 'SIGNUP' ? 'Sign Up' : 'Sign In'}
           </button>
         </form>
       )}
@@ -559,7 +617,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                 className="auth-input"
                 placeholder="you@domain.com"
                 value={email}
-                onChange={e => setEmail(e.target.value)}
+                onChange={e => { setEmail(e.target.value); if (cooldown > 0) setCooldown(0); if (localError) setLocalError(null); }}
                 disabled={isSubmitting}
                 autoComplete="email"
               />
@@ -712,7 +770,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     className="auth-input"
                     placeholder="e.g. Syed Salman A"
                     value={fullName}
-                    onChange={e => setFullName(e.target.value)}
+                    onChange={e => { setFullName(e.target.value); if (localError) setLocalError(null); }}
                     disabled={isSubmitting || Boolean(socialLoading)}
                     autoComplete="name"
                   />
@@ -770,7 +828,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
                     className="auth-input auth-password-input"
                     placeholder={mode === 'register' ? 'At least 8 characters' : 'Enter your password'}
                     value={password}
-                    onChange={e => setPassword(e.target.value)}
+                    onChange={e => { setPassword(e.target.value); if (localError) setLocalError(null); }}
                     disabled={isSubmitting || Boolean(socialLoading)}
                     autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
                   />
