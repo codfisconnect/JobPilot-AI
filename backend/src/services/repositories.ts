@@ -153,8 +153,11 @@ export class JobRepository {
         id, role, company, location, sourceUrl, sourceType, source, applicationUrl,
         applicationMethod, employmentType, workMode, publishedDate, isExternal, externalJobId,
         experienceRequired, salary, careerTrack, mustHaveSkills, niceToHaveSkills,
-        responsibilities, qualifications, rawText, createdAt, applicationMode
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        responsibilities, qualifications, rawText, createdAt, applicationMode,
+        applicationType, openingsCount, department, roleCategory, screeningQuestions,
+        rating, reviewsCount, companyLogo, companyWebsite, companySize, companyHeadquarters,
+        companyFounded, companyDescription, benefits
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         job.id,
         job.role,
@@ -164,25 +167,39 @@ export class JobRepository {
         job.sourceType,
         job.source || (job.isExternal ? 'Codewalla' : 'JobPilot Predefined'),
         job.applicationUrl || '',
-        job.applicationMethod || 'External Website',
+        job.applicationMethod || (job.applicationType === 'INTERNAL' ? 'JobPilot Portal' : 'External Website'),
         job.employmentType || 'Full-time',
         job.workMode || 'Onsite',
         job.publishedDate || '',
-        job.isExternal ? 1 : 0,
+        job.isExternal ? 1 : (job.applicationType === 'INTERNAL' ? 0 : 1),
         job.externalJobId || '',
         job.experienceRequired,
         job.salary || '',
         job.careerTrack,
-        JSON.stringify(job.mustHaveSkills),
-        JSON.stringify(job.niceToHaveSkills),
-        JSON.stringify(job.responsibilities),
-        JSON.stringify(job.qualifications),
+        JSON.stringify(job.mustHaveSkills || []),
+        JSON.stringify(job.niceToHaveSkills || []),
+        JSON.stringify(job.responsibilities || []),
+        JSON.stringify(job.qualifications || []),
         job.rawText,
         job.createdAt,
         // Codewalla is MANDATORY demo. Other jobs use explicitly assigned mode or default to demo.
         job.company.toLowerCase().includes('codewalla') || (job.source && job.source.toLowerCase().includes('codewalla'))
           ? 'demo'
-          : (job.applicationMode || (job.isExternal ? 'external' : 'demo'))
+          : (job.applicationMode || (job.isExternal ? 'external' : 'demo')),
+        job.applicationType || (job.isExternal ? 'EXTERNAL' : 'INTERNAL'),
+        job.openingsCount || 1,
+        job.department || 'Engineering',
+        job.roleCategory || 'Software Development',
+        JSON.stringify(job.screeningQuestions || []),
+        job.rating || 4.2,
+        job.reviewsCount || 0,
+        job.companyLogo || '',
+        job.companyWebsite || '',
+        job.companySize || '10,000+ Employees',
+        job.companyHeadquarters || 'Bangalore, India',
+        job.companyFounded || '',
+        job.companyDescription || '',
+        JSON.stringify(job.benefits || [])
       ]
     );
     saveDb();
@@ -209,6 +226,12 @@ export class JobRepository {
       source: row.source || (row.isExternal ? 'Codewalla' : 'JobPilot Predefined'),
       isExternal: Boolean(row.isExternal),
       applicationMode: appMode,
+      applicationType: row.applicationType || (row.isExternal ? 'EXTERNAL' : 'INTERNAL'),
+      openingsCount: row.openingsCount ? Number(row.openingsCount) : 1,
+      rating: row.rating ? Number(row.rating) : 4.2,
+      reviewsCount: row.reviewsCount ? Number(row.reviewsCount) : 0,
+      screeningQuestions: JSON.parse(row.screeningQuestions || '[]'),
+      benefits: JSON.parse(row.benefits || '[]'),
       mustHaveSkills: JSON.parse(row.mustHaveSkills || '[]'),
       niceToHaveSkills: JSON.parse(row.niceToHaveSkills || '[]'),
       responsibilities: JSON.parse(row.responsibilities || '[]'),
@@ -476,13 +499,17 @@ export class ApplicationRepository {
     // Codewalla is MANDATORY demo
     const isCodewalla = (app.company && app.company.toLowerCase().includes('codewalla'));
     const safeMode = isCodewalla ? 'demo' : (app.applicationMode || 'demo');
+    const safeType = app.applicationType || (app.applicationMode === 'external' ? 'EXTERNAL' : 'INTERNAL');
 
     db.run(
       `INSERT OR REPLACE INTO applications (
         id, candidateId, jobId, resumeVersionId, resumeVersionName, company, role, location,
         jobUrl, matchScore, status, applicationDate, notes, customAnswers, createdAt, updatedAt,
-        applicationMode, applicationUrl, atsScore, appliedAt, skillGaps, timeline, coverLetter
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+        applicationMode, applicationUrl, atsScore, appliedAt, skillGaps, timeline, coverLetter,
+        applicationType, employerId, candidateName, candidateEmail, candidatePhone, candidateLocation,
+        candidateExperience, candidateDesignation, resumeUrl, screeningAnswers, statusHistory,
+        interviewDetails, employerNotes
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         app.id,
         app.candidateId,
@@ -506,11 +533,36 @@ export class ApplicationRepository {
         app.appliedAt || app.applicationDate,
         JSON.stringify(app.skillGaps || []),
         JSON.stringify(app.timeline || []),
-        app.coverLetter || ''
+        app.coverLetter || '',
+        safeType,
+        app.employerId || '',
+        app.candidateName || '',
+        app.candidateEmail || '',
+        app.candidatePhone || '',
+        app.candidateLocation || '',
+        app.candidateExperience || 0,
+        app.candidateDesignation || '',
+        app.resumeUrl || '',
+        JSON.stringify(app.screeningAnswers || {}),
+        JSON.stringify(app.statusHistory || []),
+        JSON.stringify(app.interviewDetails || {}),
+        app.employerNotes || ''
       ]
     );
     saveDb();
-    return { ...app, applicationMode: safeMode };
+    return { ...app, applicationMode: safeMode, applicationType: safeType as any };
+  }
+
+  public static async getByEmployerOrCompany(companyOrEmployerId: string): Promise<ApplicationRecord[]> {
+    const db = await getDb();
+    const clean = companyOrEmployerId.toLowerCase();
+    const res = db.exec(`SELECT * FROM applications WHERE LOWER(company) LIKE '%${clean}%' OR employerId = '${companyOrEmployerId}' ORDER BY createdAt DESC`);
+    if (!res.length || !res[0].values) return [];
+    return res[0].values.map(row => {
+      const obj: any = {};
+      res[0].columns.forEach((c, idx) => { obj[c] = row[idx]; });
+      return this.deserialize(obj);
+    });
   }
 
   private static deserialize(row: any): ApplicationRecord {
@@ -520,8 +572,13 @@ export class ApplicationRepository {
     return {
       ...row,
       applicationMode: appMode,
+      applicationType: row.applicationType || (row.applicationMode === 'external' ? 'EXTERNAL' : 'INTERNAL'),
       atsScore: row.atsScore ? Number(row.atsScore) : undefined,
+      candidateExperience: row.candidateExperience ? Number(row.candidateExperience) : undefined,
       customAnswers: JSON.parse(row.customAnswers || '{}'),
+      screeningAnswers: JSON.parse(row.screeningAnswers || '{}'),
+      statusHistory: JSON.parse(row.statusHistory || '[]'),
+      interviewDetails: JSON.parse(row.interviewDetails || '{}'),
       skillGaps: JSON.parse(row.skillGaps || '[]'),
       timeline: JSON.parse(row.timeline || '[]')
     };
@@ -800,6 +857,210 @@ export class LearningRepository {
     );
     saveDb();
     return institute;
+  }
+}
+
+export class CompanyReviewRepository {
+  public static async getAll(companyName?: string): Promise<any[]> {
+    const db = await getDb();
+    let query = 'SELECT * FROM company_reviews ORDER BY createdAt DESC';
+    if (companyName) {
+      const clean = companyName.toLowerCase().replace(/'/g, "''");
+      query = `SELECT * FROM company_reviews WHERE LOWER(companyName) LIKE '%${clean}%' ORDER BY createdAt DESC`;
+    }
+    const res = db.exec(query);
+    if (!res.length || !res[0].values) return [];
+    return res[0].values.map(row => {
+      const obj: any = {};
+      res[0].columns.forEach((c, idx) => { obj[c] = row[idx]; });
+      return {
+        ...obj,
+        rating: Number(obj.rating || 0),
+        workCultureRating: Number(obj.workCultureRating || 0),
+        salaryBenefitsRating: Number(obj.salaryBenefitsRating || 0),
+        careerGrowthRating: Number(obj.careerGrowthRating || 0),
+        workLifeBalanceRating: Number(obj.workLifeBalanceRating || 0),
+        isVerified: Boolean(obj.isVerified)
+      };
+    });
+  }
+
+  public static async save(review: any): Promise<any> {
+    const db = await getDb();
+    db.run(
+      `INSERT OR REPLACE INTO company_reviews (
+        id, companyName, companyId, reviewerName, reviewerRole, rating, title, reviewText,
+        pros, cons, workCultureRating, salaryBenefitsRating, careerGrowthRating,
+        workLifeBalanceRating, employmentStatus, isVerified, createdAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        review.id,
+        review.companyName,
+        review.companyId || '',
+        review.reviewerName,
+        review.reviewerRole || 'Software Professional',
+        review.rating || 4.0,
+        review.title,
+        review.reviewText || '',
+        review.pros || '',
+        review.cons || '',
+        review.workCultureRating || review.rating || 4.0,
+        review.salaryBenefitsRating || review.rating || 4.0,
+        review.careerGrowthRating || review.rating || 4.0,
+        review.workLifeBalanceRating || review.rating || 4.0,
+        review.employmentStatus || 'Current Employee',
+        review.isVerified ? 1 : 1,
+        review.createdAt || new Date().toISOString()
+      ]
+    );
+    saveDb();
+    return review;
+  }
+}
+
+export class FollowedCompanyRepository {
+  public static async getByCandidateId(candidateId: string): Promise<any[]> {
+    const db = await getDb();
+    const clean = candidateId.replace(/'/g, "''");
+    const res = db.exec(`SELECT * FROM followed_companies WHERE candidateId = '${clean}' ORDER BY followedAt DESC`);
+    if (!res.length || !res[0].values) return [];
+    return res[0].values.map(row => {
+      const obj: any = {};
+      res[0].columns.forEach((c, idx) => { obj[c] = row[idx]; });
+      return {
+        ...obj,
+        notificationsEnabled: Boolean(obj.notificationsEnabled)
+      };
+    });
+  }
+
+  public static async isFollowing(candidateId: string, companyName: string): Promise<boolean> {
+    const db = await getDb();
+    const cClean = candidateId.replace(/'/g, "''");
+    const nameClean = companyName.toLowerCase().replace(/'/g, "''");
+    const res = db.exec(`SELECT 1 FROM followed_companies WHERE candidateId = '${cClean}' AND LOWER(companyName) = '${nameClean}' LIMIT 1`);
+    return Boolean(res.length && res[0].values && res[0].values.length > 0);
+  }
+
+  public static async follow(candidateId: string, companyName: string, companyId?: string): Promise<void> {
+    const db = await getDb();
+    const id = `fc-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`;
+    db.run(
+      `INSERT OR REPLACE INTO followed_companies (id, candidateId, companyName, companyId, notificationsEnabled, followedAt)
+       VALUES (?, ?, ?, ?, 1, ?)`,
+      [id, candidateId, companyName, companyId || '', new Date().toISOString()]
+    );
+    saveDb();
+  }
+
+  public static async unfollow(candidateId: string, companyName: string): Promise<void> {
+    const db = await getDb();
+    const cClean = candidateId.replace(/'/g, "''");
+    const nameClean = companyName.toLowerCase().replace(/'/g, "''");
+    db.run(`DELETE FROM followed_companies WHERE candidateId = '${cClean}' AND LOWER(companyName) = '${nameClean}'`);
+    saveDb();
+  }
+}
+
+export class JobAlertRepository {
+  public static async getByCandidateId(candidateId: string): Promise<any[]> {
+    const db = await getDb();
+    const clean = candidateId.replace(/'/g, "''");
+    const res = db.exec(`SELECT * FROM job_alerts WHERE candidateId = '${clean}' ORDER BY createdAt DESC`);
+    if (!res.length || !res[0].values) return [];
+    return res[0].values.map(row => {
+      const obj: any = {};
+      res[0].columns.forEach((c, idx) => { obj[c] = row[idx]; });
+      return {
+        ...obj,
+        isActive: Boolean(obj.isActive),
+        experienceMin: obj.experienceMin ? Number(obj.experienceMin) : undefined,
+        experienceMax: obj.experienceMax ? Number(obj.experienceMax) : undefined
+      };
+    });
+  }
+
+  public static async save(alert: any): Promise<any> {
+    const db = await getDb();
+    db.run(
+      `INSERT OR REPLACE INTO job_alerts (
+        id, candidateId, title, keywords, location, experienceMin, experienceMax, salaryMin, frequency, isActive, createdAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        alert.id,
+        alert.candidateId,
+        alert.title,
+        alert.keywords || '',
+        alert.location || '',
+        alert.experienceMin || null,
+        alert.experienceMax || null,
+        alert.salaryMin || '',
+        alert.frequency || 'Daily',
+        alert.isActive !== false ? 1 : 0,
+        alert.createdAt || new Date().toISOString()
+      ]
+    );
+    saveDb();
+    return alert;
+  }
+
+  public static async delete(id: string): Promise<void> {
+    const db = await getDb();
+    db.run('DELETE FROM job_alerts WHERE id = ?', [id]);
+    saveDb();
+  }
+}
+
+export class SqliteUserRepository {
+  public static async findByEmail(email: string): Promise<any | null> {
+    const db = await getDb();
+    const clean = (email || '').toLowerCase().trim().replace(/'/g, "''");
+    const res = db.exec(`SELECT * FROM users WHERE LOWER(email) = '${clean}' LIMIT 1`);
+    if (!res.length || !res[0].values || !res[0].values.length) return null;
+    const obj: any = {};
+    res[0].columns.forEach((col, i) => { obj[col] = res[0].values[0][i]; });
+    return obj;
+  }
+
+  public static async findById(id: string): Promise<any | null> {
+    const db = await getDb();
+    const clean = id.replace(/'/g, "''");
+    const res = db.exec(`SELECT * FROM users WHERE id = '${clean}' LIMIT 1`);
+    if (!res.length || !res[0].values || !res[0].values.length) return null;
+    const obj: any = {};
+    res[0].columns.forEach((col, i) => { obj[col] = res[0].values[0][i]; });
+    return obj;
+  }
+
+  public static async save(user: any): Promise<any> {
+    const db = await getDb();
+    db.run(
+      `INSERT OR REPLACE INTO users (
+        id, email, passwordHash, fullName, phone, role, location, experience, designation,
+        companyName, companyWebsite, industry, companySize, emailVerified, isActive, createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        user.id,
+        user.email.toLowerCase().trim(),
+        user.passwordHash,
+        user.fullName || '',
+        user.phone || '',
+        user.role || 'CANDIDATE',
+        user.location || '',
+        user.experience || 0,
+        user.designation || '',
+        user.companyName || '',
+        user.companyWebsite || '',
+        user.industry || '',
+        user.companySize || '',
+        user.emailVerified ? 1 : 1,
+        user.isActive ? 1 : 1,
+        user.createdAt || new Date().toISOString(),
+        user.updatedAt || new Date().toISOString()
+      ]
+    );
+    saveDb();
+    return user;
   }
 }
 

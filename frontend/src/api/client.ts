@@ -289,7 +289,21 @@ export class ApiClient {
   }
 
   // Authentication API methods
-  async register(data: { email: string; password: string; fullName?: string; role?: string }): Promise<RegisterResponse> {
+  async register(data: {
+    email: string;
+    password: string;
+    fullName?: string;
+    role?: string;
+    phone?: string;
+    location?: string;
+    experience?: number | string;
+    designation?: string;
+    companyName?: string;
+    companyWebsite?: string;
+    industry?: string;
+    companySize?: string;
+    [key: string]: any;
+  }): Promise<RegisterResponse> {
     const res = await this.request<RegisterResponse>('/auth/register', {
       method: 'POST',
       body: JSON.stringify(data)

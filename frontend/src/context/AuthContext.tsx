@@ -7,7 +7,21 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isLoading: boolean;
   login: (credentials: { email: string; password?: string; code?: string }) => Promise<any>;
-  register: (data: { email: string; password: string; fullName?: string }) => Promise<RegisterResponse>;
+  register: (data: {
+    email: string;
+    password: string;
+    fullName?: string;
+    role?: 'CANDIDATE' | 'EMPLOYER' | 'INSTITUTE' | 'ADMIN';
+    phone?: string;
+    location?: string;
+    experience?: number | string;
+    designation?: string;
+    companyName?: string;
+    companyWebsite?: string;
+    industry?: string;
+    companySize?: string;
+    [key: string]: any;
+  }) => Promise<RegisterResponse>;
   verifyOtp: (data: { email: string; code: string; purpose?: string; newPassword?: string }) => Promise<User>;
   requestOtp: (data: { email: string; purpose?: string }) => Promise<OtpResponse>;
   resendOtp: (data: { email: string; purpose?: string }) => Promise<OtpResponse>;
@@ -118,7 +132,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const register = useCallback(async (data: { email: string; password: string; fullName?: string }) => {
+  const register = useCallback(async (data: any) => {
     try {
       setError(null);
       const res = await apiClient.register(data);

@@ -1,0 +1,434 @@
+/* Job Apply Modals Styling (Internal & External) */
+
+.internal-apply-container,
+.external-apply-container {
+  padding: 0.5rem 0.25rem;
+  color: var(--text-primary);
+}
+
+.apply-job-header-strip {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 1.25rem;
+  background: var(--bg-surface-active, rgba(255, 255, 255, 0.04));
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg, 12px);
+  margin-bottom: 1.5rem;
+}
+
+.apply-company-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-md, 8px);
+  background: var(--accent-primary, #6366f1);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.apply-job-role {
+  margin: 0;
+  font-size: 1.125rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.apply-job-company {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  display: block;
+  margin-top: 2px;
+}
+
+.apply-job-type-badge {
+  display: inline-block;
+  margin-top: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.12);
+  color: var(--accent-primary, #6366f1);
+  border: 1px solid rgba(99, 102, 241, 0.25);
+}
+
+.apply-section {
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid var(--border-secondary, rgba(255, 255, 255, 0.08));
+}
+
+.apply-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.apply-sec-icon {
+  color: var(--accent-primary, #6366f1);
+}
+
+.apply-sec-title {
+  margin: 0;
+  font-size: 0.9375rem;
+  font-weight: 700;
+}
+
+.apply-sec-desc {
+  margin: 0 0 0.875rem 0;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+}
+
+/* Resume radio cards */
+.resume-options-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+}
+
+.resume-option-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md, 8px);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.resume-option-card:hover {
+  border-color: var(--accent-primary);
+}
+
+.resume-option-card.selected {
+  border-color: var(--accent-primary, #6366f1);
+  background: rgba(99, 102, 241, 0.05);
+}
+
+.resume-option-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.resume-option-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.resume-option-meta {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* 2-column grid for fields */
+.apply-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.875rem;
+}
+
+@media (max-width: 600px) {
+  .apply-grid-2 {
+    grid-template-columns: 1fr;
+  }
+}
+
+.apply-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.apply-field label {
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.apply-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.apply-input-wrap svg {
+  position: absolute;
+  left: 0.75rem;
+  color: var(--text-muted);
+  pointer-events: none;
+}
+
+.apply-input-wrap input {
+  width: 100%;
+  height: 40px;
+  background: var(--input-bg, var(--bg-surface));
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md, 8px);
+  padding: 0 0.75rem 0 2.25rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  box-sizing: border-box;
+}
+
+.apply-input-wrap input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+/* Screening Questions */
+.screening-questions-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.875rem;
+}
+
+.screening-q-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.screening-q-label {
+  font-size: 0.84375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.screening-q-label .q-num {
+  color: var(--accent-primary, #6366f1);
+}
+
+.screening-q-input {
+  width: 100%;
+  background: var(--input-bg, var(--bg-surface));
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md, 8px);
+  padding: 0.625rem 0.75rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  box-sizing: border-box;
+  resize: vertical;
+}
+
+.screening-q-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
+}
+
+.apply-footer-bar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  margin-top: 1.25rem;
+  padding-top: 1rem;
+}
+
+.apply-error-banner {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: var(--radius-md, 8px);
+  color: #ef4444;
+  font-size: 0.875rem;
+  margin-bottom: 1.25rem;
+}
+
+/* Success Confirmation View */
+.apply-success-view,
+.ext-step-done {
+  text-align: center;
+  padding: 1.5rem 1rem;
+}
+
+.apply-success-badge,
+.ext-icon-circle.done {
+  width: 72px;
+  height: 72px;
+  margin: 0 auto 1.25rem auto;
+  border-radius: 50%;
+  background: rgba(16, 185, 129, 0.12);
+  color: #10b981;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.success-title {
+  margin: 0;
+  font-size: 1.375rem;
+  font-weight: 700;
+}
+
+.success-subtitle {
+  margin: 0.5rem 0 1.5rem 0;
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  line-height: 1.5;
+}
+
+.success-details-card {
+  max-width: 440px;
+  margin: 0 auto 1.5rem auto;
+  background: var(--bg-surface-active, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-lg, 12px);
+  padding: 1rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  text-align: left;
+}
+
+.detail-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.84375rem;
+}
+
+.detail-label {
+  color: var(--text-muted);
+}
+
+.detail-val {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.status-badge.status-submitted {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 700;
+}
+
+.success-actions-row,
+.ext-actions-center {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+}
+
+/* External Modal Specifics */
+.ext-step-redirect,
+.ext-step-confirmation {
+  text-align: center;
+  padding: 0.75rem 0.5rem;
+}
+
+.ext-icon-row {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 1rem;
+}
+
+.ext-icon-circle {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  background: rgba(99, 102, 241, 0.1);
+  color: var(--accent-primary, #6366f1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ext-icon-circle.waiting {
+  background: rgba(245, 158, 11, 0.12);
+  color: #f59e0b;
+}
+
+.ext-main-title {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.ext-main-desc {
+  margin: 0.5rem 0 1.25rem 0;
+  font-size: 0.9375rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.ext-disclaimer-box {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+  border-radius: var(--radius-md, 8px);
+  padding: 0.875rem 1rem;
+  margin-bottom: 1.25rem;
+  text-align: left;
+}
+
+.disclaimer-icon {
+  color: #f59e0b;
+  flex-shrink: 0;
+  margin-top: 2px;
+}
+
+.disclaimer-text {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  line-height: 1.45;
+}
+
+.ext-options-card {
+  background: var(--bg-surface-active, rgba(255, 255, 255, 0.03));
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md, 8px);
+  padding: 0.75rem 1rem;
+  margin-bottom: 1.5rem;
+  text-align: left;
+}
+
+.ext-checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.ext-checkbox-label input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--accent-primary, #6366f1);
+  cursor: pointer;
+}
+
+.ext-actions-row {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ext-confirm-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+

@@ -56,8 +56,16 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onApply, onOpen
         <div className="job-company-info">
           <Building size={16} className="company-icon" />
           <span className="job-company-name">{job.company?.name || 'Company'}</span>
+          {job.rating && (
+            <span className="job-card-rating" style={{ display: 'inline-flex', alignItems: 'center', gap: '2px', fontSize: '0.75rem', fontWeight: 700, color: '#f59e0b', marginLeft: '6px' }}>
+              ★ {job.rating}
+            </span>
+          )}
         </div>
         <div className="job-badges-row">
+          <span className={`source-type-badge ${job.applicationType === 'EXTERNAL' ? 'badge-external' : 'badge-internal'}`} style={{ fontSize: '0.6875rem', padding: '2px 7px', borderRadius: '999px', fontWeight: 600 }}>
+            {job.applicationType === 'EXTERNAL' ? 'External' : 'Direct'}
+          </span>
           {job.recommendation && (
             <span className={`recommendation-badge ${job.recommendation.isStrongMatch ? 'badge-strong-match' : 'badge-good-match'}`}>
               <Sparkles size={12} className="inline mr-1" />

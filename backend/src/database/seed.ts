@@ -1,6 +1,15 @@
 import { getDb, saveDb } from './db.js';
-import { CandidateRepository, JobRepository, ApplicationRepository } from '../services/repositories.js';
+import {
+  CandidateRepository,
+  JobRepository,
+  ApplicationRepository,
+  CompanyReviewRepository,
+  FollowedCompanyRepository,
+  JobAlertRepository,
+  SqliteUserRepository
+} from '../services/repositories.js';
 import { CandidateProfile, JobDescription, ApplicationRecord } from '../types/index.js';
+import { hashPassword } from '../utils/password.js';
 
 export const demoCandidates: CandidateProfile[] = [
   {
@@ -309,7 +318,22 @@ export const demoJobs: JobDescription[] = [
     location: 'Bangalore, India (Hybrid)',
     sourceUrl: 'https://hcltech.com/careers/senior-qa-automation-engineer',
     sourceType: 'sample',
-    applicationMode: 'demo',
+    source: 'External Job Board',
+    applicationMode: 'external',
+    applicationType: 'EXTERNAL',
+    applicationUrl: 'https://hcltech.com/careers/senior-qa-automation-engineer',
+    openingsCount: 5,
+    department: 'Digital Quality Services',
+    roleCategory: 'Automation Testing',
+    rating: 3.9,
+    reviewsCount: 4200,
+    companyLogo: 'https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=128&auto=format&fit=crop&q=80',
+    companyWebsite: 'https://hcltech.com',
+    companySize: '100,000+ Employees',
+    companyHeadquarters: 'Noida, Uttar Pradesh, India',
+    companyFounded: '1976',
+    companyDescription: 'HCLTech is a global technology company, home to more than 224,000 people across 60 countries, delivering industry-leading capabilities centered around digital, engineering, cloud and AI.',
+    benefits: ['Comprehensive Group Health Insurance', 'Provident Fund & Gratuity', 'Transport Allowance', 'Upskilling Certifications'],
     experienceRequired: '5-7 years',
     salary: '₹20,00,000 - ₹25,00,000 INR',
     careerTrack: 'QA Automation',
@@ -535,6 +559,376 @@ export const demoJobs: JobDescription[] = [
     ],
     rawText: 'PhonePe Product Analytics Lead...',
     createdAt: new Date().toISOString()
+  },
+  {
+    id: 'job-internal-1',
+    role: 'Automation Test Engineer',
+    company: 'ABC Technologies',
+    location: 'Bangalore, India (Hybrid)',
+    sourceUrl: 'https://abctechnologies.io/careers/automation-test-engineer',
+    sourceType: 'sample',
+    source: 'Employer Portal',
+    applicationMode: 'demo',
+    applicationType: 'INTERNAL',
+    openingsCount: 3,
+    department: 'Quality Assurance',
+    roleCategory: 'Automation Testing',
+    rating: 4.4,
+    reviewsCount: 185,
+    companyLogo: 'https://images.unsplash.com/photo-1549923746-c502d488b3ea?w=128&auto=format&fit=crop&q=80',
+    companyWebsite: 'https://abctechnologies.io',
+    companySize: '1,000 - 5,000 Employees',
+    companyHeadquarters: 'Bangalore, Karnataka, India',
+    companyFounded: '2014',
+    companyDescription: 'ABC Technologies is an enterprise cloud and digital engineering accelerator delivering mission-critical SaaS platforms, fintech infrastructure, and automated testing ecosystems.',
+    benefits: ['Comprehensive Medical Insurance', 'Flexible Hybrid Work Schedule', 'Annual Learning & Certification Stipend', 'Performance Bonus', 'Wellness Program'],
+    screeningQuestions: [
+      'How many years of hands-on experience do you have with Playwright or Selenium in Java?',
+      'What is your official notice period?',
+      'Are you open to working in a hybrid arrangement at our Bangalore campus?'
+    ],
+    experienceRequired: '4-7 years',
+    salary: '₹18,00,000 - ₹25,00,000 INR',
+    careerTrack: 'QA Automation',
+    mustHaveSkills: ['Java', 'Selenium', 'Playwright', 'API Testing', 'Jenkins', 'SQL'],
+    niceToHaveSkills: ['Docker', 'AWS', 'TestNG', 'RestAssured', 'Git'],
+    responsibilities: [
+      'Design, construct, and scale automated regression test frameworks for core enterprise platforms.',
+      'Lead API verification suites and integrate continuous automated testing gates in Jenkins CI/CD.',
+      'Collaborate directly with product owners and developers to diagnose defect root causes early in sprint lifecycles.'
+    ],
+    qualifications: [
+      '4+ years of dedicated experience writing test automation code in Java.',
+      'Solid hands-on expertise in Playwright and Selenium WebDriver.',
+      'B.Tech / B.E. in Computer Science, Information Technology, or equivalent practical experience.'
+    ],
+    rawText: 'ABC Technologies is hiring an Automation Test Engineer for our flagship engineering team in Bangalore...',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'job-internal-2',
+    role: 'Lead Full Stack Engineer',
+    company: 'Zeta Tech',
+    location: 'Hyderabad, India (Remote / Hybrid)',
+    sourceUrl: 'https://zetatech.io/careers/lead-full-stack',
+    sourceType: 'sample',
+    source: 'Employer Portal',
+    applicationMode: 'demo',
+    applicationType: 'INTERNAL',
+    openingsCount: 2,
+    department: 'Platform Engineering',
+    roleCategory: 'Software Development',
+    rating: 4.6,
+    reviewsCount: 310,
+    companyLogo: 'https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=128&auto=format&fit=crop&q=80',
+    companyWebsite: 'https://zetatech.io',
+    companySize: '500 - 1,000 Employees',
+    companyHeadquarters: 'Hyderabad, Telangana, India',
+    companyFounded: '2018',
+    companyDescription: 'Zeta Tech builds next-generation banking APIs and real-time transaction rails powering millions of daily financial operations globally.',
+    benefits: ['100% Remote-first Work Option', 'Stock Options (ESOPs)', 'Health & Dental Coverage', 'Home Office Allowance'],
+    screeningQuestions: [
+      'Have you led production microservices architectures using React, Node.js, and TypeScript?',
+      'What is your expected CTC and earliest joining date?'
+    ],
+    experienceRequired: '5-8 years',
+    salary: '₹28,00,000 - ₹38,00,000 INR',
+    careerTrack: 'Full Stack',
+    mustHaveSkills: ['React', 'Node.js', 'TypeScript', 'MongoDB', 'AWS', 'REST API'],
+    niceToHaveSkills: ['GraphQL', 'Docker', 'Redis', 'Kubernetes', 'Next.js'],
+    responsibilities: [
+      'Architect resilient full stack web applications and microservices serving 500k+ active merchants.',
+      'Mentor senior engineers, oversee code reviews, and champion engineering standards.'
+    ],
+    qualifications: [
+      '5+ years in full stack engineering with deep TypeScript, React, and Node.js proficiency.'
+    ],
+    rawText: 'Zeta Tech is hiring a Lead Full Stack Engineer to spearhead our merchant platform...',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'job-external-1',
+    role: 'Test Lead',
+    company: 'Exavalu',
+    location: 'Kolkata / Remote, India',
+    sourceUrl: 'https://exavalu.com/careers/test-lead-automation',
+    sourceType: 'external',
+    source: 'External Job Website',
+    applicationMode: 'external',
+    applicationType: 'EXTERNAL',
+    applicationUrl: 'https://exavalu.com/careers/test-lead-automation',
+    openingsCount: 1,
+    department: 'Insurance Technology QA',
+    roleCategory: 'Quality Engineering Lead',
+    rating: 4.1,
+    reviewsCount: 92,
+    companyLogo: 'https://images.unsplash.com/photo-1572021335469-31706a17aaef?w=128&auto=format&fit=crop&q=80',
+    companyWebsite: 'https://exavalu.com',
+    companySize: '1,000 - 5,000 Employees',
+    companyHeadquarters: 'Newport Beach, CA / Kolkata, India',
+    companyFounded: '2019',
+    companyDescription: 'Exavalu is a specialized digital transformation consultancy providing strategy and technology solutions for insurance and financial services.',
+    benefits: ['Health Insurance', 'Retirement Plan', 'Flexible Vacation Policy', 'Skill Development Grants'],
+    experienceRequired: '7-10 years',
+    salary: '₹24,00,000 - ₹32,00,000 INR',
+    careerTrack: 'QA Automation',
+    mustHaveSkills: ['Selenium', 'Java', 'API Testing', 'Test Strategy', 'Jenkins', 'SQL'],
+    niceToHaveSkills: ['Playwright', 'Guidewire', 'Docker', 'Performance Testing'],
+    responsibilities: [
+      'Formulate comprehensive quality assurance strategies across multi-tier insurance platforms.',
+      'Lead and mentor distributed test teams, ensuring automated regression coverage exceeds 85%.'
+    ],
+    qualifications: [
+      '7+ years in QA with proven experience leading test teams and architecting enterprise test frameworks.'
+    ],
+    rawText: 'Exavalu is seeking an experienced Test Lead to drive automation excellence for Tier-1 insurance clients...',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'job-external-2',
+    role: 'Technical Project Manager',
+    company: 'Codewalla',
+    location: 'Pune / Bangalore, India',
+    sourceUrl: 'https://careers.codewalla.com/jobs/technical-project-manager',
+    sourceType: 'external',
+    source: 'Codewalla',
+    applicationMode: 'external',
+    applicationType: 'EXTERNAL',
+    applicationUrl: 'https://careers.codewalla.com/jobs/technical-project-manager',
+    openingsCount: 2,
+    department: 'Project & Delivery Management',
+    roleCategory: 'Project Management',
+    rating: 4.3,
+    reviewsCount: 140,
+    companyLogo: 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=128&auto=format&fit=crop&q=80',
+    companyWebsite: 'https://codewalla.com',
+    companySize: '200 - 500 Employees',
+    companyHeadquarters: 'Pune, Maharashtra, India',
+    companyFounded: '2011',
+    companyDescription: 'Codewalla is a digital product studio partnering with high-growth startups and global enterprises to engineer modern digital experiences.',
+    benefits: ['Hybrid Work Model', 'Health Insurance', 'Team Retreats', 'Annual Training Budget'],
+    experienceRequired: '6-9 years',
+    salary: '₹22,00,000 - ₹30,00,000 INR',
+    careerTrack: 'Project & Delivery Management',
+    mustHaveSkills: ['Agile Delivery', 'Scrum', 'Stakeholder Management', 'Sprint Planning', 'JIRA'],
+    niceToHaveSkills: ['Technical Background', 'CI/CD Awareness', 'PMP', 'CSM'],
+    responsibilities: [
+      'Lead end-to-end agile execution for modern web and mobile product teams.',
+      'Manage sprint milestones, remove blockers, and align engineering sprints with client business objectives.'
+    ],
+    qualifications: [
+      '6+ years in technical software project and delivery management.'
+    ],
+    rawText: 'Codewalla is hiring a Technical Project Manager with deep agile execution expertise...',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'job-demo-2',
+    role: 'SDET (Software Development Engineer in Test)',
+    company: 'Tata Consultancy Services (TCS)',
+    location: 'Bangalore, India (Hybrid)',
+    sourceUrl: 'https://tcs.com/careers/sdet-automation',
+    sourceType: 'sample',
+    applicationMode: 'demo',
+    experienceRequired: '4-6 years',
+    salary: '₹18,00,000 - ₹23,00,000 INR',
+    careerTrack: 'QA Automation',
+    mustHaveSkills: ['Java', 'Selenium', 'RestAssured', 'TestNG', 'Jenkins'],
+    niceToHaveSkills: ['Playwright', 'SQL', 'Docker', 'Kubernetes'],
+    responsibilities: [
+      'Design test harnesses and automation frameworks from ground up for distributed financial platforms.',
+      'Develop automated API regression suites with RestAssured and execute load validation.',
+      'Identify bottlenecks and enhance CI/CD test parallelization.'
+    ],
+    qualifications: [
+      'Strong expertise in core Java and object-oriented test design.',
+      'Extensive hands-on testing with TestNG, Selenium WebDriver, and REST APIs.'
+    ],
+    rawText: 'TCS is hiring an experienced SDET in Bangalore...',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'job-demo-3',
+    role: 'QA Engineer',
+    company: 'Freshworks',
+    location: 'Chennai / Bangalore, India',
+    sourceUrl: 'https://freshworks.com/careers/qa-engineer',
+    sourceType: 'sample',
+    applicationMode: 'demo',
+    experienceRequired: '3-5 years',
+    salary: '₹16,00,000 - ₹21,00,000 INR',
+    careerTrack: 'QA Automation',
+    mustHaveSkills: ['Selenium', 'Java', 'Postman', 'API Testing'],
+    niceToHaveSkills: ['Playwright', 'Jenkins', 'SQL', 'JIRA'],
+    responsibilities: [
+      'Ensure top-tier reliability for customer relationship management platform.',
+      'Execute both automated and exploratory testing across modern SaaS frontends and APIs.'
+    ],
+    qualifications: [
+      '3+ years in software quality assurance with proven automation coding skills.'
+    ],
+    rawText: 'Freshworks QA Engineer opportunity...',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'job-demo-4',
+    role: 'Senior Java Backend Developer',
+    company: 'Societe Generale',
+    location: 'Bangalore, India (Hybrid)',
+    sourceUrl: 'https://careers.societegenerale.com/java-backend',
+    sourceType: 'sample',
+    applicationMode: 'demo',
+    experienceRequired: '4-6 years',
+    salary: '₹24,00,000 - ₹30,00,000 INR',
+    careerTrack: 'Java Backend',
+    mustHaveSkills: ['Java', 'Spring Boot', 'PostgreSQL', 'Kafka', 'REST API'],
+    niceToHaveSkills: ['Redis', 'Docker', 'Kubernetes', 'Microservices'],
+    responsibilities: [
+      'Design and deploy resilient, high-throughput financial transaction microservices.',
+      'Implement asynchronous event streaming pipelines with Apache Kafka.',
+      'Optimize database queries and schema indices in PostgreSQL.'
+    ],
+    qualifications: [
+      'Proven expertise in Java 11/17, Spring Boot, and enterprise SQL databases.',
+      'Strong understanding of messaging middleware like Kafka.'
+    ],
+    rawText: 'Societe Generale Senior Java Backend Developer...',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'job-demo-5',
+    role: 'Full Stack Developer',
+    company: 'Razorpay',
+    location: 'Bangalore, India (Onsite / Hybrid)',
+    sourceUrl: 'https://razorpay.com/jobs/full-stack-engineer',
+    sourceType: 'sample',
+    applicationMode: 'demo',
+    experienceRequired: '4-6 years',
+    salary: '₹26,00,000 - ₹34,00,000 INR',
+    careerTrack: 'Full Stack',
+    mustHaveSkills: ['React', 'Node.js', 'TypeScript', 'MongoDB', 'AWS'],
+    niceToHaveSkills: ['Docker', 'Redis', 'GraphQL', 'PostgreSQL'],
+    responsibilities: [
+      'Build end-to-end user journeys for merchant dashboards and payment checkouts.',
+      'Collaborate with UI/UX teams to build modular React components.'
+    ],
+    qualifications: [
+      'Hands-on mastery of React, TypeScript, Node.js, and cloud platforms.'
+    ],
+    rawText: 'Razorpay Full Stack Engineer...',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'job-demo-6',
+    role: 'Senior Data Analyst',
+    company: 'Flipkart',
+    location: 'Bangalore, India',
+    sourceUrl: 'https://flipkartcareers.com/data-analyst',
+    sourceType: 'sample',
+    applicationMode: 'demo',
+    experienceRequired: '3-5 years',
+    salary: '₹18,00,000 - ₹24,00,000 INR',
+    careerTrack: 'Data Analytics',
+    mustHaveSkills: ['SQL', 'Power BI', 'Python', 'Excel', 'Tableau'],
+    niceToHaveSkills: ['Snowflake', 'Pandas', 'Data Warehousing'],
+    responsibilities: [
+      'Partner with business leaders to extract actionable product analytics insights.',
+      'Build scalable dashboards and data models using SQL and Power BI.'
+    ],
+    qualifications: [
+      'Deep expertise in complex SQL aggregations, Power BI, and Python analytics libraries.'
+    ],
+    rawText: 'Flipkart Senior Data Analyst position...',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'job-demo-7',
+    role: 'Manual QA Specialist',
+    company: 'Wipro',
+    location: 'Pune / Hyderabad, India',
+    sourceUrl: 'https://wipro.com/careers/manual-qa',
+    sourceType: 'sample',
+    applicationMode: 'demo',
+    experienceRequired: '2-4 years',
+    salary: '₹8,00,000 - ₹12,00,000 INR',
+    careerTrack: 'QA Manual',
+    mustHaveSkills: ['Manual Testing', 'Postman', 'JIRA'],
+    niceToHaveSkills: ['SQL Basics', 'Selenium', 'Java'],
+    responsibilities: [
+      'Design test cases, execute system testing, and report defects across agile sprints.'
+    ],
+    qualifications: [
+      'Thorough knowledge of Software Testing Life Cycle (STLC) and JIRA.'
+    ],
+    rawText: 'Wipro Manual QA position...',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'job-demo-8',
+    role: 'Cloud DevOps Engineer',
+    company: 'Infosys',
+    location: 'Bangalore, India',
+    sourceUrl: 'https://infosys.com/careers/devops-engineer',
+    sourceType: 'sample',
+    applicationMode: 'external',
+    applicationUrl: 'https://career.infosys.com/jobdesc?jobReferenceCode=INF-DEVOPS-2026',
+    experienceRequired: '4-7 years',
+    salary: '₹22,00,000 - ₹28,00,000 INR',
+    careerTrack: 'DevOps',
+    mustHaveSkills: ['Docker', 'Kubernetes', 'AWS', 'Jenkins', 'Terraform'],
+    niceToHaveSkills: ['Linux', 'Python', 'GitLab CI'],
+    responsibilities: [
+      'Manage cloud infrastructure, CI/CD pipelines, and Kubernetes deployments.'
+    ],
+    qualifications: [
+      'Deep hands-on experience in AWS, Kubernetes, and infrastructure as code.'
+    ],
+    rawText: 'Infosys Cloud DevOps Engineer...',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'job-demo-9',
+    role: 'Lead Java Backend Architect',
+    company: 'Oracle',
+    location: 'Hyderabad, India',
+    sourceUrl: 'https://oracle.com/careers/lead-java-architect',
+    sourceType: 'sample',
+    applicationMode: 'demo',
+    experienceRequired: '8-10 years',
+    salary: '₹40,00,000 - ₹55,00,000 INR',
+    careerTrack: 'Java Backend',
+    mustHaveSkills: ['Java', 'Spring Boot', 'Kafka', 'PostgreSQL', 'Microservices', 'Kubernetes'],
+    niceToHaveSkills: ['Cloud Infrastructure', 'Distributed Caching', 'Event Sourcing'],
+    responsibilities: [
+      'Architect next-generation global database cloud microservices.'
+    ],
+    qualifications: [
+      '8+ years in enterprise backend architecture and distributed messaging systems.'
+    ],
+    rawText: 'Oracle Lead Java Backend Architect...',
+    createdAt: new Date().toISOString()
+  },
+  {
+    id: 'job-demo-10',
+    role: 'Product Analytics Lead',
+    company: 'PhonePe',
+    location: 'Bangalore, India',
+    sourceUrl: 'https://phonepe.com/careers/product-analytics-lead',
+    sourceType: 'sample',
+    applicationMode: 'demo',
+    experienceRequired: '5-8 years',
+    salary: '₹30,00,000 - ₹42,00,000 INR',
+    careerTrack: 'Data Analytics',
+    mustHaveSkills: ['SQL', 'Python', 'Tableau', 'Power BI', 'A/B Testing'],
+    niceToHaveSkills: ['Machine Learning', 'BigQuery', 'Airflow'],
+    responsibilities: [
+      'Spearhead product metrics, experimentation frameworks, and analytics modeling.'
+    ],
+    qualifications: [
+      'Proven expertise leading product analytics teams and statistical modeling.'
+    ],
+    rawText: 'PhonePe Product Analytics Lead...',
+    createdAt: new Date().toISOString()
   }
 ];
 
@@ -550,8 +944,77 @@ export async function seedDatabase() {
     await JobRepository.save(job);
   }
 
-  // Pre-seed a couple of realistic demo applications for Candidate 1 (Aarav Sharma)
+  // Pre-seed realistic applications showcasing both Type A (Internal) and Type B (External) workflows
   const demoApps: ApplicationRecord[] = [
+    {
+      id: 'app-internal-1',
+      candidateId: 'cand-demo-1',
+      jobId: 'job-internal-1',
+      company: 'ABC Technologies',
+      role: 'Automation Test Engineer',
+      location: 'Bangalore, India (Hybrid)',
+      applicationType: 'INTERNAL',
+      applicationMode: 'demo',
+      matchScore: 94,
+      status: 'Shortlisted' as any,
+      candidateName: 'Aarav Sharma',
+      candidateEmail: 'aarav.sharma.test@jobpilot-demo.internal',
+      candidatePhone: '+91 98765 43210',
+      candidateLocation: 'Bangalore, India',
+      candidateExperience: 5.5,
+      candidateDesignation: 'Senior QA Automation Engineer',
+      resumeVersionName: 'Aarav_Sharma_QA_v1',
+      applicationDate: new Date(Date.now() - 5 * 86400000).toISOString().split('T')[0],
+      appliedAt: new Date(Date.now() - 5 * 86400000).toISOString(),
+      notes: 'Applied directly inside JobPilot portal. Answered screening questions.',
+      screeningAnswers: {
+        'How many years of hands-on experience do you have with Playwright or Selenium in Java?': '5.5 years',
+        'What is your official notice period?': '30 Days',
+        'Are you open to working in a hybrid arrangement at our Bangalore campus?': 'Yes, absolutely'
+      },
+      statusHistory: [
+        { status: 'Submitted', changedAt: new Date(Date.now() - 5 * 86400000).toISOString(), note: 'Application submitted directly on JobPilot' },
+        { status: 'Viewed', changedAt: new Date(Date.now() - 4 * 86400000).toISOString(), note: 'Employer viewed application and downloaded resume' },
+        { status: 'Under Review', changedAt: new Date(Date.now() - 2 * 86400000).toISOString(), note: 'Candidate profile forwarded to QA Engineering Lead' },
+        { status: 'Shortlisted', changedAt: new Date(Date.now() - 1 * 86400000).toISOString(), note: 'Selected for technical interview round' }
+      ],
+      employerNotes: 'Excellent match on Java & Playwright. Schedule Round 1 interview.',
+      interviewDetails: {
+        scheduledAt: new Date(Date.now() + 2 * 86400000).toISOString(),
+        meetingLink: 'https://meet.google.com/abc-tech-interview',
+        instructions: 'Please be prepared to demonstrate framework design and solve a live Playwright coding challenge.'
+      },
+      createdAt: new Date(Date.now() - 5 * 86400000).toISOString(),
+      updatedAt: new Date(Date.now() - 1 * 86400000).toISOString()
+    },
+    {
+      id: 'app-external-1',
+      candidateId: 'cand-demo-1',
+      jobId: 'job-external-1',
+      company: 'Exavalu',
+      role: 'Test Lead',
+      location: 'Kolkata / Remote, India',
+      applicationType: 'EXTERNAL',
+      applicationMode: 'external',
+      applicationUrl: 'https://exavalu.com/careers/test-lead-automation',
+      matchScore: 86,
+      status: 'Applied' as any,
+      candidateName: 'Aarav Sharma',
+      candidateEmail: 'aarav.sharma.test@jobpilot-demo.internal',
+      candidatePhone: '+91 98765 43210',
+      candidateLocation: 'Bangalore, India',
+      candidateExperience: 5.5,
+      candidateDesignation: 'Senior QA Automation Engineer',
+      applicationDate: new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0],
+      appliedAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+      notes: 'Redirected to Exavalu career website. Candidate explicitly confirmed application on JobPilot.',
+      statusHistory: [
+        { status: 'Ready to Apply', changedAt: new Date(Date.now() - 3 * 86400000).toISOString(), note: 'Redirected to Exavalu application URL' },
+        { status: 'Applied', changedAt: new Date(Date.now() - 3 * 86400000 + 1800000).toISOString(), note: 'Candidate returned and confirmed completion on external site' }
+      ],
+      createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
+      updatedAt: new Date(Date.now() - 3 * 86400000).toISOString()
+    },
     {
       id: 'app-demo-1',
       candidateId: 'cand-demo-1',
@@ -562,43 +1025,154 @@ export async function seedDatabase() {
       role: 'Senior QA Automation Engineer',
       location: 'Bangalore, India (Hybrid)',
       jobUrl: 'https://hcltech.com/careers/senior-qa-automation-engineer',
+      applicationType: 'EXTERNAL',
+      applicationMode: 'external',
       matchScore: 92,
-      status: 'Applied',
-      applicationDate: new Date(Date.now() - 3 * 86400000).toISOString().split('T')[0],
+      status: 'Applied' as any,
+      applicationDate: new Date(Date.now() - 4 * 86400000).toISOString().split('T')[0],
+      appliedAt: new Date(Date.now() - 4 * 86400000).toISOString(),
       notes: 'Applied through HCL career portal. Tailored resume focused on Playwright and API testing.',
-      customAnswers: {
-        'Total years of relevant experience?': '5.5 years',
-        'What is your notice period?': '30 Days'
-      },
-      createdAt: new Date(Date.now() - 3 * 86400000).toISOString(),
-      updatedAt: new Date(Date.now() - 3 * 86400000).toISOString()
-    },
-    {
-      id: 'app-demo-2',
-      candidateId: 'cand-demo-1',
-      jobId: 'job-demo-2',
-      resumeVersionId: 'resume-demo-tcs-1',
-      resumeVersionName: 'TCS_SDET_v1',
-      company: 'Tata Consultancy Services (TCS)',
-      role: 'SDET (Software Development Engineer in Test)',
-      location: 'Bangalore, India (Hybrid)',
-      jobUrl: 'https://tcs.com/careers/sdet-automation',
-      matchScore: 88,
-      status: 'Interview',
-      applicationDate: new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0],
-      notes: 'Technical round 1 scheduled for this Thursday at 3 PM IST.',
-      customAnswers: {
-        'Total years of relevant experience?': '5.5 years',
-        'What is your notice period?': '30 Days'
-      },
-      createdAt: new Date(Date.now() - 7 * 86400000).toISOString(),
-      updatedAt: new Date(Date.now() - 2 * 86400000).toISOString()
+      statusHistory: [
+        { status: 'Ready to Apply', changedAt: new Date(Date.now() - 4 * 86400000).toISOString(), note: 'Viewed external opening' },
+        { status: 'Applied', changedAt: new Date(Date.now() - 4 * 86400000 + 900000).toISOString(), note: 'Candidate confirmed application' }
+      ],
+      createdAt: new Date(Date.now() - 4 * 86400000).toISOString(),
+      updatedAt: new Date(Date.now() - 4 * 86400000).toISOString()
     }
   ];
 
   for (const app of demoApps) {
     await ApplicationRepository.save(app);
   }
+
+  // Pre-seed genuine company reviews
+  const reviews = [
+    {
+      id: 'rev-abc-1',
+      companyName: 'ABC Technologies',
+      reviewerName: 'Karthik R.',
+      reviewerRole: 'Senior SDET',
+      rating: 4.5,
+      title: 'Great engineering culture with modern test frameworks',
+      reviewText: 'ABC Technologies invests heavily in test automation and CI/CD quality gates. Management trusts engineers to choose the best tools (Playwright, Java, Docker). Work-life balance is very solid.',
+      pros: 'Strong focus on quality, collaborative managers, competitive annual bonuses.',
+      cons: 'Occasional late evening deployments when releasing major enterprise modules.',
+      workCultureRating: 4.6,
+      salaryBenefitsRating: 4.4,
+      careerGrowthRating: 4.5,
+      workLifeBalanceRating: 4.3,
+      employmentStatus: 'Current Employee',
+      isVerified: true,
+      createdAt: new Date(Date.now() - 20 * 86400000).toISOString()
+    },
+    {
+      id: 'rev-hcl-1',
+      companyName: 'HCL Technologies',
+      reviewerName: 'Pooja M.',
+      reviewerRole: 'Lead Quality Consultant',
+      rating: 4.0,
+      title: 'Stable enterprise projects and good learning environment',
+      reviewText: 'HCL gives exposure to very large enterprise client accounts in the US and Europe. Good corporate benefits and health insurance.',
+      pros: 'Job security, recognized brand name, extensive internal training portals.',
+      cons: 'Project allocation process can take time between client handoffs.',
+      workCultureRating: 3.9,
+      salaryBenefitsRating: 4.0,
+      careerGrowthRating: 3.8,
+      workLifeBalanceRating: 4.1,
+      employmentStatus: 'Former Employee',
+      isVerified: true,
+      createdAt: new Date(Date.now() - 45 * 86400000).toISOString()
+    },
+    {
+      id: 'rev-zeta-1',
+      companyName: 'Zeta Tech',
+      reviewerName: 'Arun K.',
+      reviewerRole: 'Full Stack Tech Lead',
+      rating: 4.7,
+      title: 'Fast-paced fintech with high-scale architecture',
+      reviewText: 'Working on high-throughput payment APIs is exciting. Modern tech stack (TypeScript, React, Node.js, AWS) and very transparent leadership.',
+      pros: 'Generous stock grants, fully remote flexibility, top-tier engineering colleagues.',
+      cons: 'High expectations during quarterly release cycles.',
+      workCultureRating: 4.8,
+      salaryBenefitsRating: 4.8,
+      careerGrowthRating: 4.7,
+      workLifeBalanceRating: 4.3,
+      employmentStatus: 'Current Employee',
+      isVerified: true,
+      createdAt: new Date(Date.now() - 15 * 86400000).toISOString()
+    }
+  ];
+
+  for (const rev of reviews) {
+    await CompanyReviewRepository.save(rev);
+  }
+
+  // Pre-seed followed companies
+  await FollowedCompanyRepository.follow('cand-demo-1', 'ABC Technologies');
+  await FollowedCompanyRepository.follow('cand-demo-1', 'HCL Technologies');
+
+  // Pre-seed job alert
+  await JobAlertRepository.save({
+    id: 'alert-demo-1',
+    candidateId: 'cand-demo-1',
+    title: 'QA Automation Engineer (Playwright / Java)',
+    keywords: 'Playwright, Java, Selenium, API',
+    location: 'Bangalore / Remote',
+    experienceMin: 4,
+    experienceMax: 8,
+    salaryMin: '₹18,00,000 INR',
+    frequency: 'Daily',
+    isActive: true,
+    createdAt: new Date().toISOString()
+  });
+
+  // Pre-seed test users in SqliteUserRepository
+  const defaultPasswordHash = await hashPassword('Password123!');
+  await SqliteUserRepository.save({
+    id: 'cand-demo-1',
+    email: 'aarav.sharma@example.com',
+    passwordHash: defaultPasswordHash,
+    fullName: 'Aarav Sharma',
+    phone: '+91 98765 43210',
+    role: 'CANDIDATE',
+    location: 'Bangalore, India',
+    experience: 5.5,
+    designation: 'Senior QA Automation Engineer',
+    emailVerified: 1,
+    isActive: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
+
+  await SqliteUserRepository.save({
+    id: 'emp-demo-1',
+    email: 'recruiter@abctech.com',
+    passwordHash: defaultPasswordHash,
+    fullName: 'Neha Verma',
+    phone: '+91 98111 22233',
+    role: 'EMPLOYER',
+    companyName: 'ABC Technologies',
+    companyWebsite: 'https://abctechnologies.io',
+    industry: 'Information Technology / Cloud Engineering',
+    companySize: '1,000 - 5,000 Employees',
+    emailVerified: 1,
+    isActive: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
+
+  await SqliteUserRepository.save({
+    id: 'admin-demo-1',
+    email: 'admin@pilotmama.io',
+    passwordHash: await hashPassword('AdminSecret123!'),
+    fullName: 'Platform Administrator',
+    phone: '+91 90000 00001',
+    role: 'ADMIN',
+    emailVerified: 1,
+    isActive: 1,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString()
+  });
 
   saveDb();
   console.log('Database successfully seeded!');

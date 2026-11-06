@@ -6,6 +6,7 @@ import { Button } from "../components/common/Button";
 import { useAuth } from "../context/AuthContext";
 import { useApp } from "../context/AppContext";
 import { apiClient } from "../api/client";
+import { api } from "../api/index";
 import {
   User,
   FileText,
@@ -56,6 +57,9 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     OFFER: 0,
     REJECTED: 0
   });
+  const [internalAppsCount, setInternalAppsCount] = useState<number>(0);
+  const [externalAppsCount, setExternalAppsCount] = useState<number>(0);
+  const [shortlistedCount, setShortlistedCount] = useState<number>(0);
   const [skillGaps, setSkillGaps] = useState<any[]>([]);
   const [secondaryLoading, setSecondaryLoading] = useState<boolean>(true);
 
@@ -93,10 +97,12 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
     try {
       setSecondaryLoading(true);
 
+      const targetCandidateId = activeCandidate?.id || user?.id || '';
+
       const [profileRes, resumesRes, appsRes] = await Promise.allSettled([
         apiClient.getCandidateProfile(),
         apiClient.listResumes(),
-        apiClient.listApplications({ pageSize: 100 })
+        api.getApplications(targetCandidateId)
       ]);
 
       if (!active) return;
@@ -114,17 +120,33 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
       }
 
       if (appsRes.status === 'fulfilled') {
-        const appsData = appsRes.value?.data || [];
+        const appsData: any[] = Array.isArray(appsRes.value) ? appsRes.value : ((appsRes.value as any)?.data || []);
+        let internal = 0;
+        let external = 0;
+        let shortlisted = 0;
         const counts = { SAVED: 0, APPLIED: 0, INTERVIEW: 0, OFFER: 0, REJECTED: 0 };
+
         appsData.forEach((app: any) => {
           const s = (app.status || '').toUpperCase();
           if (s === 'SAVED') counts.SAVED++;
-          else if (s === 'APPLIED' || s === 'APPLICATION_STARTED') counts.APPLIED++;
+          else if (s === 'APPLIED' || s === 'APPLICATION_STARTED' || s === 'SUBMITTED') counts.APPLIED++;
           else if (s.includes('INTERVIEW') || s === 'HR_SCREEN' || s === 'TECHNICAL') counts.INTERVIEW++;
-          else if (s === 'OFFER') counts.OFFER++;
+          else if (s === 'OFFER' || s === 'SELECTED') counts.OFFER++;
           else if (s === 'REJECTED') counts.REJECTED++;
+
+          if (s.includes('SHORTLIST')) shortlisted++;
+
+          if (app.applicationType === 'INTERNAL' || app.applicationMethod === 'JobPilot Demo Simulation') {
+            internal++;
+          } else if (app.applicationType === 'EXTERNAL' || app.applicationMode === 'external') {
+            external++;
+          }
         });
+
         setAppStats(counts);
+        setInternalAppsCount(internal);
+        setExternalAppsCount(external);
+        setShortlistedCount(shortlisted);
       }
 
       // Compute Top Skill Gaps if candidate profile and jobs are available
@@ -232,6 +254,59 @@ export const DashboardPage: React.FC<DashboardPageProps> = ({ onNavigate }) => {
             <SlidersHorizontal size={14} />
             <span>Filters</span>
           </button>
+        </div>
+      </div>
+
+      {/* Real Platform Database Metrics Ribbon */}
+      <div className="dash-metrics-ribbon">
+        <div className="dash-metric-pill-card" onClick={() => onNavigate('profile')}>
+          <span className="metric-pill-label">Profile Completion</span>
+          <span className="metric-pill-value">{completeness}%</span>
+          <span className="metric-pill-sub">{completeness === 100 ? 'All sections complete' : 'Action needed'}</span>
+        </div>
+
+        <div className="dash-metric-pill-card" onClick={() => onNavigate('resumes')}>
+          <span className="metric-pill-label">Resume Status</span>
+          <span className="metric-pill-value" style={{ fontSize: '1rem', color: masterResume ? '#10b981' : '#f59e0b' }}>
+            {masterResume ? 'Active & Ready' : 'Needs Upload'}
+          </span>
+          <span className="metric-pill-sub">{resumes.length} versions tracked</span>
+        </div>
+
+        <div className="dash-metric-pill-card" onClick={() => onNavigate('jobs')}>
+          <span className="metric-pill-label">Recommended Jobs</span>
+          <span className="metric-pill-value">{latestJobs.length}</span>
+          <span className="metric-pill-sub">Tailored to profile</span>
+        </div>
+
+        <div className="dash-metric-pill-card" onClick={() => onNavigate('saved-jobs')}>
+          <span className="metric-pill-label">Saved Jobs</span>
+          <span className="metric-pill-value">{appStats.SAVED}</span>
+          <span className="metric-pill-sub">Bookmarks</span>
+        </div>
+
+        <div className="dash-metric-pill-card" onClick={() => onNavigate('applications')}>
+          <span className="metric-pill-label">Total Applications</span>
+          <span className="metric-pill-value">{internalAppsCount + externalAppsCount || appStats.APPLIED}</span>
+          <span className="metric-pill-sub">Combined tracking</span>
+        </div>
+
+        <div className="dash-metric-pill-card" onClick={() => onNavigate('applications')}>
+          <span className="metric-pill-label">Internal Apps</span>
+          <span className="metric-pill-value" style={{ color: '#10b981' }}>{internalAppsCount}</span>
+          <span className="metric-pill-sub">Direct submissions</span>
+        </div>
+
+        <div className="dash-metric-pill-card" onClick={() => onNavigate('applications')}>
+          <span className="metric-pill-label">External Apps</span>
+          <span className="metric-pill-value" style={{ color: '#3b82f6' }}>{externalAppsCount}</span>
+          <span className="metric-pill-sub">Company portals</span>
+        </div>
+
+        <div className="dash-metric-pill-card" onClick={() => onNavigate('applications')}>
+          <span className="metric-pill-label">Shortlisted</span>
+          <span className="metric-pill-value" style={{ color: '#8b5cf6' }}>{shortlistedCount}</span>
+          <span className="metric-pill-sub">Under review / interview</span>
         </div>
       </div>
 

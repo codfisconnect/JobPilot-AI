@@ -151,10 +151,24 @@ export interface JobDescription {
   location: string;
   sourceUrl?: string;
   sourceType: 'pasted' | 'url' | 'extension' | 'sample' | 'external';
-  source?: string; // e.g. 'Codewalla', 'JobPilot Predefined'
+  source?: string; // e.g. 'Codewalla', 'JobPilot Predefined', 'Employer Portal'
   applicationUrl?: string;
   applicationMethod?: 'External Website' | 'Email' | 'LinkedIn' | 'Other';
   applicationMode: 'demo' | 'external';
+  applicationType?: 'INTERNAL' | 'EXTERNAL';
+  openingsCount?: number;
+  department?: string;
+  roleCategory?: string;
+  screeningQuestions?: string[];
+  rating?: number;
+  reviewsCount?: number;
+  companyLogo?: string;
+  companyWebsite?: string;
+  companySize?: string;
+  companyHeadquarters?: string;
+  companyFounded?: string;
+  companyDescription?: string;
+  benefits?: string[];
   employmentType?: string;
   workMode?: string;
   publishedDate?: string;
@@ -334,6 +348,19 @@ export interface ApplicationRecord {
   role: string;
   location: string;
   applicationMode: 'demo' | 'external';
+  applicationType?: 'INTERNAL' | 'EXTERNAL';
+  employerId?: string;
+  candidateName?: string;
+  candidateEmail?: string;
+  candidatePhone?: string;
+  candidateLocation?: string;
+  candidateExperience?: number;
+  candidateDesignation?: string;
+  resumeUrl?: string;
+  screeningAnswers?: Record<string, string>;
+  statusHistory?: Array<{ status: string; changedAt: string; note?: string }>;
+  employerNotes?: string;
+  interviewDetails?: { scheduledAt?: string; meetingLink?: string; instructions?: string };
   jobUrl?: string;
   applicationUrl?: string;
   matchScore: number;
@@ -348,6 +375,49 @@ export interface ApplicationRecord {
   coverLetter?: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface CompanyReviewItem {
+  id: string;
+  companyName: string;
+  companyId?: string;
+  reviewerName: string;
+  reviewerRole?: string;
+  rating: number;
+  title: string;
+  reviewText?: string;
+  pros?: string;
+  cons?: string;
+  workCultureRating?: number;
+  salaryBenefitsRating?: number;
+  careerGrowthRating?: number;
+  workLifeBalanceRating?: number;
+  employmentStatus?: string;
+  isVerified?: boolean;
+  createdAt: string;
+}
+
+export interface FollowedCompanyItem {
+  id: string;
+  candidateId: string;
+  companyName: string;
+  companyId?: string;
+  notificationsEnabled: boolean;
+  followedAt: string;
+}
+
+export interface JobAlertItem {
+  id: string;
+  candidateId: string;
+  title: string;
+  keywords?: string;
+  location?: string;
+  experienceMin?: number;
+  experienceMax?: number;
+  salaryMin?: string;
+  frequency: string;
+  isActive: boolean;
+  createdAt: string;
 }
 
 export interface InterviewPreparation {

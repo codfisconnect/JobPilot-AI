@@ -9,7 +9,8 @@ import {
   InterviewController,
   CompanyController,
   StrategyController,
-  LearningController
+  LearningController,
+  JobAlertController
 } from '../controllers/index.js';
 import { authenticateJwt } from '../middleware/auth.middleware.js';
 import { UnauthorizedError, ForbiddenError } from '../utils/errors.js';
@@ -27,8 +28,8 @@ function requireCandidateOwnership(req: Request, _res: Response, next: NextFunct
     throw new UnauthorizedError('Authentication required');
   }
   const requestedId = req.params.id || req.params.candidateId || req.body?.candidateId || req.query?.candidateId;
-  // If the user is an admin or the requested ID matches the token identity or candidate ID, allow; otherwise block cross-tenant IDOR
-  if (req.user.role === 'ADMIN') {
+  // If the user is an admin or employer or the requested ID matches the token identity or candidate ID, allow; otherwise block cross-tenant IDOR
+  if (req.user.role === 'ADMIN' || req.user.role === 'EMPLOYER') {
     return next();
   }
   if (requestedId && req.user.userId !== requestedId && !String(requestedId).includes(req.user.userId)) {
@@ -50,11 +51,18 @@ apiRouter.get('/jobs/sources', JobController.getSources);
 apiRouter.get('/jobs/source-health', LearningController.getSourceHealth);
 apiRouter.post('/jobs/sync-source', authenticateJwt, JobController.syncSource);
 apiRouter.get('/jobs/:id', JobController.getById);
+apiRouter.post('/jobs', authenticateJwt, JobController.create);
 apiRouter.post('/jobs/parse', authenticateJwt, JobController.parseAndCreate);
 apiRouter.post('/jobs/extract-url', authenticateJwt, JobController.extractUrl);
 
-// 3. Company Registry Routes
+// 3. Company Registry & Reviews Routes
 apiRouter.get('/companies', CompanyController.getAll);
+apiRouter.get('/companies/:companyName/reviews', CompanyController.getReviews);
+apiRouter.get('/reviews', CompanyController.getReviews);
+apiRouter.post('/reviews', authenticateJwt, CompanyController.submitReview);
+apiRouter.post('/companies/follow', authenticateJwt, CompanyController.followCompany);
+apiRouter.post('/companies/unfollow', authenticateJwt, CompanyController.unfollowCompany);
+apiRouter.get('/companies/followed/:candidateId', authenticateJwt, CompanyController.getFollowedCompanies);
 
 // 4. Matching & Strategy Routes (Authenticated)
 apiRouter.post('/match/analyze', authenticateJwt, requireCandidateOwnership, MatchController.analyze);
@@ -74,16 +82,23 @@ apiRouter.get('/resumes/:id', authenticateJwt, ResumeController.getById);
 apiRouter.get('/applications', authenticateJwt, ApplicationController.getAll);
 apiRouter.get('/applications/:id', authenticateJwt, ApplicationController.getById);
 apiRouter.post('/applications', authenticateJwt, requireCandidateOwnership, ApplicationController.createOrUpdate);
+apiRouter.post('/applications/apply-internal', authenticateJwt, ApplicationController.applyInternal);
+apiRouter.post('/applications/track-external', authenticateJwt, ApplicationController.trackExternal);
+apiRouter.patch('/applications/:id/employer-status', authenticateJwt, ApplicationController.updateStatusByEmployer);
+apiRouter.get('/employer/applicants', authenticateJwt, ApplicationController.getEmployerApplicants);
 apiRouter.delete('/applications/:id', authenticateJwt, ApplicationController.delete);
 apiRouter.delete('/applications', authenticateJwt, requireCandidateOwnership, ApplicationController.deleteByCandidateAndJob);
 
-// 7. Interview Preparation Routes (Authenticated)
+// 7. Job Alerts Routes (Authenticated)
+apiRouter.get('/alerts', authenticateJwt, JobAlertController.listAlerts);
+apiRouter.post('/alerts', authenticateJwt, JobAlertController.createAlert);
+apiRouter.delete('/alerts/:id', authenticateJwt, JobAlertController.deleteAlert);
+
+// 8. Interview Preparation Routes (Authenticated)
 apiRouter.post('/interview/generate', authenticateJwt, requireCandidateOwnership, InterviewController.generate);
 apiRouter.get('/interview/:candidateId/:jobId', authenticateJwt, requireCandidateOwnership, InterviewController.getByCandidateAndJob);
 
-// 8. Learning & Skill Gap Routes (Authenticated / Public Resources)
+// 9. Learning & Skill Gap Routes (Authenticated / Public Resources)
 apiRouter.get('/learning/skill-gaps', authenticateJwt, requireCandidateOwnership, LearningController.getSkillGaps);
 apiRouter.get('/learning/resources', LearningController.getResources);
 apiRouter.get('/learning/institutes', LearningController.getInstitutes);
-
-

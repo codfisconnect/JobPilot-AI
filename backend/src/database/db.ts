@@ -3,7 +3,30 @@ import fs from 'fs';
 import path from 'path';
 
 let dbInstance: Database | null = null;
-const dbFilePath = path.resolve(process.cwd(), '../database/jobpilot.sqlite');
+
+function resolveDbFilePath(): string {
+  // Check candidate paths for existing jobpilot.sqlite
+  const candidatePaths = [
+    path.resolve(process.cwd(), 'database/jobpilot.sqlite'),
+    path.resolve(process.cwd(), '../database/jobpilot.sqlite'),
+    path.resolve(process.cwd(), 'backend/database/jobpilot.sqlite'),
+    path.resolve(process.cwd(), '../../database/jobpilot.sqlite')
+  ];
+
+  for (const candidate of candidatePaths) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  // If not found yet, default safely based on cwd
+  if (process.cwd().endsWith('backend')) {
+    return path.resolve(process.cwd(), '../database/jobpilot.sqlite');
+  }
+  return path.resolve(process.cwd(), 'database/jobpilot.sqlite');
+}
+
+const dbFilePath = resolveDbFilePath();
 
 export async function getDb(): Promise<Database> {
   if (dbInstance) return dbInstance;
@@ -29,9 +52,14 @@ export async function getDb(): Promise<Database> {
 
 export function saveDb(): void {
   if (!dbInstance) return;
+  const targetPath = resolveDbFilePath();
+  const dir = path.dirname(targetPath);
+  if (!fs.existsSync(dir)) {
+    fs.mkdirSync(dir, { recursive: true });
+  }
   const data = dbInstance.export();
   const buffer = Buffer.from(data);
-  fs.writeFileSync(dbFilePath, buffer);
+  fs.writeFileSync(targetPath, buffer);
 }
 
 function initSchema(db: Database): void {
@@ -123,7 +151,34 @@ function initSchema(db: Database): void {
     'ALTER TABLE applications ADD COLUMN appliedAt TEXT',
     'ALTER TABLE applications ADD COLUMN skillGaps TEXT',
     'ALTER TABLE applications ADD COLUMN timeline TEXT',
-    'ALTER TABLE applications ADD COLUMN coverLetter TEXT'
+    'ALTER TABLE applications ADD COLUMN coverLetter TEXT',
+    'ALTER TABLE jobs ADD COLUMN applicationType TEXT DEFAULT "EXTERNAL"',
+    'ALTER TABLE jobs ADD COLUMN openingsCount INTEGER DEFAULT 1',
+    'ALTER TABLE jobs ADD COLUMN department TEXT',
+    'ALTER TABLE jobs ADD COLUMN roleCategory TEXT',
+    'ALTER TABLE jobs ADD COLUMN screeningQuestions TEXT',
+    'ALTER TABLE jobs ADD COLUMN rating REAL DEFAULT 4.2',
+    'ALTER TABLE jobs ADD COLUMN reviewsCount INTEGER DEFAULT 0',
+    'ALTER TABLE jobs ADD COLUMN companyLogo TEXT',
+    'ALTER TABLE jobs ADD COLUMN companyWebsite TEXT',
+    'ALTER TABLE jobs ADD COLUMN companySize TEXT',
+    'ALTER TABLE jobs ADD COLUMN companyHeadquarters TEXT',
+    'ALTER TABLE jobs ADD COLUMN companyFounded TEXT',
+    'ALTER TABLE jobs ADD COLUMN companyDescription TEXT',
+    'ALTER TABLE jobs ADD COLUMN benefits TEXT',
+    'ALTER TABLE applications ADD COLUMN applicationType TEXT DEFAULT "EXTERNAL"',
+    'ALTER TABLE applications ADD COLUMN employerId TEXT',
+    'ALTER TABLE applications ADD COLUMN candidateName TEXT',
+    'ALTER TABLE applications ADD COLUMN candidateEmail TEXT',
+    'ALTER TABLE applications ADD COLUMN candidatePhone TEXT',
+    'ALTER TABLE applications ADD COLUMN candidateLocation TEXT',
+    'ALTER TABLE applications ADD COLUMN candidateExperience REAL',
+    'ALTER TABLE applications ADD COLUMN candidateDesignation TEXT',
+    'ALTER TABLE applications ADD COLUMN resumeUrl TEXT',
+    'ALTER TABLE applications ADD COLUMN screeningAnswers TEXT',
+    'ALTER TABLE applications ADD COLUMN statusHistory TEXT',
+    'ALTER TABLE applications ADD COLUMN interviewDetails TEXT',
+    'ALTER TABLE applications ADD COLUMN employerNotes TEXT'
   ];
   for (const colSql of schemaMigrations) {
     try {
@@ -320,6 +375,69 @@ function initSchema(db: Database): void {
       website TEXT,
       distanceEstimate TEXT,
       isVerified INTEGER DEFAULT 1
+    );
+
+    CREATE TABLE IF NOT EXISTS company_reviews (
+      id TEXT PRIMARY KEY,
+      companyName TEXT NOT NULL,
+      companyId TEXT,
+      reviewerName TEXT NOT NULL,
+      reviewerRole TEXT,
+      rating REAL NOT NULL,
+      title TEXT NOT NULL,
+      reviewText TEXT,
+      pros TEXT,
+      cons TEXT,
+      workCultureRating REAL,
+      salaryBenefitsRating REAL,
+      careerGrowthRating REAL,
+      workLifeBalanceRating REAL,
+      employmentStatus TEXT DEFAULT 'Current Employee',
+      isVerified INTEGER DEFAULT 1,
+      createdAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS followed_companies (
+      id TEXT PRIMARY KEY,
+      candidateId TEXT NOT NULL,
+      companyName TEXT NOT NULL,
+      companyId TEXT,
+      notificationsEnabled INTEGER DEFAULT 1,
+      followedAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS job_alerts (
+      id TEXT PRIMARY KEY,
+      candidateId TEXT NOT NULL,
+      title TEXT NOT NULL,
+      keywords TEXT,
+      location TEXT,
+      experienceMin REAL,
+      experienceMax REAL,
+      salaryMin TEXT,
+      frequency TEXT DEFAULT 'Daily',
+      isActive INTEGER DEFAULT 1,
+      createdAt TEXT NOT NULL
+    );
+
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      passwordHash TEXT NOT NULL,
+      fullName TEXT,
+      phone TEXT,
+      role TEXT NOT NULL DEFAULT 'CANDIDATE',
+      location TEXT,
+      experience REAL,
+      designation TEXT,
+      companyName TEXT,
+      companyWebsite TEXT,
+      industry TEXT,
+      companySize TEXT,
+      emailVerified INTEGER DEFAULT 1,
+      isActive INTEGER DEFAULT 1,
+      createdAt TEXT NOT NULL,
+      updatedAt TEXT NOT NULL
     );
   `);
 }

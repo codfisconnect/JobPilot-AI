@@ -46,6 +46,20 @@ export interface CanonicalJob {
   jobDetailUrl?: string;
   applicationUrl?: string;
   skills: CanonicalJobSkill[];
+  applicationType?: 'INTERNAL' | 'EXTERNAL';
+  openingsCount?: number;
+  department?: string;
+  roleCategory?: string;
+  screeningQuestions?: string[];
+  rating?: number;
+  reviewsCount?: number;
+  companyLogo?: string;
+  companyWebsite?: string;
+  companySize?: string;
+  companyHeadquarters?: string;
+  companyFounded?: string;
+  companyDescription?: string;
+  benefits?: string[];
   recommendation?: {
     score: number;
     headline: string;

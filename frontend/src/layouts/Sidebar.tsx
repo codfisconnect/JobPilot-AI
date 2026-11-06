@@ -15,7 +15,13 @@ import {
   GraduationCap,
   CreditCard,
   LogOut,
-  LogIn
+  LogIn,
+  Search,
+  Bell,
+  Building2,
+  ExternalLink,
+  Target,
+  Wand2
 } from 'lucide-react';
 import './Sidebar.css';
 
@@ -38,12 +44,14 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const { user, isAuthenticated, logout } = useAuth();
 
   const candidateMenuItems = [
-    { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+    { id: 'dashboard', label: 'Overview', icon: LayoutDashboard },
     { id: 'profile', label: 'My Profile', icon: User },
     { id: 'resumes', label: 'My Resume', icon: FileText },
-    { id: 'jobs', label: 'Jobs', icon: Briefcase },
-    { id: 'applications', label: 'Applications', icon: Send },
-    { id: 'career', label: 'Career', icon: GraduationCap },
+    { id: 'jobs', label: 'Search Jobs', icon: Search },
+    { id: 'saved-jobs', label: 'Saved Jobs', icon: Bookmark },
+    { id: 'applications', label: 'Application Tracker', icon: Send },
+    { id: 'studio', label: 'AI Resume Builder', icon: Wand2 },
+    { id: 'career', label: 'Skill Gap Analysis', icon: Target },
     { id: 'interview', label: 'Interview Prep', icon: Headphones },
     { id: 'settings', label: 'Settings', icon: Settings },
   ];

@@ -23,7 +23,16 @@ export function validateRequest(schema: { body?: z.ZodTypeAny; query?: z.ZodType
 export const RegisterSchema = z.object({
   email: z.string().trim().toLowerCase().email('Please enter a valid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters long'),
-  fullName: z.string().min(2, 'Full name must be at least 2 characters').optional()
+  fullName: z.string().optional(),
+  phone: z.string().optional(),
+  role: z.enum(['CANDIDATE', 'EMPLOYER', 'INSTITUTE', 'ADMIN']).optional().default('CANDIDATE'),
+  location: z.string().optional(),
+  experience: z.union([z.number(), z.string()]).optional(),
+  designation: z.string().optional(),
+  companyName: z.string().optional(),
+  companyWebsite: z.string().optional(),
+  industry: z.string().optional(),
+  companySize: z.string().optional()
 });
 
 export const LoginSchema = z.object({

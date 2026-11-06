@@ -191,7 +191,10 @@ export const App: React.FC = () => {
         <Suspense fallback={<RouteLoadingFallback />}>
           <AuthPage
             initialMode="login"
-            onSuccess={() => handleNavigate('dashboard')}
+            onSuccess={() => {
+              const target = user?.role === 'ADMIN' ? 'admin' : (user?.role === 'EMPLOYER' ? 'employer' : 'dashboard');
+              handleNavigate(target);
+            }}
             onNavigateMode={(mode) => {
               const targetPath = mode === 'register' ? '/register' : '/login';
               if (window.location.pathname !== targetPath) {
@@ -212,7 +215,10 @@ export const App: React.FC = () => {
         <Suspense fallback={<RouteLoadingFallback />}>
           <AuthPage
             initialMode={isRegisterRoute ? 'register' : 'login'}
-            onSuccess={() => handleNavigate('dashboard')}
+            onSuccess={() => {
+              const target = user?.role === 'ADMIN' ? 'admin' : (user?.role === 'EMPLOYER' ? 'employer' : 'dashboard');
+              handleNavigate(target);
+            }}
             onNavigateMode={(mode) => {
               const targetPath = mode === 'register' ? '/register' : '/login';
               if (window.location.pathname !== targetPath) {

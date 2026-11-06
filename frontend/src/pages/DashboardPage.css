@@ -10,6 +10,52 @@
   width: 100%;
 }
 
+/* Metrics Ribbon */
+.dash-metrics-ribbon {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+  width: 100%;
+}
+
+.dash-metric-pill-card {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md, 10px);
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dash-metric-pill-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--accent-primary, #6366f1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.metric-pill-label {
+  font-size: 0.71875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  letter-spacing: 0.03em;
+}
+
+.metric-pill-value {
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.metric-pill-sub {
+  font-size: 0.6875rem;
+  color: var(--text-secondary);
+}
+
 /* --------------------------------------------------------------------------
    Top Bar: Greeting & Instant Universal Job Search
    -------------------------------------------------------------------------- */

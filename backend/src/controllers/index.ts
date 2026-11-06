@@ -124,6 +124,59 @@ export class JobController {
     }
   }
 
+  public static async create(req: Request, res: Response) {
+    try {
+      const data = req.body;
+      if (!data.role || !data.company) {
+        return res.status(400).json({ success: false, error: 'Job role and company are required' });
+      }
+
+      const job: JobDescription = {
+        id: data.id || `job-emp-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        role: data.role,
+        company: data.company,
+        location: data.location || 'Bangalore, India',
+        sourceType: data.sourceType || 'sample',
+        source: data.source || 'Employer Portal',
+        applicationType: data.applicationType || 'INTERNAL',
+        applicationUrl: data.applicationUrl,
+        applicationMethod: data.applicationMethod || (data.applicationType === 'EXTERNAL' ? 'External Website' : 'JobPilot Demo Simulation'),
+        applicationMode: data.applicationMode || (data.applicationType === 'EXTERNAL' ? 'external' : 'demo'),
+        openingsCount: data.openingsCount ? Number(data.openingsCount) : 1,
+        department: data.department || 'Engineering',
+        roleCategory: data.roleCategory || 'Software Development',
+        screeningQuestions: Array.isArray(data.screeningQuestions) ? data.screeningQuestions : [],
+        rating: data.rating !== undefined ? Number(data.rating) : 4.2,
+        reviewsCount: data.reviewsCount !== undefined ? Number(data.reviewsCount) : 12,
+        companyLogo: data.companyLogo || '',
+        companyWebsite: data.companyWebsite || '',
+        companySize: data.companySize || '500-1000 employees',
+        companyHeadquarters: data.companyHeadquarters || 'Bangalore, Karnataka, India',
+        companyFounded: data.companyFounded || '2015',
+        companyDescription: data.companyDescription || `${data.company} is a leading enterprise providing innovative technology solutions.`,
+        benefits: Array.isArray(data.benefits) ? data.benefits : ['Health Insurance', 'Flexible Working Hours', 'Performance Bonus', 'Learning Allowance'],
+        employmentType: data.employmentType || 'Full-time',
+        workMode: data.workMode || 'Hybrid',
+        publishedDate: data.publishedDate || new Date().toISOString(),
+        isExternal: data.applicationType === 'EXTERNAL',
+        experienceRequired: data.experienceRequired || '2-5 years',
+        salary: data.salary || '₹12,00,000 - ₹18,00,000 P.A.',
+        careerTrack: data.careerTrack || 'Software Development',
+        mustHaveSkills: Array.isArray(data.mustHaveSkills) ? data.mustHaveSkills : [],
+        niceToHaveSkills: Array.isArray(data.niceToHaveSkills) ? data.niceToHaveSkills : [],
+        responsibilities: Array.isArray(data.responsibilities) ? data.responsibilities : [],
+        qualifications: Array.isArray(data.qualifications) ? data.qualifications : ["Bachelor's degree in Computer Science or related field"],
+        rawText: data.rawText || `${data.role} at ${data.company}`,
+        createdAt: new Date().toISOString()
+      };
+
+      const saved = await JobRepository.save(job);
+      res.status(201).json({ success: true, message: 'Job created successfully', data: saved });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
   public static async parseAndCreate(req: Request, res: Response) {
     try {
       const { rawText, sourceType, sourceUrl } = req.body;
@@ -613,6 +666,265 @@ export class ApplicationController {
       res.status(500).json({ success: false, error: err.message });
     }
   }
+
+  /**
+   * TYPE A: Candidate Applies Directly to Internal Job
+   */
+  public static async applyInternal(req: Request, res: Response) {
+    try {
+      const { candidateId, jobId, resumeVersionId, resumeVersionName, screeningAnswers, notes } = req.body;
+      if (!candidateId || !jobId) {
+        return res.status(400).json({ success: false, error: 'candidateId and jobId are required' });
+      }
+
+      const job = await JobRepository.getById(jobId);
+      if (!job) {
+        return res.status(404).json({ success: false, error: 'Job not found' });
+      }
+
+      const candidate = await CandidateRepository.getById(candidateId);
+      if (!candidate) {
+        return res.status(404).json({ success: false, error: 'Candidate profile not found' });
+      }
+
+      const now = new Date().toISOString();
+      const existing = (await ApplicationRepository.getAll(candidateId)).find(a => a.jobId === jobId);
+      if (existing) {
+        return res.status(409).json({
+          success: false,
+          isDuplicate: true,
+          message: 'You have already submitted an application for this position.',
+          data: existing
+        });
+      }
+
+      // Calculate initial match score if possible
+      let matchScore = 85;
+      try {
+        const analysis = await MatchingEngine.analyze(candidate, job);
+        matchScore = analysis.scores.overallScore;
+      } catch {}
+
+      const application: ApplicationRecord = {
+        id: `app-int-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        candidateId,
+        jobId,
+        company: job.company,
+        role: job.role,
+        location: job.location,
+        applicationType: 'INTERNAL',
+        applicationMode: 'demo',
+        status: 'Submitted' as any,
+        matchScore,
+        resumeVersionId: resumeVersionId || undefined,
+        resumeVersionName: resumeVersionName || 'Master Resume',
+        candidateName: candidate.name,
+        candidateEmail: candidate.email,
+        candidatePhone: candidate.phone,
+        candidateLocation: candidate.location,
+        candidateExperience: candidate.yearsOfExperience,
+        candidateDesignation: candidate.headline || (candidate.targetRoles && candidate.targetRoles[0]) || 'Applicant',
+        applicationDate: now.split('T')[0],
+        appliedAt: now,
+        notes: notes || '',
+        screeningAnswers: screeningAnswers || {},
+        statusHistory: [
+          { status: 'Submitted', changedAt: now, note: 'Direct candidate application submitted on JobPilot' }
+        ],
+        timeline: [
+          { timestamp: now, stage: 'Submitted', description: 'Application delivered directly to employer dashboard.' }
+        ],
+        createdAt: now,
+        updatedAt: now
+      };
+
+      const saved = await ApplicationRepository.save(application);
+      res.status(201).json({
+        success: true,
+        message: 'Your application has been successfully submitted to the employer.',
+        data: saved
+      });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * TYPE B: Candidate Tracks External Application
+   */
+  public static async trackExternal(req: Request, res: Response) {
+    try {
+      const { candidateId, jobId, action, notes, reminderDate, followCompany } = req.body;
+      if (!candidateId || !jobId) {
+        return res.status(400).json({ success: false, error: 'candidateId and jobId are required' });
+      }
+
+      const job = await JobRepository.getById(jobId);
+      if (!job) {
+        return res.status(404).json({ success: false, error: 'Job not found' });
+      }
+
+      const candidate = await CandidateRepository.getById(candidateId);
+      const now = new Date().toISOString();
+
+      // If user selected "Follow this company", register follow intent
+      if (followCompany && job.company) {
+        const { FollowedCompanyRepository } = await import('../services/repositories.js');
+        await FollowedCompanyRepository.follow(candidateId, job.company);
+      }
+
+      // Check existing application record
+      let app = (await ApplicationRepository.getAll(candidateId)).find(a => a.jobId === jobId);
+
+      if (action === 'CLICKED_LINK') {
+        // Link clicked -> DOES NOT mark as applied. Sets status to 'Ready to Apply'
+        if (!app) {
+          app = {
+            id: `app-ext-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+            candidateId,
+            jobId,
+            company: job.company,
+            role: job.role,
+            location: job.location,
+            applicationType: 'EXTERNAL',
+            applicationMode: 'external',
+            applicationUrl: job.applicationUrl || job.sourceUrl,
+            status: 'Ready to Apply' as any,
+            matchScore: 80,
+            candidateName: candidate?.name,
+            candidateEmail: candidate?.email,
+            candidatePhone: candidate?.phone,
+            applicationDate: now.split('T')[0],
+            notes: notes || 'Redirected to external career page.',
+            statusHistory: [
+              { status: 'Ready to Apply', changedAt: now, note: 'External career link opened in new tab' }
+            ],
+            timeline: [
+              { timestamp: now, stage: 'Redirected to Company Site', description: 'Application link opened on official company website.' }
+            ],
+            createdAt: now,
+            updatedAt: now
+          };
+          await ApplicationRepository.save(app);
+        }
+        return res.json({ success: true, data: app, redirected: true });
+      }
+
+      if (action === 'CONFIRMED_APPLIED') {
+        // Candidate returns and explicitly confirms they submitted on external site
+        const statusHistory = app?.statusHistory || [];
+        statusHistory.push({
+          status: 'Applied',
+          changedAt: now,
+          note: notes || 'Candidate confirmed manual application submission on employer career website.'
+        });
+
+        const timeline = app?.timeline || [];
+        timeline.push({
+          timestamp: now,
+          stage: 'Applied on External Site',
+          description: 'Candidate confirmed application was completed.'
+        });
+
+        const updatedApp: ApplicationRecord = {
+          id: app?.id || `app-ext-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          candidateId,
+          jobId,
+          company: job.company,
+          role: job.role,
+          location: job.location,
+          applicationType: 'EXTERNAL',
+          applicationMode: 'external',
+          applicationUrl: job.applicationUrl || job.sourceUrl,
+          status: 'Applied' as any,
+          matchScore: app?.matchScore || 80,
+          candidateName: candidate?.name,
+          candidateEmail: candidate?.email,
+          candidatePhone: candidate?.phone,
+          applicationDate: now.split('T')[0],
+          appliedAt: now,
+          notes: notes || app?.notes || 'Applied on company website.',
+          statusHistory,
+          timeline,
+          createdAt: app?.createdAt || now,
+          updatedAt: now
+        };
+
+        const saved = await ApplicationRepository.save(updatedApp);
+        return res.json({ success: true, data: saved, message: 'External application confirmed and logged in your tracker.' });
+      }
+
+      if (action === 'REQUESTED_EMAIL') {
+        // Candidate requested job details in email to apply later
+        return res.json({
+          success: true,
+          message: `Job opportunity details sent to ${candidate?.email || 'your email'}. You can apply whenever you are ready.`
+        });
+      }
+
+      res.status(400).json({ success: false, error: 'Invalid tracking action' });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Employer Updates Application Status (Submitted, Viewed, Under Review, Shortlisted, Interview Scheduled, Selected, Rejected)
+   */
+  public static async updateStatusByEmployer(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const { status, employerNotes, interviewDetails } = req.body;
+
+      const app = await ApplicationRepository.getById(id);
+      if (!app) {
+        return res.status(404).json({ success: false, error: 'Application not found' });
+      }
+
+      const now = new Date().toISOString();
+      const statusHistory = app.statusHistory || [];
+      statusHistory.push({
+        status,
+        changedAt: now,
+        note: employerNotes || `Application status updated to ${status}`
+      });
+
+      const timeline = app.timeline || [];
+      timeline.push({
+        timestamp: now,
+        stage: status,
+        description: employerNotes || `Employer updated status to ${status}.`
+      });
+
+      const updated: ApplicationRecord = {
+        ...app,
+        status: status as any,
+        employerNotes: employerNotes !== undefined ? employerNotes : app.employerNotes,
+        interviewDetails: interviewDetails !== undefined ? interviewDetails : app.interviewDetails,
+        statusHistory,
+        timeline,
+        updatedAt: now
+      };
+
+      const saved = await ApplicationRepository.save(updated);
+      res.json({ success: true, data: saved });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  /**
+   * Employer Fetches Applicants
+   */
+  public static async getEmployerApplicants(req: Request, res: Response) {
+    try {
+      const companyOrEmployerId = String(req.query.company || req.query.employerId || '');
+      const apps = await ApplicationRepository.getByEmployerOrCompany(companyOrEmployerId);
+      res.json({ success: true, data: apps });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
 }
 
 export class InterviewController {
@@ -658,6 +970,139 @@ export class CompanyController {
       const { CompanyRepository } = await import('../services/repositories.js');
       const companies = await CompanyRepository.getAll();
       res.json({ success: true, data: companies });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  public static async getReviews(req: Request, res: Response) {
+    try {
+      const companyName = (req.params.companyName || req.query.company || '') as string;
+      const { CompanyReviewRepository } = await import('../services/repositories.js');
+      const reviews = await CompanyReviewRepository.getAll(companyName || undefined);
+      res.json({ success: true, data: reviews });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  public static async submitReview(req: Request, res: Response) {
+    try {
+      const { companyName, reviewerName, reviewerRole, rating, title, reviewText, pros, cons, workCultureRating, salaryBenefitsRating, careerGrowthRating, workLifeBalanceRating, employmentStatus } = req.body;
+      if (!companyName || !reviewerName || !title || !rating) {
+        return res.status(400).json({ success: false, error: 'companyName, reviewerName, title, and rating are required' });
+      }
+
+      const { CompanyReviewRepository } = await import('../services/repositories.js');
+      const review = await CompanyReviewRepository.save({
+        id: `rev-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        companyName,
+        reviewerName,
+        reviewerRole: reviewerRole || 'Software Professional',
+        rating: Number(rating),
+        title,
+        reviewText: reviewText || '',
+        pros: pros || '',
+        cons: cons || '',
+        workCultureRating: Number(workCultureRating || rating),
+        salaryBenefitsRating: Number(salaryBenefitsRating || rating),
+        careerGrowthRating: Number(careerGrowthRating || rating),
+        workLifeBalanceRating: Number(workLifeBalanceRating || rating),
+        employmentStatus: employmentStatus || 'Current Employee',
+        isVerified: true,
+        createdAt: new Date().toISOString()
+      });
+
+      res.status(201).json({ success: true, message: 'Review submitted successfully', data: review });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  public static async followCompany(req: Request, res: Response) {
+    try {
+      const { candidateId, companyName } = req.body;
+      if (!candidateId || !companyName) {
+        return res.status(400).json({ success: false, error: 'candidateId and companyName are required' });
+      }
+      const { FollowedCompanyRepository } = await import('../services/repositories.js');
+      await FollowedCompanyRepository.follow(candidateId, companyName);
+      res.json({ success: true, message: `You are now following ${companyName}` });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  public static async unfollowCompany(req: Request, res: Response) {
+    try {
+      const { candidateId, companyName } = req.body;
+      if (!candidateId || !companyName) {
+        return res.status(400).json({ success: false, error: 'candidateId and companyName are required' });
+      }
+      const { FollowedCompanyRepository } = await import('../services/repositories.js');
+      await FollowedCompanyRepository.unfollow(candidateId, companyName);
+      res.json({ success: true, message: `Unfollowed ${companyName}` });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  public static async getFollowedCompanies(req: Request, res: Response) {
+    try {
+      const candidateId = (req.params.candidateId || req.query.candidateId || '') as string;
+      const { FollowedCompanyRepository } = await import('../services/repositories.js');
+      const list = await FollowedCompanyRepository.getByCandidateId(candidateId);
+      res.json({ success: true, data: list });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+}
+
+export class JobAlertController {
+  public static async listAlerts(req: Request, res: Response) {
+    try {
+      const candidateId = (req.query.candidateId || '') as string;
+      const { JobAlertRepository } = await import('../services/repositories.js');
+      const alerts = await JobAlertRepository.getByCandidateId(candidateId);
+      res.json({ success: true, data: alerts });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  public static async createAlert(req: Request, res: Response) {
+    try {
+      const { candidateId, title, keywords, location, experienceMin, experienceMax, salaryMin, frequency } = req.body;
+      if (!candidateId || !title) {
+        return res.status(400).json({ success: false, error: 'candidateId and title are required' });
+      }
+      const { JobAlertRepository } = await import('../services/repositories.js');
+      const alert = await JobAlertRepository.save({
+        id: `alert-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        candidateId,
+        title,
+        keywords: keywords || '',
+        location: location || '',
+        experienceMin: experienceMin ? Number(experienceMin) : undefined,
+        experienceMax: experienceMax ? Number(experienceMax) : undefined,
+        salaryMin: salaryMin || '',
+        frequency: frequency || 'Daily',
+        isActive: true,
+        createdAt: new Date().toISOString()
+      });
+      res.status(201).json({ success: true, message: 'Job alert created successfully', data: alert });
+    } catch (err: any) {
+      res.status(500).json({ success: false, error: err.message });
+    }
+  }
+
+  public static async deleteAlert(req: Request, res: Response) {
+    try {
+      const id = req.params.id as string;
+      const { JobAlertRepository } = await import('../services/repositories.js');
+      await JobAlertRepository.delete(id);
+      res.json({ success: true, message: 'Job alert removed' });
     } catch (err: any) {
       res.status(500).json({ success: false, error: err.message });
     }

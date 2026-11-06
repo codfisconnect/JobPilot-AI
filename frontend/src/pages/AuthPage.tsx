@@ -14,7 +14,14 @@ import {
   CheckCircle2,
   KeyRound,
   ArrowLeft,
-  RotateCw
+  RotateCw,
+  Building2,
+  Briefcase,
+  Phone,
+  MapPin,
+  Globe,
+  Users,
+  Award
 } from 'lucide-react';
 import './AuthPage.css';
 
@@ -59,6 +66,25 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   const [localError, setLocalError] = useState<string | null>(null);
   const [successNotice, setSuccessNotice] = useState<string | null>(null);
 
+  // Role Selection for Registration (Candidate vs Employer)
+  const [regRole, setRegRole] = useState<'CANDIDATE' | 'EMPLOYER'>('CANDIDATE');
+
+  // Candidate Registration Fields
+  const [candidateMobile, setCandidateMobile] = useState('');
+  const [candidateLocation, setCandidateLocation] = useState('Bangalore, India');
+  const [candidateExperience, setCandidateExperience] = useState('3');
+  const [candidateDesignation, setCandidateDesignation] = useState('Software Engineer');
+
+  // Employer Registration Fields
+  const [employerContactPerson, setEmployerContactPerson] = useState('');
+  const [employerWorkEmail, setEmployerWorkEmail] = useState('');
+  const [employerMobile, setEmployerMobile] = useState('');
+  const [employerCompanyName, setEmployerCompanyName] = useState('');
+  const [employerCompanyWebsite, setEmployerCompanyWebsite] = useState('');
+  const [employerIndustry, setEmployerIndustry] = useState('Technology & IT');
+  const [employerCompanySize, setEmployerCompanySize] = useState('50-200');
+  const [employerPassword, setEmployerPassword] = useState('');
+
   // Resend cooldown timer
   const [cooldown, setCooldown] = useState<number>(0);
 
@@ -79,7 +105,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
   };
 
   /**
-   * Handle Sign-Up Form Submission
+   * Handle Sign-Up Form Submission (Candidate or Employer)
    */
   const handleRegisterSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -87,62 +113,145 @@ export const AuthPage: React.FC<AuthPageProps> = ({
     setSuccessNotice(null);
     clearError();
 
-    const cleanEmail = email.trim().toLowerCase();
-    if (!validateEmailFormat(cleanEmail)) {
-      setLocalError('Enter a valid email address.');
-      return;
-    }
-
-    if (!fullName.trim() || fullName.trim().length < 2) {
-      setLocalError('Please enter your full name (minimum 2 characters).');
-      return;
-    }
-
-    if (password.length < 8) {
-      setLocalError('Password must be at least 8 characters long.');
-      return;
-    }
-
-    try {
-      setIsSubmitting(true);
-      const res = await register({ email: cleanEmail, password, fullName: fullName.trim() });
-      if (res && (res.requiresVerification || (res as any).requiresOtp)) {
-        setOtpPurpose('SIGNUP');
-        setOtpCode('');
-        setCooldown(res.cooldownSeconds || 60);
-        setSuccessNotice(res.message || 'Verification code sent to your email.');
-        setMode('otp_verification');
-      } else if (onSuccess) {
-        onSuccess();
+    if (regRole === 'CANDIDATE') {
+      const cleanEmail = email.trim().toLowerCase();
+      if (!validateEmailFormat(cleanEmail)) {
+        setLocalError('Enter a valid email address.');
+        return;
       }
-    } catch (err: any) {
-      const normalized = normalizeApiError(err);
-      let userMsg = normalized.message;
-      if (normalized.code === 'CONFLICT' || userMsg.toLowerCase().includes('already exists')) {
-        userMsg = 'An account already exists with this email. Please sign in.';
-        setLocalError(userMsg);
+      if (!fullName.trim() || fullName.trim().length < 2) {
+        setLocalError('Please enter your full name (minimum 2 characters).');
+        return;
+      }
+      if (!candidateMobile.trim()) {
+        setLocalError('Please enter your mobile phone number.');
+        return;
+      }
+      if (!candidateLocation.trim()) {
+        setLocalError('Please specify your current location (e.g. Bangalore, India).');
+        return;
+      }
+      if (!candidateDesignation.trim()) {
+        setLocalError('Please specify your current designation (e.g. QA Automation Engineer).');
+        return;
+      }
+      if (password.length < 8) {
+        setLocalError('Password must be at least 8 characters long.');
         return;
       }
 
-      // If an existing unverified account already had an active OTP in cooldown:
-      if (
-        normalized.code === 'TOO_MANY_REQUESTS' ||
-        userMsg.toLowerCase().includes('before requesting a new code') ||
-        userMsg.toLowerCase().includes('wait')
-      ) {
-        const remaining = (err as any).details?.remainingSeconds || (err as any).details?.cooldownSeconds || 60;
-        setOtpPurpose('SIGNUP');
-        setOtpCode('');
-        setCooldown(remaining);
-        setSuccessNotice('A verification code was recently sent. Please enter the 6-digit code sent to your email.');
-        setMode('otp_verification');
+      try {
+        setIsSubmitting(true);
+        const res = await register({
+          role: 'CANDIDATE',
+          email: cleanEmail,
+          password,
+          fullName: fullName.trim(),
+          mobile: candidateMobile.trim(),
+          phone: candidateMobile.trim(),
+          location: candidateLocation.trim(),
+          experience: Number(candidateExperience) || 0,
+          designation: candidateDesignation.trim()
+        });
+        if (res && (res.requiresVerification || (res as any).requiresOtp)) {
+          setOtpPurpose('SIGNUP');
+          setOtpCode('');
+          setCooldown(res.cooldownSeconds || 60);
+          setSuccessNotice(res.message || 'Verification code sent to your email.');
+          setMode('otp_verification');
+        } else if (onSuccess) {
+          onSuccess();
+        }
+      } catch (err: any) {
+        handleAuthError(err);
+      } finally {
+        setIsSubmitting(false);
+      }
+    } else {
+      // Employer Registration
+      const cleanEmail = employerWorkEmail.trim().toLowerCase();
+      if (!validateEmailFormat(cleanEmail)) {
+        setLocalError('Enter a valid company work email address.');
+        return;
+      }
+      if (!employerContactPerson.trim() || employerContactPerson.trim().length < 2) {
+        setLocalError("Please enter the contact person's full name.");
+        return;
+      }
+      if (!employerMobile.trim()) {
+        setLocalError('Please enter your mobile number.');
+        return;
+      }
+      if (!employerCompanyName.trim()) {
+        setLocalError('Please enter your company name.');
+        return;
+      }
+      if (!employerCompanyWebsite.trim()) {
+        setLocalError('Please enter your company website URL (e.g. https://company.com).');
+        return;
+      }
+      if (employerPassword.length < 8) {
+        setLocalError('Password must be at least 8 characters long.');
         return;
       }
 
+      try {
+        setIsSubmitting(true);
+        const res = await register({
+          role: 'EMPLOYER',
+          email: cleanEmail,
+          workEmail: cleanEmail,
+          password: employerPassword,
+          fullName: employerContactPerson.trim(),
+          contactPerson: employerContactPerson.trim(),
+          mobile: employerMobile.trim(),
+          phone: employerMobile.trim(),
+          companyName: employerCompanyName.trim(),
+          companyWebsite: employerCompanyWebsite.trim(),
+          industry: employerIndustry,
+          companySize: employerCompanySize
+        });
+        if (res && (res.requiresVerification || (res as any).requiresOtp)) {
+          setOtpPurpose('SIGNUP');
+          setOtpCode('');
+          setCooldown(res.cooldownSeconds || 60);
+          setSuccessNotice(res.message || 'Verification code sent to your work email.');
+          setMode('otp_verification');
+        } else if (onSuccess) {
+          onSuccess();
+        }
+      } catch (err: any) {
+        handleAuthError(err);
+      } finally {
+        setIsSubmitting(false);
+      }
+    }
+  };
+
+  const handleAuthError = (err: any) => {
+    const normalized = normalizeApiError(err);
+    let userMsg = normalized.message;
+    if (normalized.code === 'CONFLICT' || userMsg.toLowerCase().includes('already exists')) {
+      userMsg = 'An account already exists with this email. Please sign in.';
       setLocalError(userMsg);
-    } finally {
-      setIsSubmitting(false);
+      return;
     }
+
+    if (
+      normalized.code === 'TOO_MANY_REQUESTS' ||
+      userMsg.toLowerCase().includes('before requesting a new code') ||
+      userMsg.toLowerCase().includes('wait')
+    ) {
+      const remaining = (err as any).details?.remainingSeconds || (err as any).details?.cooldownSeconds || 60;
+      setOtpPurpose('SIGNUP');
+      setOtpCode('');
+      setCooldown(remaining);
+      setSuccessNotice('A verification code was recently sent. Please enter the 6-digit code sent to your email.');
+      setMode('otp_verification');
+      return;
+    }
+
+    setLocalError(userMsg);
   };
 
   /**
@@ -719,6 +828,38 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             <span className="auth-divider-line" />
           </div>
 
+          {/* Role Selection Tabs for Registration */}
+          {mode === 'register' && (
+            <div className="auth-role-tabs" role="tablist">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={regRole === 'CANDIDATE'}
+                className={`auth-role-tab ${regRole === 'CANDIDATE' ? 'active' : ''}`}
+                onClick={() => {
+                  setRegRole('CANDIDATE');
+                  setLocalError(null);
+                }}
+              >
+                <UserIcon size={16} />
+                <span>I am a Candidate</span>
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={regRole === 'EMPLOYER'}
+                className={`auth-role-tab ${regRole === 'EMPLOYER' ? 'active' : ''}`}
+                onClick={() => {
+                  setRegRole('EMPLOYER');
+                  setLocalError(null);
+                }}
+              >
+                <Building2 size={16} />
+                <span>I am an Employer / Recruiter</span>
+              </button>
+            </div>
+          )}
+
           {/* Login Method Sub-Toggle (OTP vs Password) */}
           {mode === 'login' && (
             <div className="auth-method-tabs" role="tablist">
@@ -755,94 +896,421 @@ export const AuthPage: React.FC<AuthPageProps> = ({
             }
             noValidate
           >
-            {mode === 'register' && (
-              <div className="auth-field">
-                <label className="auth-label" htmlFor="auth-fullName">
-                  Full Name
-                </label>
-                <div className="auth-input-wrap">
-                  <UserIcon size={18} className="auth-input-icon" aria-hidden="true" />
-                  <input
-                    id="auth-fullName"
-                    name="fullName"
-                    type="text"
-                    required
-                    className="auth-input"
-                    placeholder="e.g. Syed Salman A"
-                    value={fullName}
-                    onChange={e => { setFullName(e.target.value); if (localError) setLocalError(null); }}
-                    disabled={isSubmitting || Boolean(socialLoading)}
-                    autoComplete="name"
-                  />
-                </div>
-              </div>
-            )}
-
-            <div className="auth-field">
-              <label className="auth-label" htmlFor="auth-email">
-                Email Address
-              </label>
-              <div className="auth-input-wrap">
-                <Mail size={18} className="auth-input-icon" aria-hidden="true" />
-                <input
-                  id="auth-email"
-                  name="email"
-                  type="email"
-                  required
-                  className="auth-input"
-                  placeholder="you@domain.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  disabled={isSubmitting || Boolean(socialLoading)}
-                  autoComplete="email"
-                />
-              </div>
-            </div>
-
-            {(mode === 'register' || loginMethod === 'password') && (
-              <div className="auth-field">
-                <div className="auth-field-header">
-                  <label className="auth-label" htmlFor="auth-password">
-                    Password
+            {/* 1. CANDIDATE REGISTRATION FIELDS */}
+            {mode === 'register' && regRole === 'CANDIDATE' && (
+              <>
+                <div className="auth-field">
+                  <label className="auth-label" htmlFor="auth-fullName">
+                    Full Name
                   </label>
-                  {mode === 'login' && loginMethod === 'password' && (
+                  <div className="auth-input-wrap">
+                    <UserIcon size={18} className="auth-input-icon" aria-hidden="true" />
+                    <input
+                      id="auth-fullName"
+                      name="fullName"
+                      type="text"
+                      required
+                      className="auth-input"
+                      placeholder="e.g. Syed Salman A"
+                      value={fullName}
+                      onChange={e => { setFullName(e.target.value); if (localError) setLocalError(null); }}
+                      disabled={isSubmitting || Boolean(socialLoading)}
+                      autoComplete="name"
+                    />
+                  </div>
+                </div>
+
+                <div className="auth-field">
+                  <label className="auth-label" htmlFor="auth-email">
+                    Email Address
+                  </label>
+                  <div className="auth-input-wrap">
+                    <Mail size={18} className="auth-input-icon" aria-hidden="true" />
+                    <input
+                      id="auth-email"
+                      name="email"
+                      type="email"
+                      required
+                      className="auth-input"
+                      placeholder="you@domain.com"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      disabled={isSubmitting || Boolean(socialLoading)}
+                      autoComplete="email"
+                    />
+                  </div>
+                </div>
+
+                <div className="auth-field">
+                  <label className="auth-label" htmlFor="auth-candidate-mobile">
+                    Mobile Number
+                  </label>
+                  <div className="auth-input-wrap">
+                    <Phone size={18} className="auth-input-icon" aria-hidden="true" />
+                    <input
+                      id="auth-candidate-mobile"
+                      name="mobile"
+                      type="tel"
+                      required
+                      className="auth-input"
+                      placeholder="+91 98765 43210"
+                      value={candidateMobile}
+                      onChange={e => setCandidateMobile(e.target.value)}
+                      disabled={isSubmitting}
+                      autoComplete="tel"
+                    />
+                  </div>
+                </div>
+
+                <div className="auth-field">
+                  <label className="auth-label" htmlFor="auth-candidate-location">
+                    Current Location
+                  </label>
+                  <div className="auth-input-wrap">
+                    <MapPin size={18} className="auth-input-icon" aria-hidden="true" />
+                    <input
+                      id="auth-candidate-location"
+                      name="location"
+                      type="text"
+                      required
+                      className="auth-input"
+                      placeholder="Bangalore, Karnataka, India"
+                      value={candidateLocation}
+                      onChange={e => setCandidateLocation(e.target.value)}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+
+                <div className="auth-grid-2">
+                  <div className="auth-field">
+                    <label className="auth-label" htmlFor="auth-candidate-designation">
+                      Current Designation
+                    </label>
+                    <div className="auth-input-wrap">
+                      <Briefcase size={18} className="auth-input-icon" aria-hidden="true" />
+                      <input
+                        id="auth-candidate-designation"
+                        name="designation"
+                        type="text"
+                        required
+                        className="auth-input"
+                        placeholder="e.g. QA Automation Engineer"
+                        value={candidateDesignation}
+                        onChange={e => setCandidateDesignation(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="auth-field">
+                    <label className="auth-label" htmlFor="auth-candidate-experience">
+                      Experience (Years)
+                    </label>
+                    <div className="auth-input-wrap">
+                      <Award size={18} className="auth-input-icon" aria-hidden="true" />
+                      <input
+                        id="auth-candidate-experience"
+                        name="experience"
+                        type="number"
+                        min="0"
+                        max="40"
+                        required
+                        className="auth-input"
+                        placeholder="3"
+                        value={candidateExperience}
+                        onChange={e => setCandidateExperience(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="auth-field">
+                  <div className="auth-field-header">
+                    <label className="auth-label" htmlFor="auth-password">
+                      Create Password
+                    </label>
+                  </div>
+                  <div className="auth-input-wrap">
+                    <Lock size={18} className="auth-input-icon" aria-hidden="true" />
+                    <input
+                      id="auth-password"
+                      name="password"
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      className="auth-input auth-password-input"
+                      placeholder="At least 8 characters"
+                      value={password}
+                      onChange={e => { setPassword(e.target.value); if (localError) setLocalError(null); }}
+                      disabled={isSubmitting}
+                      autoComplete="new-password"
+                    />
                     <button
                       type="button"
-                      className="auth-forgot-link"
-                      onClick={() => {
-                        setMode('forgot_password');
-                        setLocalError(null);
-                      }}
+                      className="auth-password-toggle"
+                      onClick={() => setShowPassword(prev => !prev)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
                     >
-                      Forgot password?
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
                     </button>
-                  )}
+                  </div>
                 </div>
-                <div className="auth-input-wrap">
-                  <Lock size={18} className="auth-input-icon" aria-hidden="true" />
-                  <input
-                    id="auth-password"
-                    name="password"
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    className="auth-input auth-password-input"
-                    placeholder={mode === 'register' ? 'At least 8 characters' : 'Enter your password'}
-                    value={password}
-                    onChange={e => { setPassword(e.target.value); if (localError) setLocalError(null); }}
-                    disabled={isSubmitting || Boolean(socialLoading)}
-                    autoComplete={mode === 'login' ? 'current-password' : 'new-password'}
-                  />
-                  <button
-                    type="button"
-                    className="auth-password-toggle"
-                    onClick={() => setShowPassword(prev => !prev)}
-                    aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    title={showPassword ? 'Hide password' : 'Show password'}
-                  >
-                    {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
-                  </button>
+              </>
+            )}
+
+            {/* 2. EMPLOYER REGISTRATION FIELDS */}
+            {mode === 'register' && regRole === 'EMPLOYER' && (
+              <>
+                <div className="auth-field">
+                  <label className="auth-label" htmlFor="auth-employer-contact">
+                    Contact Person's Full Name
+                  </label>
+                  <div className="auth-input-wrap">
+                    <UserIcon size={18} className="auth-input-icon" aria-hidden="true" />
+                    <input
+                      id="auth-employer-contact"
+                      name="contactPerson"
+                      type="text"
+                      required
+                      className="auth-input"
+                      placeholder="e.g. Ramesh Chandra (HR Director)"
+                      value={employerContactPerson}
+                      onChange={e => setEmployerContactPerson(e.target.value)}
+                      disabled={isSubmitting}
+                    />
+                  </div>
                 </div>
-              </div>
+
+                <div className="auth-field">
+                  <label className="auth-label" htmlFor="auth-employer-email">
+                    Official Work Email
+                  </label>
+                  <div className="auth-input-wrap">
+                    <Mail size={18} className="auth-input-icon" aria-hidden="true" />
+                    <input
+                      id="auth-employer-email"
+                      name="workEmail"
+                      type="email"
+                      required
+                      className="auth-input"
+                      placeholder="recruiter@company.com"
+                      value={employerWorkEmail}
+                      onChange={e => setEmployerWorkEmail(e.target.value)}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+
+                <div className="auth-field">
+                  <label className="auth-label" htmlFor="auth-employer-mobile">
+                    Mobile / Contact Number
+                  </label>
+                  <div className="auth-input-wrap">
+                    <Phone size={18} className="auth-input-icon" aria-hidden="true" />
+                    <input
+                      id="auth-employer-mobile"
+                      name="employerMobile"
+                      type="tel"
+                      required
+                      className="auth-input"
+                      placeholder="+91 99887 76655"
+                      value={employerMobile}
+                      onChange={e => setEmployerMobile(e.target.value)}
+                      disabled={isSubmitting}
+                    />
+                  </div>
+                </div>
+
+                <div className="auth-grid-2">
+                  <div className="auth-field">
+                    <label className="auth-label" htmlFor="auth-employer-company">
+                      Company Name
+                    </label>
+                    <div className="auth-input-wrap">
+                      <Building2 size={18} className="auth-input-icon" aria-hidden="true" />
+                      <input
+                        id="auth-employer-company"
+                        name="companyName"
+                        type="text"
+                        required
+                        className="auth-input"
+                        placeholder="ABC Technologies"
+                        value={employerCompanyName}
+                        onChange={e => setEmployerCompanyName(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="auth-field">
+                    <label className="auth-label" htmlFor="auth-employer-website">
+                      Company Website
+                    </label>
+                    <div className="auth-input-wrap">
+                      <Globe size={18} className="auth-input-icon" aria-hidden="true" />
+                      <input
+                        id="auth-employer-website"
+                        name="companyWebsite"
+                        type="url"
+                        required
+                        className="auth-input"
+                        placeholder="https://abctech.com"
+                        value={employerCompanyWebsite}
+                        onChange={e => setEmployerCompanyWebsite(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="auth-grid-2">
+                  <div className="auth-field">
+                    <label className="auth-label" htmlFor="auth-employer-industry">
+                      Industry
+                    </label>
+                    <div className="auth-input-wrap">
+                      <Briefcase size={18} className="auth-input-icon" aria-hidden="true" />
+                      <input
+                        id="auth-employer-industry"
+                        name="industry"
+                        type="text"
+                        required
+                        className="auth-input"
+                        placeholder="Information Technology"
+                        value={employerIndustry}
+                        onChange={e => setEmployerIndustry(e.target.value)}
+                        disabled={isSubmitting}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="auth-field">
+                    <label className="auth-label" htmlFor="auth-employer-size">
+                      Company Size
+                    </label>
+                    <div className="auth-input-wrap">
+                      <Users size={18} className="auth-input-icon" aria-hidden="true" />
+                      <select
+                        id="auth-employer-size"
+                        name="companySize"
+                        className="auth-input"
+                        value={employerCompanySize}
+                        onChange={e => setEmployerCompanySize(e.target.value)}
+                        disabled={isSubmitting}
+                      >
+                        <option value="1-10">1-10 employees</option>
+                        <option value="11-50">11-50 employees</option>
+                        <option value="50-200">50-200 employees</option>
+                        <option value="200-500">200-500 employees</option>
+                        <option value="500-1000">500-1,000 employees</option>
+                        <option value="1000+">1,000+ employees</option>
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="auth-field">
+                  <div className="auth-field-header">
+                    <label className="auth-label" htmlFor="auth-employer-password">
+                      Create Password
+                    </label>
+                  </div>
+                  <div className="auth-input-wrap">
+                    <Lock size={18} className="auth-input-icon" aria-hidden="true" />
+                    <input
+                      id="auth-employer-password"
+                      name="employerPassword"
+                      type={showPassword ? 'text' : 'password'}
+                      required
+                      className="auth-input auth-password-input"
+                      placeholder="At least 8 characters"
+                      value={employerPassword}
+                      onChange={e => setEmployerPassword(e.target.value)}
+                      disabled={isSubmitting}
+                      autoComplete="new-password"
+                    />
+                    <button
+                      type="button"
+                      className="auth-password-toggle"
+                      onClick={() => setShowPassword(prev => !prev)}
+                      aria-label={showPassword ? 'Hide password' : 'Show password'}
+                    >
+                      {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                    </button>
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* 3. SIGN IN FIELDS (EMAIL & OPTIONAL PASSWORD) */}
+            {mode === 'login' && (
+              <>
+                <div className="auth-field">
+                  <label className="auth-label" htmlFor="auth-email">
+                    Email Address
+                  </label>
+                  <div className="auth-input-wrap">
+                    <Mail size={18} className="auth-input-icon" aria-hidden="true" />
+                    <input
+                      id="auth-email"
+                      name="email"
+                      type="email"
+                      required
+                      className="auth-input"
+                      placeholder="you@domain.com"
+                      value={email}
+                      onChange={e => setEmail(e.target.value)}
+                      disabled={isSubmitting || Boolean(socialLoading)}
+                      autoComplete="email"
+                    />
+                  </div>
+                </div>
+
+                {loginMethod === 'password' && (
+                  <div className="auth-field">
+                    <div className="auth-field-header">
+                      <label className="auth-label" htmlFor="auth-password">
+                        Password
+                      </label>
+                      <button
+                        type="button"
+                        className="auth-forgot-link"
+                        onClick={() => {
+                          setMode('forgot_password');
+                          setLocalError(null);
+                        }}
+                      >
+                        Forgot password?
+                      </button>
+                    </div>
+                    <div className="auth-input-wrap">
+                      <Lock size={18} className="auth-input-icon" aria-hidden="true" />
+                      <input
+                        id="auth-password"
+                        name="password"
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        className="auth-input auth-password-input"
+                        placeholder="Enter your password"
+                        value={password}
+                        onChange={e => { setPassword(e.target.value); if (localError) setLocalError(null); }}
+                        disabled={isSubmitting || Boolean(socialLoading)}
+                        autoComplete="current-password"
+                      />
+                      <button
+                        type="button"
+                        className="auth-password-toggle"
+                        onClick={() => setShowPassword(prev => !prev)}
+                        aria-label={showPassword ? 'Hide password' : 'Show password'}
+                        title={showPassword ? 'Hide password' : 'Show password'}
+                      >
+                        {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             <button

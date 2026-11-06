@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { apiClient } from '../api/client';
+import { api } from '../api/index';
 import type {
   EmployerOrganization,
   EmployerMember,
@@ -45,7 +46,7 @@ export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSel
   const [metrics, setMetrics] = useState<EmployerDashboardMetrics | null>(null);
   const [jobs, setJobs] = useState<EmployerJob[]>([]);
   const [selectedJobId, setSelectedJobId] = useState<string | null>(null);
-  const [applicants, setApplicants] = useState<EmployerApplicant[]>([]);
+  const [applicants, setApplicants] = useState<any[]>([]);
 
   // Careers URL Connection State
   const [careersUrlInput, setCareersUrlInput] = useState<string>('');
@@ -75,7 +76,15 @@ export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSel
   const [showJobModal, setShowJobModal] = useState<boolean>(false);
   const [newJobTitle, setNewJobTitle] = useState<string>('');
   const [newJobDesc, setNewJobDesc] = useState<string>('');
-  const [newJobLoc, setNewJobLoc] = useState<string>('');
+  const [newJobLoc, setNewJobLoc] = useState<string>('Bangalore, India');
+  const [newJobDept, setNewJobDept] = useState<string>('Engineering');
+  const [newJobRoleCategory, setNewJobRoleCategory] = useState<string>('Software Development');
+  const [newJobWorkMode, setNewJobWorkMode] = useState<string>('Hybrid');
+  const [newJobExperience, setNewJobExperience] = useState<string>('2 - 5 years');
+  const [newJobSalary, setNewJobSalary] = useState<string>('₹ 12,00,000 - 18,00,000 P.A.');
+  const [newJobOpenings, setNewJobOpenings] = useState<string>('2');
+  const [newJobSkills, setNewJobSkills] = useState<string>('Java, Selenium, Automation Testing, CI/CD');
+  const [newJobScreeningQuestions, setNewJobScreeningQuestions] = useState<string>('How many years of relevant experience do you have?, What is your current notice period?');
 
 
   const loadEmployerData = async () => {
@@ -145,17 +154,41 @@ export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSel
   const handleCreateJob = async (e: React.FormEvent) => {
     e.preventDefault();
     try {
-      await apiClient.createEmployerJob({
-        title: newJobTitle,
-        description: newJobDesc,
-        location: newJobLoc || 'Remote',
-        requirements: ['Relevant experience'],
-        responsibilities: ['Core product delivery']
+      // 1. Direct JobPilot Catalogue & SQLite persistence
+      await api.createJob({
+        role: newJobTitle,
+        company: org?.name || 'ABC Technologies',
+        location: newJobLoc || 'Bangalore, India',
+        department: newJobDept,
+        roleCategory: newJobRoleCategory,
+        workMode: newJobWorkMode,
+        experienceRequired: newJobExperience,
+        salary: newJobSalary,
+        openingsCount: Number(newJobOpenings) || 1,
+        mustHaveSkills: newJobSkills.split(',').map(s => s.trim()).filter(Boolean),
+        responsibilities: [newJobDesc],
+        rawText: `${newJobTitle} at ${org?.name || 'Company'}\n\n${newJobDesc}`,
+        screeningQuestions: newJobScreeningQuestions.split(',').map(q => q.trim()).filter(Boolean),
+        applicationType: 'INTERNAL'
       });
+
+      // 2. Also register in employer client store
+      try {
+        await apiClient.createEmployerJob({
+          title: newJobTitle,
+          description: newJobDesc,
+          location: newJobLoc || 'Bangalore, India',
+          requirements: newJobSkills.split(',').map(s => s.trim()).filter(Boolean),
+          responsibilities: [newJobDesc]
+        });
+      } catch {
+        // Fallback gracefully
+      }
+
       setShowJobModal(false);
       setNewJobTitle('');
       setNewJobDesc('');
-      setNewJobLoc('');
+      setActionSuccess(`Job "${newJobTitle}" successfully published! Candidates can apply directly.`);
       await loadEmployerData();
     } catch (err: any) {
       alert(err.message || 'Failed to create job');
@@ -174,13 +207,53 @@ export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSel
   const handleViewApplicants = async (jobId: string) => {
     try {
       setSelectedJobId(jobId);
-      const res = await apiClient.getJobApplicants(jobId);
-      const appData = (res as any)?.data !== undefined ? (res as any).data : res;
-      if (Array.isArray(appData)) {
-        setApplicants(appData);
+      const [v1Res, repoApps] = await Promise.allSettled([
+        apiClient.getJobApplicants(jobId),
+        api.getEmployerApplicants(org?.name || '')
+      ]);
+
+      let combined: any[] = [];
+      if (repoApps.status === 'fulfilled' && Array.isArray(repoApps.value)) {
+        combined = repoApps.value.map((a: any) => ({
+          id: a.id,
+          candidateProfile: {
+            fullName: a.candidateName || 'Candidate',
+            headline: `${a.candidateDesignation || 'Professional'} • ${a.candidateExperience || 3} yrs exp`,
+            email: a.candidateEmail,
+            phone: a.candidatePhone,
+            location: a.candidateLocation
+          },
+          resumeVersion: {
+            versionName: a.resumeId || a.tailoredResumeId || 'Tailored Resume'
+          },
+          screeningAnswers: a.screeningAnswers,
+          appliedAt: a.createdAt,
+          stage: a.status || 'SUBMITTED',
+          employerNotes: a.employerNotes || '',
+          reviews: [{ stage: a.status || 'SUBMITTED' }]
+        }));
       }
+
+      if (v1Res.status === 'fulfilled') {
+        const appData = (v1Res.value as any)?.data !== undefined ? (v1Res.value as any).data : v1Res.value;
+        if (Array.isArray(appData) && appData.length > 0) {
+          combined = [...appData, ...combined];
+        }
+      }
+
+      setApplicants(combined);
     } catch (err: any) {
       alert(err.message || 'Failed to fetch applicants');
+    }
+  };
+
+  const handleUpdateApplicantStage = async (applicantId: string, newStage: string) => {
+    try {
+      await api.updateEmployerApplicationStatus(applicantId, { status: newStage });
+      setApplicants(prev => prev.map(a => a.id === applicantId ? { ...a, stage: newStage, reviews: [{ stage: newStage }] } : a));
+      setActionSuccess(`Candidate application moved to ${newStage}`);
+    } catch (err: any) {
+      alert(err.message || 'Failed to update applicant status');
     }
   };
 
@@ -583,9 +656,10 @@ export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSel
                     <thead>
                       <tr>
                         <th>Candidate</th>
-                        <th>Headline</th>
+                        <th>Contact & Location</th>
                         <th>Submitted Resume</th>
-                        <th>Stage</th>
+                        <th>Screening Answers</th>
+                        <th>Recruitment Stage</th>
                         <th>Applied Date</th>
                       </tr>
                     </thead>
@@ -593,20 +667,51 @@ export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSel
                       {applicants.map((app) => (
                         <tr key={app.id}>
                           <td style={{ fontWeight: 600 }}>
-                            {app.candidateProfile.fullName}
+                            <div>{app.candidateProfile.fullName}</div>
+                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>{app.candidateProfile.headline || '—'}</div>
                           </td>
-                          <td style={{ color: 'var(--text-secondary)' }}>
-                            {app.candidateProfile.headline || '—'}
+                          <td style={{ fontSize: '0.8125rem' }}>
+                            <div>{app.candidateProfile.email || '—'}</div>
+                            <div style={{ color: 'var(--text-muted)' }}>{app.candidateProfile.phone || app.candidateProfile.location || '—'}</div>
+                          </td>
+                          <td style={{ fontSize: '0.8125rem' }}>
+                            <span style={{ fontWeight: 600 }}>{app.resumeVersion?.versionName || 'Master Resume'}</span>
+                          </td>
+                          <td style={{ fontSize: '0.75rem', maxWidth: '200px' }}>
+                            {app.screeningAnswers && Object.keys(app.screeningAnswers).length > 0 ? (
+                              Object.entries(app.screeningAnswers).map(([k, v], idx) => (
+                                <div key={idx} style={{ marginBottom: '2px' }}>
+                                  <strong>{k.slice(0, 25)}...:</strong> {String(v)}
+                                </div>
+                              ))
+                            ) : (
+                              <span style={{ color: 'var(--text-muted)' }}>None required</span>
+                            )}
                           </td>
                           <td>
-                            {app.resumeVersion?.versionName || 'Standard Version'}
+                            <select
+                              value={app.stage || app.reviews?.[0]?.stage || 'SUBMITTED'}
+                              onChange={(e) => handleUpdateApplicantStage(app.id, e.target.value)}
+                              style={{
+                                padding: '4px 8px',
+                                borderRadius: '6px',
+                                border: '1px solid var(--border-primary)',
+                                background: 'var(--bg-surface)',
+                                color: 'var(--text-primary)',
+                                fontSize: '0.8125rem',
+                                fontWeight: 600
+                              }}
+                            >
+                              <option value="Submitted">Submitted</option>
+                              <option value="Viewed">Viewed</option>
+                              <option value="Under Review">Under Review</option>
+                              <option value="Shortlisted">Shortlisted</option>
+                              <option value="Interview Scheduled">Interview Scheduled</option>
+                              <option value="Selected">Selected</option>
+                              <option value="Rejected">Rejected</option>
+                            </select>
                           </td>
-                          <td>
-                            <span className="status-badge status-published">
-                              {app.reviews?.[0]?.stage || 'NEW'}
-                            </span>
-                          </td>
-                          <td style={{ color: 'var(--text-muted)' }}>
+                          <td style={{ color: 'var(--text-muted)', fontSize: '0.8125rem' }}>
                             {app.appliedAt ? new Date(app.appliedAt).toLocaleDateString() : 'Recent'}
                           </td>
                         </tr>
@@ -841,43 +946,132 @@ export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSel
 
       {/* Create Job Modal */}
       {showJobModal && (
-        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100 }}>
-          <div style={{ background: 'var(--bg-surface)', padding: '2rem', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: '550px' }}>
-            <h3 style={{ fontSize: '1.25rem', fontWeight: 600, marginBottom: '1.25rem' }}>
-              Create Job Opening
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.6)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '1rem', overflowY: 'auto' }}>
+          <div style={{ background: 'var(--bg-surface)', padding: '2rem', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: '680px', maxHeight: '90vh', overflowY: 'auto' }}>
+            <h3 style={{ fontSize: '1.35rem', fontWeight: 700, marginBottom: '1.25rem' }}>
+              Post a New Job Opening (Internal Job)
             </h3>
-            <form onSubmit={handleCreateJob}>
+            <form onSubmit={handleCreateJob} style={{ display: 'flex', flexDirection: 'column', gap: '0.875rem' }}>
               <div className="form-field">
-                <label className="form-label">Job Title</label>
+                <label className="form-label">Job Title / Role</label>
                 <input
                   className="form-input"
                   required
-                  placeholder="e.g. Lead Machine Learning Engineer"
+                  placeholder="e.g. Senior QA Automation Engineer"
                   value={newJobTitle}
                   onChange={(e) => setNewJobTitle(e.target.value)}
                 />
               </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="form-field">
+                  <label className="form-label">Department</label>
+                  <input
+                    className="form-input"
+                    placeholder="Engineering & QA"
+                    value={newJobDept}
+                    onChange={(e) => setNewJobDept(e.target.value)}
+                  />
+                </div>
+                <div className="form-field">
+                  <label className="form-label">Role Category</label>
+                  <input
+                    className="form-input"
+                    placeholder="Software Testing / QA"
+                    value={newJobRoleCategory}
+                    onChange={(e) => setNewJobRoleCategory(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '0.75rem' }}>
+                <div className="form-field">
+                  <label className="form-label">Location</label>
+                  <input
+                    className="form-input"
+                    placeholder="Bengaluru, Karnataka, India"
+                    value={newJobLoc}
+                    onChange={(e) => setNewJobLoc(e.target.value)}
+                  />
+                </div>
+                <div className="form-field">
+                  <label className="form-label">Work Mode</label>
+                  <select
+                    className="form-input"
+                    value={newJobWorkMode}
+                    onChange={(e) => setNewJobWorkMode(e.target.value)}
+                  >
+                    <option value="Hybrid">Hybrid</option>
+                    <option value="Remote">Remote</option>
+                    <option value="Onsite">Onsite</option>
+                  </select>
+                </div>
+              </div>
+
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '0.75rem' }}>
+                <div className="form-field">
+                  <label className="form-label">Experience Required</label>
+                  <input
+                    className="form-input"
+                    placeholder="3 - 6 Years"
+                    value={newJobExperience}
+                    onChange={(e) => setNewJobExperience(e.target.value)}
+                  />
+                </div>
+                <div className="form-field">
+                  <label className="form-label">Salary Range</label>
+                  <input
+                    className="form-input"
+                    placeholder="₹ 14,00,000 - 22,00,000 P.A."
+                    value={newJobSalary}
+                    onChange={(e) => setNewJobSalary(e.target.value)}
+                  />
+                </div>
+                <div className="form-field">
+                  <label className="form-label">Openings Count</label>
+                  <input
+                    className="form-input"
+                    type="number"
+                    min="1"
+                    value={newJobOpenings}
+                    onChange={(e) => setNewJobOpenings(e.target.value)}
+                  />
+                </div>
+              </div>
+
               <div className="form-field">
-                <label className="form-label">Location / Work Arrangement</label>
+                <label className="form-label">Required Skills (Comma-separated)</label>
                 <input
                   className="form-input"
-                  placeholder="e.g. Bengaluru, India (Hybrid)"
-                  value={newJobLoc}
-                  onChange={(e) => setNewJobLoc(e.target.value)}
+                  placeholder="Java, Selenium, Playwright, CI/CD"
+                  value={newJobSkills}
+                  onChange={(e) => setNewJobSkills(e.target.value)}
                 />
               </div>
+
               <div className="form-field">
-                <label className="form-label">Job Description</label>
+                <label className="form-label">Screening Questions (Comma-separated)</label>
+                <input
+                  className="form-input"
+                  placeholder="How many years of test automation experience do you possess?, What is your current notice period?"
+                  value={newJobScreeningQuestions}
+                  onChange={(e) => setNewJobScreeningQuestions(e.target.value)}
+                />
+              </div>
+
+              <div className="form-field">
+                <label className="form-label">Job Description & Responsibilities</label>
                 <textarea
                   className="form-input"
-                  style={{ minHeight: '120px' }}
+                  style={{ minHeight: '100px' }}
                   required
-                  placeholder="Detail responsibilities and technical expectations..."
+                  placeholder="Detail responsibilities, tech stack, and key qualifications..."
                   value={newJobDesc}
                   onChange={(e) => setNewJobDesc(e.target.value)}
                 />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1.5rem' }}>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', marginTop: '1rem' }}>
                 <button
                   type="button"
                   onClick={() => setShowJobModal(false)}
@@ -889,7 +1083,7 @@ export const EmployerPage: React.FC<EmployerPageProps> = ({ activeSection, onSel
                   type="submit"
                   className="action-btn action-primary"
                 >
-                  Save Role
+                  Publish Role to JobPilot
                 </button>
               </div>
             </form>
