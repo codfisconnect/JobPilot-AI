@@ -1,13 +1,22 @@
 import type { IResumeStorage } from './resumeStorage.interface.js';
 import { LocalResumeStorage } from './localResumeStorage.js';
 import { S3ResumeStorage } from './s3ResumeStorage.js';
+import { GCSResumeStorage } from './gcsResumeStorage.js';
 import { env } from '../config/env.js';
 import { logger } from '../utils/logger.js';
 
 export function createResumeStorage(): IResumeStorage {
-  const configuredProvider = process.env.RESUME_STORAGE_PROVIDER || env.STORAGE_PROVIDER || 'local';
+  const configuredProvider = process.env.RESUME_STORAGE_PROVIDER || process.env.STORAGE_PROVIDER || env.STORAGE_PROVIDER || 'local';
   const provider = configuredProvider === 'durable' ? (process.env.STORAGE_PROVIDER || 's3') : configuredProvider;
 
+  // 1. Native Google Cloud Storage (Cloud Run Workload Identity / ADC)
+  if (provider === 'gcs') {
+    const bucket = process.env.STORAGE_BUCKET || env.STORAGE_BUCKET || 'pilotmama-resumes-prod';
+    logger.info(`Initialized Google Cloud Storage provider: GCS (Bucket: ${bucket})`);
+    return new GCSResumeStorage({ bucket });
+  }
+
+  // 2. S3-compatible / Cloudflare R2
   if (provider === 's3' || provider === 'r2' || configuredProvider === 'durable') {
     if (!env.STORAGE_BUCKET || !env.STORAGE_ACCESS_KEY || !env.STORAGE_SECRET_KEY) {
       if (env.NODE_ENV === 'production') {
@@ -30,7 +39,7 @@ export function createResumeStorage(): IResumeStorage {
 
   // Default to Local filesystem storage
   if (env.NODE_ENV === 'production') {
-    logger.warn('NOTICE: Resume storage is currently configured to LOCAL filesystem. In ephemeral cloud containers, configure STORAGE_PROVIDER=s3 or r2 with object storage credentials to guarantee persistence across redeployments.');
+    logger.warn('NOTICE: Resume storage is currently configured to LOCAL filesystem. In ephemeral cloud containers, configure STORAGE_PROVIDER=gcs with STORAGE_BUCKET to guarantee persistence across redeployments.');
   }
 
   return new LocalResumeStorage();
@@ -39,4 +48,5 @@ export function createResumeStorage(): IResumeStorage {
 export const resumeStorage: IResumeStorage = createResumeStorage();
 export { LocalResumeStorage } from './localResumeStorage.js';
 export { S3ResumeStorage } from './s3ResumeStorage.js';
+export { GCSResumeStorage } from './gcsResumeStorage.js';
 export * from './resumeStorage.interface.js';

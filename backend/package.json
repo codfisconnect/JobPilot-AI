@@ -13,6 +13,7 @@
     "test": "tsx src/tests/runTests.ts && tsx --test src/tests/*.test.ts"
   },
   "dependencies": {
+    "@google-cloud/storage": "^9.0.0",
     "@google/generative-ai": "^0.21.0",
     "@prisma/client": "^6.4.1",
     "@types/cookie-parser": "^1.4.10",

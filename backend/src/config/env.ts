@@ -37,8 +37,8 @@ const envSchema = z.object({
   SMTP_FROM_EMAIL: z.string().optional().default(''),
   SMTP_FROM_NAME: z.string().optional().default('Pilot Mama'),
   BREVO_API_KEY: z.string().optional().default(''),
-  // Persistent Object Storage Configuration (S3 / R2 / MinIO)
-  STORAGE_PROVIDER: z.enum(['local', 's3', 'r2']).default('local'),
+  // Persistent Object Storage Configuration (GCS / S3 / R2 / Local)
+  STORAGE_PROVIDER: z.enum(['local', 's3', 'r2', 'gcs']).default('local'),
   STORAGE_ENDPOINT: z.string().optional().default(''),
   STORAGE_BUCKET: z.string().optional().default(''),
   STORAGE_REGION: z.string().optional().default('auto'),

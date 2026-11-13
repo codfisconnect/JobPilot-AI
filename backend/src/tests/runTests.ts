@@ -313,6 +313,19 @@ JNT University - Bachelor of Technology
   const fetchedVers = await ResumeVersionRepository.getByCandidateId(cand1.id);
   assert(fetchedVers.length > 0, `Resume version retrieval verified: found ${fetchedVers.length} versions for candidate`);
 
+  // Test 25: Storage Provider Selection & GCS Instantiation
+  const { createResumeStorage, LocalResumeStorage, GCSResumeStorage } = await import('../storage/index.js');
+  const defaultStorage = createResumeStorage();
+  assert(defaultStorage instanceof LocalResumeStorage, 'Default storage provider falls back to LocalResumeStorage for local dev');
+  
+  process.env.STORAGE_PROVIDER = 'gcs';
+  process.env.STORAGE_BUCKET = 'pilotmama-resumes-prod';
+  const gcsStorage = createResumeStorage();
+  assert(gcsStorage instanceof GCSResumeStorage, 'STORAGE_PROVIDER=gcs selects GCSResumeStorage without requiring HMAC or access keys');
+  assert((gcsStorage as any).providerName === 'gcs', 'GCSResumeStorage providerName is strictly gcs');
+  delete process.env.STORAGE_PROVIDER;
+  delete process.env.STORAGE_BUCKET;
+
   console.log(`\nTest Results: ${passed}/${total} passed.`);
   if (passed === total) {
     console.log('ALL CRITICAL BACKEND, CODEWALLA INTEGRATION, AND REGRESSION TESTS PASSED SUCCESSFULLY!\n');
