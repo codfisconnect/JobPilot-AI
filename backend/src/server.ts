@@ -51,7 +51,13 @@ app.use(cors({
     }
 
     // Allow official PilotMama and Vercel deployments
-    if (/^https:\/\/.*\.vercel\.app$/.test(requestOrigin) || /^https:\/\/.*\.pilotmama\.io$/.test(requestOrigin) || /^https:\/\/pilotmama\.io$/.test(requestOrigin)) {
+    if (
+      /^https:\/\/.*\.vercel\.app$/.test(requestOrigin) ||
+      /^https:\/\/.*\.pilotmamaglobal\.in$/.test(requestOrigin) ||
+      /^https:\/\/pilotmamaglobal\.in$/.test(requestOrigin) ||
+      /^https:\/\/.*\.pilotmama\.io$/.test(requestOrigin) ||
+      /^https:\/\/pilotmama\.io$/.test(requestOrigin)
+    ) {
       return callback(null, true);
     }
 
