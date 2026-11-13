@@ -109,40 +109,45 @@ const PORT = env.PORT;
 const isTestEnv = process.env.NODE_ENV === 'test' || Boolean(process.env.TEST_MODE) || process.argv.some(arg => arg.includes('test'));
 
 if (!isTestEnv) {
-  checkDatabaseConnection()
-    .then((dbStatus) => {
-      if (dbStatus.connected) {
-        logger.info(`PostgreSQL connected successfully (${dbStatus.latencyMs}ms)`);
-        // Idempotently provision initial platform administrator if configured
-        import('./database/adminSeed.js')
-          .then(m => m.provisionDefaultAdmin())
-          .catch(() => {});
-      } else {
-        logger.warn('PostgreSQL database notice on startup:', { error: dbStatus.error });
-      }
+  // Bind HTTP listener immediately so container orchestration / Cloud Run startup probes succeed promptly
+  app.listen(PORT, () => {
+    logger.info(`Pilot Mama backend listening on port ${PORT} [${env.NODE_ENV}]`);
 
-
-      // Check and report resume storage health status on startup
-      import('./storage/index.js')
-        .then(async ({ resumeStorage }) => {
-          if (resumeStorage.checkHealth) {
-            const health = await resumeStorage.checkHealth();
-            if (health.status === 'READY') {
-              logger.info(`Resume storage: READY (${health.provider.toUpperCase()})`);
-            } else {
-              logger.warn(`Resume storage: ${health.status} (${health.provider.toUpperCase()}) - ${health.message}`);
-            }
-          }
-        })
-        .catch(() => {});
-
-      app.listen(PORT, () => {
-        logger.info(`Pilot Mama backend listening on port ${PORT} [${env.NODE_ENV}]`);
+    // Asynchronous background dependencies verification (database, storage, admin seed)
+    // Connectivity problems or temporary network latency must not block the port or fail the HTTP server process
+    checkDatabaseConnection()
+      .then((dbStatus) => {
+        if (dbStatus.connected) {
+          logger.info(`PostgreSQL connected successfully (${dbStatus.latencyMs}ms)`);
+          // Idempotently provision initial platform administrator if configured
+          import('./database/adminSeed.js')
+            .then(m => m.provisionDefaultAdmin())
+            .catch((err) => {
+              logger.warn('Default admin provisioning notice:', { error: err.message });
+            });
+        } else {
+          logger.warn('PostgreSQL database notice on startup:', { error: dbStatus.error });
+        }
+      })
+      .catch((err) => {
+        logger.warn('Unexpected database check error on startup:', { error: err.message });
       });
-    })
-    .catch((err) => {
-      logger.error('Failed to initialize server on startup:', err);
-      process.exit(1);
-    });
+
+    // Check and report resume storage health status on startup
+    import('./storage/index.js')
+      .then(async ({ resumeStorage }) => {
+        if (resumeStorage.checkHealth) {
+          const health = await resumeStorage.checkHealth();
+          if (health.status === 'READY') {
+            logger.info(`Resume storage: READY (${health.provider.toUpperCase()})`);
+          } else {
+            logger.warn(`Resume storage: ${health.status} (${health.provider.toUpperCase()}) - ${health.message}`);
+          }
+        }
+      })
+      .catch((err) => {
+        logger.warn('Unexpected storage health check error on startup:', { error: err.message });
+      });
+  });
 }
 
