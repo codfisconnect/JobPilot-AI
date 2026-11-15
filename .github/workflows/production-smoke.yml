@@ -1,0 +1,67 @@
+name: Production Smoke Tests
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      frontend_url:
+        description: 'Frontend URL to smoke test'
+        required: false
+        default: 'https://pilotmama.in'
+      backend_url:
+        description: 'Backend URL to smoke test'
+        required: false
+        default: 'https://pilotmama-api-318878936821.asia-south1.run.app'
+
+jobs:
+  smoke-test:
+    name: Verify Live Production Deployments
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js 24
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Wait for Production Deployment Availability
+        env:
+          BACKEND_URL: ${{ github.event.inputs.backend_url || 'https://pilotmama-api-318878936821.asia-south1.run.app' }}
+          FRONTEND_URL: ${{ github.event.inputs.frontend_url || 'https://pilotmama.in' }}
+        run: |
+          echo "Waiting for production service readiness at $BACKEND_URL/api/v1/ready..."
+          MAX_ATTEMPTS=30
+          ATTEMPT=0
+          READY=0
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/api/v1/ready" || echo "000")
+            if [ "$STATUS" = "200" ]; then
+              echo "Production backend is READY (HTTP 200) after attempt $ATTEMPT."
+              READY=1
+              break
+            fi
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS: Backend not yet ready (HTTP $STATUS). Waiting 10s..."
+            sleep 10
+          done
+
+          if [ $READY -ne 1 ]; then
+            echo "ERROR: Production deployment readiness probe timed out after 5 minutes."
+            exit 1
+          fi
+
+      - name: Run Production Smoke Test Suite
+        env:
+          SMOKE_BACKEND_URL: ${{ github.event.inputs.backend_url || 'https://pilotmama-api-318878936821.asia-south1.run.app' }}
+          SMOKE_FRONTEND_URL: ${{ github.event.inputs.frontend_url || 'https://pilotmama.in' }}
+          SMOKE_TIMEOUT_MS: 15000
+        run: |
+          npm run smoke:production
+

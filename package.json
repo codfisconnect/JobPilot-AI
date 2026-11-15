@@ -10,6 +10,7 @@
     "extension": "npm --prefix extension run build",
     "seed": "npm --prefix backend run seed",
     "test": "npm --prefix backend run test",
+    "smoke:production": "node scripts/production-smoke.mjs",
     "install:all": "npm install && npm --prefix backend install && npm --prefix frontend install && npm --prefix extension install"
   },
   "devDependencies": {
