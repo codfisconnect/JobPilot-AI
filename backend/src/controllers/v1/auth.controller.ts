@@ -54,7 +54,8 @@ export class AuthController {
       }
 
       if (purpose === 'LOGIN') {
-        const { user, accessToken, refreshToken } = await authService.loginWithOtp({ email, code });
+        const { fullName } = req.body;
+        const { user, accessToken, refreshToken } = await authService.loginWithOtp({ email, code, fullName });
         res.cookie(REFRESH_COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
         res.status(200).json({
           success: true,

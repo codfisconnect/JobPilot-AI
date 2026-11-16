@@ -215,7 +215,7 @@ export class AuthService {
   /**
    * Complete passwordless / email-only login with OTP
    */
-  async loginWithOtp(data: { email: string; code: string }): Promise<AuthSessionResult> {
+  async loginWithOtp(data: { email: string; code: string; fullName?: string }): Promise<AuthSessionResult> {
     const normalizedEmail = AuthService.validateEmail(data.email);
 
     // 1. Verify OTP
@@ -224,7 +224,13 @@ export class AuthService {
     // 2. Locate or provision user
     let user = await this.userRepo.findByEmail(normalizedEmail);
     if (!user) {
-      // Auto-provision candidate with verified email
+      // Require real name before creating a brand new candidate account
+      const providedName = data.fullName?.trim();
+      if (!providedName || providedName.length < 2) {
+        throw new BadRequestError('Account not found for this email. Please complete sign up with your full name.');
+      }
+
+      // Auto-provision candidate with verified email and verified name
       user = await prisma.user.create({
         data: {
           email: normalizedEmail,
@@ -234,7 +240,7 @@ export class AuthService {
           isActive: true,
           candidateProfile: {
             create: {
-              fullName: normalizedEmail.split('@')[0]
+              fullName: providedName
             }
           }
         },
@@ -465,6 +471,19 @@ export class AuthService {
         // Ensure email is marked verified
         if (!existingEmailUser.emailVerified) {
           await this.userRepo.markEmailVerified(existingEmailUser.id);
+        }
+        // If existing candidate profile is missing a real name and social provider supplied a verified name, update it without overwriting existing valid names
+        if (data.fullName && data.fullName.trim() && (!existingEmailUser.candidateProfile?.fullName || !existingEmailUser.candidateProfile.fullName.trim())) {
+          await prisma.candidateProfile.upsert({
+            where: { userId: existingEmailUser.id },
+            create: {
+              userId: existingEmailUser.id,
+              fullName: data.fullName.trim()
+            },
+            update: {
+              fullName: data.fullName.trim()
+            }
+          }).catch(() => {});
         }
         user = (await this.userRepo.findById(existingEmailUser.id)) as any;
       } else {

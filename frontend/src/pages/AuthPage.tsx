@@ -389,7 +389,8 @@ export const AuthPage: React.FC<AuthPageProps> = ({
       await verifyOtp({
         email: email.trim().toLowerCase(),
         code: cleanCode,
-        purpose: otpPurpose
+        purpose: otpPurpose,
+        fullName: fullName.trim() || undefined
       });
 
       if (onSuccess) {

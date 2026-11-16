@@ -86,6 +86,7 @@ export class UserRepository {
 
   async createUser(data: CreateUserData): Promise<any> {
     const role = data.role || UserRole.CANDIDATE;
+    const cleanFullName = data.fullName?.trim() || '';
     try {
       return await prisma.user.create({
         data: {
@@ -94,7 +95,7 @@ export class UserRepository {
           role,
           candidateProfile: role === UserRole.CANDIDATE ? {
             create: {
-              fullName: data.fullName || data.email.split('@')[0]
+              fullName: cleanFullName
             }
           } : undefined
         },
@@ -108,7 +109,7 @@ export class UserRepository {
         id,
         email: data.email.toLowerCase().trim(),
         passwordHash: data.passwordHash,
-        fullName: data.fullName || data.email.split('@')[0],
+        fullName: cleanFullName,
         role,
         emailVerified: 1,
         isActive: 1,
@@ -234,7 +235,7 @@ export class UserRepository {
         emailVerified: data.emailVerified ?? true,
         candidateProfile: {
           create: {
-            fullName: data.fullName?.trim() || normalizedEmail.split('@')[0],
+            fullName: data.fullName?.trim() || '',
             avatarUrl: data.avatarUrl || null,
             authProvider: data.provider
           }
