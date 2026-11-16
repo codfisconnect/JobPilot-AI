@@ -100,9 +100,9 @@ export async function runAvailabilityAndApplicationTrackingTests() {
 
   const parsedProj = ResumeParsingService.parse(projResumeSample);
   testAssert(parsedProj.projects.length === 2, 'Distinct projects are grouped accurately without fragmentation');
-  testAssert(parsedProj.projects[0].name.includes('EasyJet Airlines Inc.'), 'Project 1 name is extracted accurately');
-  testAssert(parsedProj.projects[0].description.includes('Architected end-to-end booking reservation'), 'Multi-line project description is preserved');
-  testAssert(parsedProj.projects[1].name.includes('Wakampa'), 'Project 2 name is extracted accurately');
+  testAssert(Boolean(parsedProj.projects[0]?.name.includes('EasyJet Airlines Inc.')), 'Project 1 name is extracted accurately');
+  testAssert(Boolean(parsedProj.projects[0]?.description?.includes('Architected end-to-end booking reservation')), 'Multi-line project description is preserved');
+  testAssert(Boolean(parsedProj.projects[1]?.name.includes('Wakampa')), 'Project 2 name is extracted accurately');
 
   // 5. Job Availability Intelligence
   const closedJob = {
