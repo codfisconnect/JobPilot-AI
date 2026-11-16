@@ -75,13 +75,99 @@ export class ResumeParsingService {
     let city = '';
     let stateProvince = '';
 
-    const locMatch = rawText.match(/([a-zA-Z\s]+),\s*([a-zA-Z\s]+),\s*(India|USA|United States|UK|United Kingdom|Canada|Germany|Singapore|Australia|UAE)/i) ||
-                     rawText.match(/([a-zA-Z\s]+),\s*(India|USA|United States|UK|United Kingdom|Canada|Germany|Singapore|Australia|UAE)/i);
+    // Standard country taxonomy
+    const countryNames = [
+      'India', 'United States', 'USA', 'United Kingdom', 'UK', 'Canada', 'Germany',
+      'Singapore', 'Australia', 'UAE', 'United Arab Emirates', 'Netherlands', 'France',
+      'Ireland', 'Switzerland', 'Sweden', 'Poland', 'Malaysia', 'Japan', 'New Zealand'
+    ];
+    const countryPattern = countryNames.join('|');
 
-    if (locMatch) {
-      location = locMatch[0].trim();
-      city = locMatch[1].trim();
-      country = locMatch[locMatch.length - 1].trim();
+    // Well-known Indian and global tech cities/states for single-city or city-state fallback
+    const majorLocations = [
+      'Chennai', 'Bangalore', 'Bengaluru', 'Hyderabad', 'Pune', 'Mumbai', 'Delhi', 'New Delhi',
+      'Noida', 'Gurgaon', 'Gurugram', 'Kolkata', 'Ahmedabad', 'Kochi', 'Coimbatore', 'Trivandrum',
+      'Thiruvananthapuram', 'Chandigarh', 'Jaipur', 'Indore', 'Tamil Nadu', 'Karnataka', 'Maharashtra',
+      'Telangana', 'Andhra Pradesh', 'Kerala', 'San Francisco', 'New York', 'London', 'Berlin', 'Toronto',
+      'Austin', 'Seattle', 'Chicago', 'Boston', 'Dubai', 'Sydney', 'Melbourne'
+    ];
+
+    // Priority 1: Check lines near top (contact section, lines 0-10) or near bottom (footer, last 10 lines)
+    // Avoid false positives from company names or project descriptions
+    const topLines = lines.slice(0, Math.min(10, lines.length));
+    const bottomLines = lines.length > 10 ? lines.slice(Math.max(10, lines.length - 10)) : [];
+    const candidateLines = [...topLines, ...bottomLines];
+
+    for (const rawL of candidateLines) {
+      const l = rawL.trim();
+      if (!l || l.length > 80) continue;
+      // Skip if this line is clearly an email, phone, URL, or degree/institution
+      if (l.includes('@') || /https?:\/\//i.test(l) || /linkedin\.com|github\.com/i.test(l)) continue;
+      if (/university|college|institute|b\.tech|b\.e\.|school|degree|bachelor|master/i.test(l)) continue;
+      if (/pvt\.?\s*ltd|inc\.|llc|technologies|solutions/i.test(l)) continue;
+
+      // Pattern A: City, State/Country, Country OR City, Country
+      const threePartRegex = new RegExp(`^([a-zA-Z\\s.-]+),\\s*([a-zA-Z\\s.-]+),\\s*(${countryPattern})$`, 'i');
+      const twoPartRegex = new RegExp(`^([a-zA-Z\\s.-]+),\\s*(${countryPattern})$`, 'i');
+      const cityStateRegex = new RegExp(`^([a-zA-Z\\s.-]+),\\s*([a-zA-Z\\s.-]+)$`, 'i');
+
+      const m3 = l.match(threePartRegex);
+      if (m3) {
+        city = m3[1].trim();
+        stateProvince = m3[2].trim();
+        country = m3[3].trim();
+        location = `${city}, ${country}`;
+        break;
+      }
+
+      const m2 = l.match(twoPartRegex);
+      if (m2) {
+        city = m2[1].trim();
+        country = m2[2].trim();
+        location = `${city}, ${country}`;
+        break;
+      }
+
+      // Standalone City, State if city is in major locations
+      const mCity = l.match(cityStateRegex);
+      if (mCity) {
+        const potentialCity = mCity[1].trim();
+        const potentialState = mCity[2].trim();
+        const isKnownCity = majorLocations.some(loc => loc.toLowerCase() === potentialCity.toLowerCase());
+        const isKnownStateOrCountry = majorLocations.some(loc => loc.toLowerCase() === potentialState.toLowerCase()) ||
+                                      countryNames.some(c => c.toLowerCase() === potentialState.toLowerCase());
+        if (isKnownCity && isKnownStateOrCountry) {
+          city = potentialCity;
+          stateProvince = potentialState;
+          country = countryNames.some(c => c.toLowerCase() === potentialState.toLowerCase()) ? potentialState : 'India';
+          location = `${city}, ${country}`;
+          break;
+        }
+      }
+
+      // Standalone known city on its own line
+      const matchedCity = majorLocations.find(loc => loc.toLowerCase() === l.toLowerCase());
+      if (matchedCity) {
+        city = matchedCity;
+        country = 'India';
+        location = `${city}, ${country}`;
+        break;
+      }
+    }
+
+    // Priority 2: Fallback to full rawText regex matching if location still empty, but strictly match boundaries
+    if (!location) {
+      const boundedLocMatch = rawText.match(new RegExp(`(?:^|[\\r\\n|•])\\s*([a-zA-Z\\s]+),\\s*([a-zA-Z\\s]+),\\s*(${countryPattern})\\b`, 'i')) ||
+                              rawText.match(new RegExp(`(?:^|[\\r\\n|•])\\s*([a-zA-Z\\s]+),\\s*(${countryPattern})\\b`, 'i'));
+      if (boundedLocMatch) {
+        city = boundedLocMatch[1].trim();
+        country = boundedLocMatch[boundedLocMatch.length - 1].trim();
+        location = `${city}, ${country}`;
+      }
+    }
+
+    if (!location) {
+      reviewReasons.push('Candidate location could not be identified with certainty');
     }
 
     // Professional links
@@ -117,9 +203,36 @@ export class ResumeParsingService {
       reviewReasons.push('No work experience entries could be identified with high confidence');
     }
 
-    // Calculate confidence
-    const parseConfidence = Math.max(30, 100 - (reviewReasons.length * 20));
-    const needsReview = reviewReasons.length > 0 || parseConfidence < 80;
+    if (education.length === 0) {
+      reviewReasons.push('Education history could not be identified');
+    }
+
+    if (skills.length === 0) {
+      reviewReasons.push('Skills section was empty or unidentifiable');
+    }
+
+    // Meaningful extraction-quality score calculation (Phase 6)
+    // Evaluates successful extraction, presence of core sections, and penalizes missing or ambiguous fields
+    let score = 100;
+    if (!fullName || fullName === 'Candidate') score -= 25;
+    if (!email) score -= 20;
+    if (!phone) score -= 10;
+    if (!location) score -= 15;
+    if (experience.length === 0) score -= 25;
+    if (education.length === 0) score -= 15;
+    if (skills.length === 0) score -= 15;
+    if (projects.length === 0) score -= 5;
+
+    // Project fragmentation or empty description penalty
+    const emptyDescProjects = projects.filter(p => !p.description || p.description.length < 15);
+    if (emptyDescProjects.length > 0) {
+      score -= Math.min(15, emptyDescProjects.length * 5);
+      reviewReasons.push('Some projects have short or incomplete descriptions');
+    }
+
+    // Bound score between 20 and 100
+    const parseConfidence = Math.max(20, Math.min(100, Math.round(score)));
+    const needsReview = reviewReasons.length > 0 || parseConfidence < 85;
 
     const parsedResult = {
       personalInfo: {
@@ -573,6 +686,8 @@ export class ResumeParsingService {
 
   /**
    * Generalized Project extraction. Parses multiple distinct projects with names, descriptions, and roles.
+   * Accurately groups multi-line descriptions, avoids project-fragmentation, detects section labels
+   * such as 'PROJECT DESCRIPTION' or 'RESPONSIBILITIES', and merges continuation bullet points.
    */
   private static parseProjects(projectsText: string): ParsedProject[] {
     if (!projectsText) return [];
@@ -582,31 +697,117 @@ export class ResumeParsingService {
     const projects: ParsedProject[] = [];
     let currentProj: Partial<ParsedProject> | null = null;
 
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i];
-      const isBullet = line.startsWith('•') || line.startsWith('-') || line.startsWith('*');
-      const clean = line.replace(/^[•\-\*\s]+/, '').trim();
+    // Common labels that should NEVER be treated as independent project names
+    const nonProjectHeadingRegex = /^(?:project\s*description|description|responsibilities|key\s*responsibilities|roles?\s*(?:&|and)\s*responsibilities|technologies(?:\s*used)?|tools(?:\s*used)?|environment|duration|client|scope|overview|deliverables|milestones):?$/i;
 
-      // If non-bullet and short to medium length, treat as project title / header
-      if (!isBullet && clean.length > 3 && clean.length < 60) {
-        if (currentProj && currentProj.name) {
+    // Project indicator patterns
+    // e.g. "Project 1:", "1. EasyJet", "Wakampa (Ecommerce)", "EasyJet Airlines Inc. | Travel Domain"
+    const explicitProjectNumberRegex = /^(?:project\s*(?:#|\d+|one|two|three|four|five|six|seven|eight|nine|ten)?[:\-–—\.]\s*)/i;
+
+    const commitCurrentProject = () => {
+      if (currentProj && currentProj.name && currentProj.name.trim()) {
+        const cleanName = currentProj.name.replace(explicitProjectNumberRegex, '').trim();
+        const cleanDesc = (currentProj.description || '').trim();
+
+        // Only save if name is meaningful and not a discarded section label
+        if (cleanName.length > 2 && !nonProjectHeadingRegex.test(cleanName)) {
           projects.push({
-            name: currentProj.name,
-            description: currentProj.description || 'Contributed to project delivery and specifications.',
+            name: cleanName,
+            description: cleanDesc || 'Contributed to project delivery and specifications.',
             role: currentProj.role || 'Contributor',
-            technologies: currentProj.technologies || ['Agile', 'Jira'],
+            technologies: currentProj.technologies && currentProj.technologies.length > 0 ? currentProj.technologies : ['Agile', 'Jira'],
             url: '',
             startDate: undefined,
             endDate: undefined,
             displayOrder: projects.length
           });
         }
+      }
+      currentProj = null;
+    };
+
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      const isBullet = line.startsWith('•') || line.startsWith('-') || line.startsWith('*') || /^\d+\.\s/.test(line);
+      const clean = line.replace(/^[•\-\*\d\.\s]+/, '').trim();
+      if (!clean) continue;
+
+      // Check if line is an internal sub-heading like "PROJECT DESCRIPTION", "RESPONSIBILITIES", etc.
+      if (nonProjectHeadingRegex.test(clean)) {
+        // This is a sub-label inside the current project, NOT a new project
+        continue;
+      }
+
+      // Check if line is an explicit role specification, e.g. "Role: Senior QA Engineer"
+      const roleMatch = clean.match(/^(?:role|designation)\s*[:\-–—]\s*(.+)$/i);
+      if (roleMatch && currentProj) {
+        // May contain pipe for environment, e.g. "Role: Senior QA Automation Engineer | Environment: Java, Selenium"
+        const roleContent = roleMatch[1].trim();
+        if (roleContent.includes('|')) {
+          const [rPart, envPart] = roleContent.split('|').map(p => p.trim());
+          currentProj.role = rPart;
+          const envTechs = envPart.replace(/^(?:environment|technologies|tools)\s*[:\-–—]?\s*/i, '').split(/[,|;]+/).map(t => t.trim()).filter(Boolean);
+          currentProj.technologies = Array.from(new Set([...(currentProj.technologies || []), ...envTechs]));
+        } else {
+          currentProj.role = roleContent;
+        }
+        continue;
+      }
+
+      // Check if line is an explicit tech specification, e.g. "Technologies: Java, Selenium" or "Environment: JIRA"
+      const techMatch = clean.match(/^(?:technologies|tools|environment)\s*[:\-–—]\s*(.+)$/i);
+      if (techMatch && currentProj) {
+        const extractedTechs = techMatch[1].split(/[,|;]+/).map(t => t.trim()).filter(Boolean);
+        currentProj.technologies = Array.from(new Set([...(currentProj.technologies || []), ...extractedTechs]));
+        continue;
+      }
+
+      // Determine if this line starts a NEW genuine project
+      const hasProjectSeparator = clean.includes('|') || clean.includes(' — ') || clean.includes(' – ');
+      const hasDomainOrCategory = /\((?:ecommerce|airline|banking|travel|health|fintech|retail)[^)]*\)/i.test(clean);
+      const hasExplicitProjectPrefix = explicitProjectNumberRegex.test(clean) && clean.length < 80;
+      const isRoleOrTech = /^(?:role|designation|technologies|environment|tools)\s*[:\-–—]/i.test(clean);
+      const isSubHeading = nonProjectHeadingRegex.test(clean);
+      // Allow ending with period only if it's an abbreviation like Inc. or Ltd.
+      const isSentenceEnd = clean.endsWith('.') && !/\b(?:inc|ltd|corp|llc)\.$/i.test(clean);
+      const isShortHeading = !isBullet && !isRoleOrTech && !isSubHeading && clean.length > 3 && clean.length <= 60 && !isSentenceEnd;
+
+      // A genuine project header usually:
+      // 1) Has an explicit project number/prefix, OR
+      // 2) Has a separator (e.g. "EasyJet Airlines Inc. | Travel Domain"), OR
+      // 3) Has domain in brackets (e.g. "Wakampa (Ecommerce)"), OR
+      // 4) Is a short non-bullet line without ending in a sentence period, AND not already having an un-described project
+      const isNewProjectHeader = !isBullet && !isRoleOrTech && !isSubHeading && (
+        hasExplicitProjectPrefix ||
+        hasProjectSeparator ||
+        hasDomainOrCategory ||
+        (isShortHeading && (!currentProj || !currentProj.name || Boolean(currentProj.description && currentProj.description.length > 25)))
+      );
+
+      if (isNewProjectHeader) {
+        commitCurrentProject();
+
+        // Extract role/client from separator if present
+        let projName = clean;
+        let projRole = 'Contributor';
+        if (hasProjectSeparator) {
+          const sep = clean.includes('|') ? '|' : (clean.includes(' — ') ? ' — ' : ' – ');
+          const parts = clean.split(sep).map(p => p.trim());
+          projName = parts[0];
+          if (parts[1]) {
+            // e.g. "Travel & Airline Domain"
+            projRole = parts[1];
+          }
+        }
+
         currentProj = {
-          name: clean,
+          name: projName,
           description: '',
+          role: projRole,
           technologies: []
         };
       } else if (currentProj) {
+        // Append bullet point or continuation paragraph into current project description
         if (!currentProj.description) {
           currentProj.description = clean;
         } else {
@@ -615,20 +816,23 @@ export class ResumeParsingService {
       }
     }
 
-    if (currentProj && currentProj.name) {
-      projects.push({
-        name: currentProj.name,
-        description: currentProj.description || 'Contributed to project delivery and specifications.',
-        role: currentProj.role || 'Contributor',
-        technologies: currentProj.technologies || ['Agile', 'Jira'],
-        url: '',
-        startDate: undefined,
-        endDate: undefined,
-        displayOrder: projects.length
-      });
+    commitCurrentProject();
+
+    // Deduplicate any project records with identical or nearly identical names
+    const uniqueProjects: ParsedProject[] = [];
+    const seenNames = new Set<string>();
+    for (const proj of projects) {
+      const norm = proj.name.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (!seenNames.has(norm)) {
+        seenNames.add(norm);
+        uniqueProjects.push({
+          ...proj,
+          displayOrder: uniqueProjects.length
+        });
+      }
     }
 
-    return projects;
+    return uniqueProjects;
   }
 
   /**
@@ -637,7 +841,7 @@ export class ResumeParsingService {
    * If "Playwright" is listed alone, years are null/undefined.
    */
   private static parseSkills(skillsText: string, fullText: string): ParsedSkill[] {
-    const rawCombined = `${skillsText}\n${fullText}`;
+    const rawCombined = skillsText && skillsText.trim().length > 10 ? skillsText : `${skillsText}\n${fullText}`;
     const skillTaxonomy: Record<string, { name: string; category: 'TECHNICAL' | 'SOFT' | 'TOOL' }> = {
       'java': { name: 'Java', category: 'TECHNICAL' },
       'python': { name: 'Python', category: 'TECHNICAL' },
@@ -667,7 +871,11 @@ export class ResumeParsingService {
       'leadership': { name: 'Leadership', category: 'SOFT' },
       'communication': { name: 'Communication', category: 'SOFT' },
       'power bi': { name: 'Power BI', category: 'TOOL' },
-      'tableau': { name: 'Tableau', category: 'TOOL' }
+      'tableau': { name: 'Tableau', category: 'TOOL' },
+      'software testing': { name: 'Software Testing', category: 'TECHNICAL' },
+      'quality engineering': { name: 'Quality Engineering', category: 'TECHNICAL' },
+      'business analysis': { name: 'Business Analysis', category: 'TECHNICAL' },
+      'root cause analysis': { name: 'Root Cause Analysis', category: 'TECHNICAL' }
     };
 
     const detectedMap = new Map<string, { category: 'TECHNICAL' | 'SOFT' | 'TOOL'; years?: number }>();
