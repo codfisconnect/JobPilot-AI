@@ -229,8 +229,11 @@ export class JobRecommendationService {
       where,
       take: 250, // pool for relevance ranking
       orderBy: [
-        { postedAt: 'desc' },
-        { createdAt: 'desc' }
+        { sourcePublishedAt: { sort: 'desc', nulls: 'last' } },
+        { firstDiscoveredAt: 'desc' },
+        { postedAt: { sort: 'desc', nulls: 'last' } },
+        { createdAt: 'desc' },
+        { id: 'desc' }
       ],
       include: {
         company: {

@@ -268,8 +268,22 @@ export const NaukriJobDetail: React.FC<NaukriJobDetailProps> = ({ job, onClose, 
         {/* Status / Openings subline */}
         <div className="nj-subline-stats">
           <div className="nj-stat-item">
-            <span>Posted: <strong>{job.publishedDate ? new Date(job.publishedDate).toLocaleDateString() : 'Just now'}</strong></span>
+            {job.sourcePublishedAt ? (
+              <span>Originally Posted: <strong>{new Date(job.sourcePublishedAt).toLocaleDateString()}</strong></span>
+            ) : job.publishedDate ? (
+              <span>Originally Posted: <strong>{new Date(job.publishedDate).toLocaleDateString()}</strong></span>
+            ) : (
+              <span>Added to Pilot Mama: <strong>{new Date(job.firstDiscoveredAt || job.firstSeenAt || Date.now()).toLocaleDateString()}</strong></span>
+            )}
           </div>
+          {job.sourcePublishedAt && job.firstDiscoveredAt && (
+            <>
+              <div className="nj-stat-divider">•</div>
+              <div className="nj-stat-item">
+                <span>Discovered: <strong>{new Date(job.firstDiscoveredAt).toLocaleDateString()}</strong></span>
+              </div>
+            </>
+          )}
           <div className="nj-stat-divider">•</div>
           <div className="nj-stat-item">
             <span>Openings: <strong>{displayOpenings}</strong></span>

@@ -4,6 +4,7 @@ import { CompletenessEstimatorService } from '../completenessEstimator.service.j
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
 import { safeParseJson } from '../../utils/safeJson.js';
+import { DateExtractionService } from '../dateExtraction.service.js';
 import * as cheerio from 'cheerio';
 
 export class RippleHireAdapter implements IJobSourceStrategy {
@@ -112,6 +113,9 @@ export class RippleHireAdapter implements IJobSourceStrategy {
             description = descParts.join(' ');
           }
 
+          // Extract original publication date from jobPostingDate or createDttm
+          const dateResult = DateExtractionService.extractPublicationDate(item, 'jobPostingDate', 'ATS_API');
+
           allJobs.push({
             externalJobId: String(jobSeq || item.jobCode || ''),
             title: item.jobTitle || 'Job Opening',
@@ -120,6 +124,14 @@ export class RippleHireAdapter implements IJobSourceStrategy {
             description,
             employmentType: item.jobType || 'FULL_TIME',
             applicationUrl: appUrl,
+            postedAt: dateResult.sourcePublishedAt || undefined,
+            sourcePublishedAt: dateResult.sourcePublishedAt,
+            firstDiscoveredAt: dateResult.firstDiscoveredAt,
+            sourceDateField: dateResult.sourceDateField,
+            sourceDatePrecision: dateResult.sourceDatePrecision,
+            sourceTimezone: dateResult.sourceTimezone,
+            dateSourceType: dateResult.dateSourceType,
+            rawPostingDate: dateResult.rawPostingDate,
             rawPayload: item
           });
         }

@@ -2,7 +2,7 @@ import React from 'react';
 import { CanonicalJob } from '../../types/job.types';
 import { Card } from '../common/Card';
 import { Button } from '../common/Button';
-import { MapPin, Briefcase, ExternalLink, Building, DollarSign, Send, Sparkles } from 'lucide-react';
+import { MapPin, Briefcase, ExternalLink, Building, DollarSign, Send, Sparkles, Clock, Calendar } from 'lucide-react';
 
 interface JobCardProps {
   job: CanonicalJob;
@@ -104,6 +104,15 @@ export const JobCard: React.FC<JobCardProps> = ({ job, onSelect, onApply, onOpen
         <div className="meta-item">
           <Briefcase size={14} />
           <span>{job.employmentType.replace('_', ' ')}</span>
+        </div>
+        {/* Date Transparency: Source Publication Date vs First Discovered Date */}
+        <div className="meta-item" title={job.sourcePublishedAt ? 'Original employer publication timestamp' : 'First discovered by Pilot Mama'}>
+          {job.sourcePublishedAt ? <Calendar size={14} className="text-primary" /> : <Clock size={14} />}
+          <span>
+            {job.sourcePublishedAt
+              ? `Posted ${new Date(job.sourcePublishedAt).toLocaleDateString()}`
+              : `Added ${new Date(job.firstDiscoveredAt || job.firstSeenAt).toLocaleDateString()}`}
+          </span>
         </div>
         {job.salaryMin && (
           <div className="meta-item salary-highlight">

@@ -4,6 +4,7 @@ import { CompletenessEstimatorService } from '../completenessEstimator.service.j
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
 import { safeParseJson } from '../../utils/safeJson.js';
+import { DateExtractionService } from '../dateExtraction.service.js';
 import * as cheerio from 'cheerio';
 
 export class WorkdayAdapter implements IJobSourceStrategy {
@@ -86,11 +87,20 @@ export class WorkdayAdapter implements IJobSourceStrategy {
             ].filter(Boolean);
             description = descParts.join(' ');
           }
+          const dateResult = DateExtractionService.extractPublicationDate(item, 'postedOn', 'ATS_API');
+
           allJobs.push({
             externalJobId: item.bulletFields?.[0] || item.jobReqId || item.id || undefined,
             title: item.title || 'Job Opening',
             location: item.locationsText || undefined,
-            postedAt: item.postedOn ? new Date(item.postedOn) : undefined,
+            postedAt: dateResult.sourcePublishedAt || undefined,
+            sourcePublishedAt: dateResult.sourcePublishedAt,
+            firstDiscoveredAt: dateResult.firstDiscoveredAt,
+            sourceDateField: dateResult.sourceDateField,
+            sourceDatePrecision: dateResult.sourceDatePrecision,
+            sourceTimezone: dateResult.sourceTimezone,
+            dateSourceType: dateResult.dateSourceType,
+            rawPostingDate: dateResult.rawPostingDate,
             description,
             applicationUrl: appUrl,
             rawPayload: item

@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import * as cheerio from 'cheerio';
 import { IConnectorJobRaw } from '../jobSources/v1/jobSourceConnector.interface.js';
 import { RemoteType, EmploymentType } from '@prisma/client';
+import { DateExtractionService } from '../universalDiscovery/dateExtraction.service.js';
 
 export interface NormalizedJobData {
   title: string;
@@ -22,6 +23,13 @@ export interface NormalizedJobData {
   experienceMax?: number;
   education?: string;
   postedAt?: Date;
+  sourcePublishedAt?: Date | null;
+  firstDiscoveredAt: Date;
+  sourceDateField?: string | null;
+  sourceDatePrecision: 'EXACT_TIMESTAMP' | 'DATE_ONLY' | 'CREATION_FALLBACK' | 'UNAVAILABLE';
+  sourceTimezone?: string | null;
+  dateSourceType: 'ATS_API' | 'STRUCTURED_DATA' | 'HTML_PAGE' | 'EXCEL_IMPORT' | 'BACKFILLED_DISCOVERY';
+  rawPostingDate?: string | null;
   contentHash: string;
   skills: { name: string; type: 'REQUIRED' | 'PREFERRED' }[];
   sourceUrl: string;
@@ -204,11 +212,24 @@ export class JobNormalizationService {
 
     const skills = this.extractSkills(raw.skills, raw.requirements, raw.preferredQualifications);
 
-    let postedAt: Date | undefined;
-    if (raw.postedAt) {
-      postedAt = typeof raw.postedAt === 'string' ? new Date(raw.postedAt) : raw.postedAt;
-      if (isNaN(postedAt.getTime())) postedAt = undefined;
-    }
+    // Publication Date vs First Discovered Extraction
+    const dateExtraction = DateExtractionService.extractPublicationDate(
+      raw.rawPayload || (raw.postedAt ? { postedAt: raw.postedAt } : {}),
+      raw.sourceDateField || (raw.postedAt ? 'postedAt' : undefined),
+      raw.dateSourceType || 'ATS_API',
+      raw.firstDiscoveredAt
+    );
+
+    const sourcePublishedAt = raw.sourcePublishedAt !== undefined ? raw.sourcePublishedAt : dateExtraction.sourcePublishedAt;
+    const firstDiscoveredAt = raw.firstDiscoveredAt || dateExtraction.firstDiscoveredAt || new Date();
+    const sourceDateField = raw.sourceDateField || dateExtraction.sourceDateField;
+    const sourceDatePrecision = raw.sourceDatePrecision || dateExtraction.sourceDatePrecision;
+    const sourceTimezone = raw.sourceTimezone || dateExtraction.sourceTimezone;
+    const dateSourceType = raw.dateSourceType || dateExtraction.dateSourceType;
+    const rawPostingDate = raw.rawPostingDate || dateExtraction.rawPostingDate;
+
+    // Backward-compatible postedAt (matches sourcePublishedAt, or null if publication date unavailable)
+    const postedAt = sourcePublishedAt || undefined;
 
     return {
       title: cleanTitle,
@@ -229,6 +250,13 @@ export class JobNormalizationService {
       experienceMax: raw.experienceMax,
       education: raw.education,
       postedAt,
+      sourcePublishedAt,
+      firstDiscoveredAt,
+      sourceDateField,
+      sourceDatePrecision,
+      sourceTimezone,
+      dateSourceType,
+      rawPostingDate,
       contentHash,
       skills,
       sourceUrl: raw.sourceUrl,
