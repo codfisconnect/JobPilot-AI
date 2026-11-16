@@ -23,7 +23,7 @@ export function validateRequest(schema: { body?: z.ZodTypeAny; query?: z.ZodType
 export const RegisterSchema = z.object({
   email: z.string().trim().toLowerCase().email('Please enter a valid email address'),
   password: z.string().min(8, 'Password must be at least 8 characters long'),
-  fullName: z.string().optional(),
+  fullName: z.string({ required_error: 'Full name is required' }).trim().min(2, 'Full name must contain at least 2 characters'),
   phone: z.string().optional(),
   role: z.enum(['CANDIDATE', 'EMPLOYER', 'INSTITUTE', 'ADMIN']).optional().default('CANDIDATE'),
   location: z.string().optional(),
@@ -45,6 +45,7 @@ export const VerifyOtpSchema = z.object({
   email: z.string().trim().toLowerCase().email('Please enter a valid email address'),
   code: z.string().min(6, 'Verification code must be 6 digits').max(6, 'Verification code must be 6 digits'),
   purpose: z.enum(['SIGNUP', 'LOGIN', 'PASSWORD_RESET', 'EMAIL_CHANGE']).optional().default('SIGNUP'),
+  fullName: z.string().trim().min(2, 'Full name must contain at least 2 characters').optional(),
   newPassword: z.string().min(8, 'New password must be at least 8 characters long').optional()
 });
 

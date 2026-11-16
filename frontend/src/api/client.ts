@@ -314,7 +314,7 @@ export class ApiClient {
     return res;
   }
 
-  async verifyOtp(data: { email: string; code: string; purpose?: string; newPassword?: string }): Promise<AuthResponse> {
+  async verifyOtp(data: { email: string; code: string; purpose?: string; fullName?: string; newPassword?: string }): Promise<AuthResponse> {
     const res = await this.request<AuthResponse>('/auth/verify-otp', {
       method: 'POST',
       body: JSON.stringify(data)

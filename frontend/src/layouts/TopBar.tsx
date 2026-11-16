@@ -23,7 +23,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   const { activeCandidate } = useApp();
   const { user, isAuthenticated } = useAuth();
 
-  const candidateName = user?.candidateProfile?.fullName || activeCandidate?.name || (user?.email ? user.email.split('@')[0] : null);
+  const candidateName = user?.candidateProfile?.fullName?.trim() || activeCandidate?.name?.trim() || (user ? 'Candidate Profile' : null);
   const headline = activeCandidate?.headline || (user?.candidateProfile as any)?.headline || (activeCandidate ? `${activeCandidate.yearsOfExperience}y exp • ${activeCandidate.targetRoles?.[0] || ''}` : null);
 
   return (

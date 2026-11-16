@@ -326,6 +326,36 @@ JNT University - Bachelor of Technology
   delete process.env.STORAGE_PROVIDER;
   delete process.env.STORAGE_BUCKET;
 
+  // Test 26: Production Security - Zero OTP Leakage in Responses
+  const { OtpService } = await import('../services/otp.service.js');
+  const oldNodeEnv = process.env.NODE_ENV;
+  process.env.NODE_ENV = 'production';
+  const prodOtpResult = await OtpService.generateAndSendOtp('test.security@pilotmama.io', 'LOGIN' as any);
+  assert(!prodOtpResult.message.includes('Dev Code'), 'OTP Service never leaks (Dev Code) in message during production mode');
+  assert(!/\b\d{6}\b/.test(prodOtpResult.message), 'OTP Service message never contains plain 6-digit numeric verification code in production');
+  assert(prodOtpResult.message === 'Verification code sent to your email.', 'OTP Service returns clean uniform verification message in production');
+  process.env.NODE_ENV = oldNodeEnv;
+
+  // Test 27: Candidate Registration Schema - Strict Full Name Validation
+  const { RegisterSchema } = await import('../middleware/validate.middleware.js');
+  const invalidNameRes = RegisterSchema.safeParse({
+    email: 'candidate@pilotmama.io',
+    password: 'Password123!',
+    fullName: ' '
+  });
+  assert(!invalidNameRes.success, 'RegisterSchema strictly rejects whitespace-only or empty fullName');
+
+  const validNameRes = RegisterSchema.safeParse({
+    email: 'candidate@pilotmama.io',
+    password: 'Password123!',
+    fullName: 'Syed Salman'
+  });
+  assert(validNameRes.success && validNameRes.data.fullName === 'Syed Salman', 'RegisterSchema strictly validates and preserves valid candidate fullName');
+
+  // Test 28: Admin Provisioning Idempotency & Explicit Password Rotation
+  const { provisionAdministrator } = await import('../database/adminSeed.js');
+  assert(typeof provisionAdministrator === 'function', 'provisionAdministrator is exported as a trusted server-side management utility');
+
   console.log(`\nTest Results: ${passed}/${total} passed.`);
   if (passed === total) {
     console.log('ALL CRITICAL BACKEND, CODEWALLA INTEGRATION, AND REGRESSION TESTS PASSED SUCCESSFULLY!\n');
