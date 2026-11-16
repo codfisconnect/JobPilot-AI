@@ -2,6 +2,7 @@ import { ApplicationRepository } from './application.repository.js';
 import { ApplicationStatusService } from './application-status.service.js';
 import { CandidateProfileRepository } from '../../repositories/candidateProfile.repository.js';
 import { JobRepositoryV1 } from '../../repositories/job.repository.js';
+import { JobAvailabilityService } from '../../services/jobAvailability.service.js';
 import { prisma } from '../../database/prisma.js';
 import {
   NotFoundError,
@@ -82,6 +83,12 @@ export class ApplicationService {
     const job = await JobRepositoryV1.findById(dto.jobId);
     if (!job) {
       throw new NotFoundError(`Job not found with ID '${dto.jobId}'`);
+    }
+
+    // Availability Check: Block application if job is closed
+    const availability = JobAvailabilityService.detectAvailability(job);
+    if (availability.status === 'CLOSED') {
+      throw new BadRequestError(`This job posting is closed and no longer accepting applications (${availability.evidence}).`);
     }
 
     // 2. Duplicate Protection: Candidate cannot have multiple applications for same job

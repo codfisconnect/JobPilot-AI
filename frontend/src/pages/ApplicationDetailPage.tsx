@@ -234,6 +234,9 @@ export const ApplicationDetailPage: React.FC<ApplicationDetailPageProps> = ({
                   <span>Applied: {new Date(appliedAt).toLocaleDateString()}</span>
                 </div>
               )}
+              <div className="timestamp-item" style={{ gridColumn: 'span 2' }}>
+                <span style={{ fontSize: '0.8rem', color: '#64748b' }}>Application ID: <code>{application.id}</code></span>
+              </div>
             </div>
           </div>
 

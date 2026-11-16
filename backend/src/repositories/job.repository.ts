@@ -396,7 +396,12 @@ export class JobRepositoryV1 {
     const skip = (page - 1) * pageSize;
 
     const where: Prisma.JobWhereInput = {
-      status: params.status || JobStatus.ACTIVE
+      status: params.status || JobStatus.ACTIVE,
+      NOT: [
+        { status: JobStatus.CLOSED },
+        { status: JobStatus.EXPIRED },
+        { status: JobStatus.REMOVED }
+      ]
     };
 
     const andConditions: Prisma.JobWhereInput[] = [];

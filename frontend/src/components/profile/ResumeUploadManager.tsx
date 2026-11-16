@@ -49,6 +49,7 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
   const [newSkillInput, setNewSkillInput] = useState('');
   const [activeMetricTab, setActiveMetricTab] = useState<string | null>(null);
   const [hasUserEdited, setHasUserEdited] = useState<{ [key: string]: boolean }>({});
+  const [activeReviewStep, setActiveReviewStep] = useState<number>(0);
   const { isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const replaceFileInputRef = useRef<HTMLInputElement>(null);
@@ -115,6 +116,7 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
       const parsedResult = await apiClient.parseResume(resumeId);
       setReviewModalData({ resumeId, parsed: parsedResult });
       setHasUserEdited({});
+      setActiveReviewStep(0);
       await loadResumes();
     } catch (err: any) {
       if (err.code === 'RESUME_FILE_MISSING' || (err.message && err.message.toLowerCase().includes('storage file not found'))) {
@@ -611,13 +613,35 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
               <Button size="sm" variant="ghost" onClick={() => setReviewModalData(null)}>✕</Button>
             </div>
 
+            {/* Compact 7-Section Wizard Navigator */}
+            <div className="wizard-nav-container">
+              {[
+                { id: 0, label: 'Personal Info', key: 'personal' },
+                { id: 1, label: 'Summary', key: 'summary' },
+                { id: 2, label: `Experience (${reviewModalData.parsed.experience?.length || 0})`, key: 'experience' },
+                { id: 3, label: `Projects (${reviewModalData.parsed.projects?.length || 0})`, key: 'projects' },
+                { id: 4, label: `Education (${reviewModalData.parsed.education?.length || 0})`, key: 'education' },
+                { id: 5, label: `Skills (${reviewModalData.parsed.skills?.length || 0})`, key: 'skills' },
+                { id: 6, label: 'Final Review', key: 'review' }
+              ].map(step => (
+                <button
+                  key={step.id}
+                  type="button"
+                  className={`wizard-step-btn ${activeReviewStep === step.id ? 'active' : ''} ${hasUserEdited[step.key] ? 'verified' : ''}`}
+                  onClick={() => setActiveReviewStep(step.id)}
+                >
+                  <span className="step-num">{step.id + 1}</span>
+                  <span className="step-text">{step.label}</span>
+                  {hasUserEdited[step.key] && <span className="step-check">✓</span>}
+                </button>
+              ))}
+            </div>
+
             {/* Quick Extraction Metric Chips / Cards */}
             <div className="review-metrics-summary">
               <div
                 className="metric-chip clickable"
-                onClick={() => {
-                  document.getElementById('section-experience')?.scrollIntoView({ behavior: 'smooth' });
-                }}
+                onClick={() => setActiveReviewStep(2)}
                 title="Jump to Experience"
               >
                 <Briefcase size={14} className="text-primary" />
@@ -626,9 +650,7 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
               </div>
               <div
                 className="metric-chip clickable"
-                onClick={() => {
-                  document.getElementById('section-projects')?.scrollIntoView({ behavior: 'smooth' });
-                }}
+                onClick={() => setActiveReviewStep(3)}
                 title="Jump to Projects"
               >
                 <FolderGit2 size={14} className="text-primary" />
@@ -637,9 +659,7 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
               </div>
               <div
                 className="metric-chip clickable"
-                onClick={() => {
-                  document.getElementById('section-education')?.scrollIntoView({ behavior: 'smooth' });
-                }}
+                onClick={() => setActiveReviewStep(4)}
                 title="Jump to Education"
               >
                 <GraduationCap size={14} className="text-primary" />
@@ -648,9 +668,7 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
               </div>
               <div
                 className="metric-chip clickable"
-                onClick={() => {
-                  document.getElementById('section-skills')?.scrollIntoView({ behavior: 'smooth' });
-                }}
+                onClick={() => setActiveReviewStep(5)}
                 title="Jump to Skills"
               >
                 <Sparkles size={14} className="text-primary" />
@@ -682,6 +700,7 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
               )}
 
               {/* 1. Detected Personal Identity */}
+              {activeReviewStep === 0 && (
               <div className="review-section" id="section-personal">
                 <div className="review-section-header-row">
                   <h4 className="review-section-title">Personal Information</h4>
@@ -770,8 +789,10 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
                   </div>
                 </div>
               </div>
+              )}
 
               {/* 2. Professional Summary */}
+              {activeReviewStep === 1 && (
               <div className="review-section" id="section-summary">
                 <div className="review-section-header-row">
                   <h4 className="review-section-title">Professional Summary</h4>
@@ -784,7 +805,7 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
                   )}
                 </div>
                 <textarea
-                  rows={3}
+                  rows={4}
                   className="textarea-input"
                   value={reviewModalData.parsed.summary || ''}
                   onChange={e => {
@@ -796,8 +817,10 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
                   }}
                 />
               </div>
+              )}
 
               {/* 3. Detected Experience Entries */}
+              {activeReviewStep === 2 && (
               <div className="review-section" id="section-experience">
                 <div className="review-section-header-row">
                   <div className="flex-row items-center gap-2">
@@ -983,8 +1006,10 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
                   </div>
                 )}
               </div>
+              )}
 
               {/* 4. Projects Section */}
+              {activeReviewStep === 3 && (
               <div className="review-section" id="section-projects">
                 <div className="review-section-header-row">
                   <div className="flex-row items-center gap-2">
@@ -1098,8 +1123,10 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
                   })}
                 </div>
               </div>
+              )}
 
               {/* 5. Education Section */}
+              {activeReviewStep === 4 && (
               <div className="review-section" id="section-education">
                 <div className="review-section-header-row">
                   <div className="flex-row items-center gap-2">
@@ -1215,8 +1242,10 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
                   })}
                 </div>
               </div>
+              )}
 
               {/* 6. Skills Section with Interactive Chips */}
+              {activeReviewStep === 5 && (
               <div className="review-section" id="section-skills">
                 <div className="review-section-header-row">
                   <div className="flex-row items-center gap-2">
@@ -1275,26 +1304,115 @@ export const ResumeUploadManager: React.FC<ResumeUploadManagerProps> = ({ onProf
                   ))}
                 </div>
               </div>
+              )}
+
+              {/* 7. Final Review Section */}
+              {activeReviewStep === 6 && (
+              <div className="review-section" id="section-final-review">
+                <div className="review-section-header-row">
+                  <div className="flex-row items-center gap-2">
+                    <CheckCircle size={16} className="text-primary" />
+                    <h4 className="review-section-title">Final Verification & Summary</h4>
+                  </div>
+                  <Badge variant={reviewModalData.parsed.parseConfidence >= 80 ? 'emerald' : 'amber'} size="sm">
+                    {reviewModalData.parsed.parseConfidence || 85}% Quality Score
+                  </Badge>
+                </div>
+
+                <div className="final-review-summary-box">
+                  <div className="final-review-grid">
+                    <div className="final-review-item">
+                      <span className="final-review-label">Candidate Name:</span>
+                      <span className="final-review-val font-bold">{reviewModalData.parsed.personalInfo.fullName || 'Not specified'}</span>
+                    </div>
+                    <div className="final-review-item">
+                      <span className="final-review-label">Email:</span>
+                      <span className="final-review-val">{reviewModalData.parsed.personalInfo.email || 'Not specified'}</span>
+                    </div>
+                    <div className="final-review-item">
+                      <span className="final-review-label">Phone:</span>
+                      <span className="final-review-val">{reviewModalData.parsed.personalInfo.phone || 'Not specified'}</span>
+                    </div>
+                    <div className="final-review-item">
+                      <span className="final-review-label">Location:</span>
+                      <span className="final-review-val">{reviewModalData.parsed.personalInfo.location || 'Not specified'}</span>
+                    </div>
+                    <div className="final-review-item">
+                      <span className="final-review-label">Experience Count:</span>
+                      <span className="final-review-val">{reviewModalData.parsed.experience?.length || 0} position(s)</span>
+                    </div>
+                    <div className="final-review-item">
+                      <span className="final-review-label">Projects Count:</span>
+                      <span className="final-review-val">{reviewModalData.parsed.projects?.length || 0} project(s)</span>
+                    </div>
+                    <div className="final-review-item">
+                      <span className="final-review-label">Education Count:</span>
+                      <span className="final-review-val">{reviewModalData.parsed.education?.length || 0} institution(s)</span>
+                    </div>
+                    <div className="final-review-item">
+                      <span className="final-review-label">Skills Count:</span>
+                      <span className="final-review-val">{reviewModalData.parsed.skills?.length || 0} verified skill(s)</span>
+                    </div>
+                  </div>
+
+                  {reviewModalData.parsed.reviewReasons && reviewModalData.parsed.reviewReasons.length > 0 && (
+                    <div className="final-review-warnings">
+                      <div className="font-semibold text-xs text-amber mb-1">Extraction Warnings to Review:</div>
+                      <ul className="text-xs text-muted" style={{ paddingLeft: 16 }}>
+                        {reviewModalData.parsed.reviewReasons.map((reason: string, rIdx: number) => (
+                          <li key={rIdx}>{reason}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="final-review-notice">
+                    <p className="text-xs text-muted">
+                      Saving will update your canonical Master Profile. All future applications will draw from these verified credentials.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              )}
             </div>
 
             {/* Sticky Footer */}
             <div className="review-modal-footer">
               <div className="review-footer-status">
                 <span className="text-xs text-muted">
-                  Ready to save: {reviewModalData.parsed.experience?.length || 0} exp, {reviewModalData.parsed.projects?.length || 0} proj, {reviewModalData.parsed.education?.length || 0} edu
+                  Section {activeReviewStep + 1} of 7 • {reviewModalData.parsed.experience?.length || 0} exp, {reviewModalData.parsed.projects?.length || 0} proj, {reviewModalData.parsed.education?.length || 0} edu
                 </span>
               </div>
               <div className="review-footer-buttons">
-                <Button variant="ghost" onClick={() => setReviewModalData(null)}>
-                  Discard Changes
-                </Button>
-                <Button
-                  variant="primary"
-                  icon={<CheckCircle size={16} />}
-                  loading={loading}
-                  onClick={handleConfirmReview}
-                >
-                  Confirm & Save to Master Profile
+                {activeReviewStep > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setActiveReviewStep(prev => Math.max(0, prev - 1))}
+                  >
+                    Previous Section
+                  </Button>
+                )}
+                {activeReviewStep < 6 ? (
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    onClick={() => setActiveReviewStep(prev => Math.min(6, prev + 1))}
+                  >
+                    Next Section →
+                  </Button>
+                ) : (
+                  <Button
+                    variant="primary"
+                    icon={<CheckCircle size={16} />}
+                    loading={loading}
+                    onClick={handleConfirmReview}
+                  >
+                    Confirm & Save to Master Profile
+                  </Button>
+                )}
+                <Button variant="ghost" size="sm" onClick={() => setReviewModalData(null)}>
+                  Close
                 </Button>
               </div>
             </div>

@@ -192,7 +192,8 @@ export class ResumeParsingService {
     // 3. Section Slicing (tolerant of formatting variations)
     const sections = this.extractSections(rawText);
 
-    const summary = sections.summary || (lines.length > 2 ? lines.slice(1, 4).filter(l => !this.isContactOrAddressLine(l)).join(' ') : '');
+    const rawSummary = sections.summary || (lines.length > 2 ? lines.slice(1, 4).filter(l => !this.isContactOrAddressLine(l)).join(' ') : '');
+    const summary = this.sanitizeProfessionalSummary(rawSummary, fullName, email, phone, location);
     const experience = this.parseExperiences(sections.experience, rawText);
     const education = this.parseEducation(sections.education);
     const certifications = this.parseCertifications(sections.certifications);
@@ -349,6 +350,64 @@ export class ResumeParsingService {
     }
 
     return result;
+  }
+
+  /**
+   * Cleans and sanitizes the extracted professional summary:
+   * Removes candidate name, email, phone numbers, addresses/locations, standalone designation titles,
+   * and repeated section headers, preserving only professional domain overview, experience, and competencies.
+   */
+  public static sanitizeProfessionalSummary(
+    rawSummary: string,
+    candidateName?: string,
+    email?: string,
+    phone?: string,
+    location?: string
+  ): string {
+    if (!rawSummary || !rawSummary.trim()) return '';
+
+    const lines = rawSummary.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+    const cleanedLines: string[] = [];
+
+    const normName = candidateName && candidateName !== 'Candidate'
+      ? candidateName.toLowerCase().replace(/[^a-z0-9]/g, '')
+      : '';
+
+    for (const line of lines) {
+      const clean = line.replace(/^[•\-\*\s]+/, '').trim();
+      if (!clean) continue;
+
+      // Filter out lines that match candidate full name
+      const normLine = clean.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (normName && (normLine === normName || normName.includes(normLine) && clean.length > 5 && !clean.includes(' '))) {
+        continue;
+      }
+
+      // Filter contact or address patterns
+      if (this.isContactOrAddressLine(clean)) continue;
+      if (email && clean.toLowerCase().includes(email.toLowerCase())) continue;
+      if (phone && clean.replace(/\D/g, '').includes(phone.replace(/\D/g, ''))) continue;
+
+      // Filter standalone location
+      if (location && clean.toLowerCase() === location.toLowerCase()) continue;
+
+      // Filter standalone role/title headers like "Senior Test Engineer / Business Analyst"
+      const isStandaloneTitle = /^[a-zA-Z\s/&-]+$/.test(clean) && clean.length < 50 &&
+        /\b(engineer|developer|analyst|architect|consultant|manager|lead|director|specialist|tester|qa|sdet)\b/i.test(clean) &&
+        !/\b(with|over|years|experience|skilled|proficient|expertise|proven|demonstrated)\b/i.test(clean);
+      if (isStandaloneTitle) continue;
+
+      cleanedLines.push(clean);
+    }
+
+    let summaryText = cleanedLines.join(' ');
+    // Further inline scrub of candidate name if accidentally prefixed at start
+    if (candidateName && candidateName !== 'Candidate') {
+      const nameEscaped = candidateName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      summaryText = summaryText.replace(new RegExp(`^${nameEscaped}[:\\s-]*`, 'i'), '').trim();
+    }
+
+    return summaryText;
   }
 
   public static isContactOrAddressLine(line: string): boolean {

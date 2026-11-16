@@ -208,7 +208,12 @@ export class JobRecommendationService {
 
     // Filter candidate jobs
     const where: any = {
-      status: 'ACTIVE'
+      status: 'ACTIVE',
+      NOT: [
+        { status: 'CLOSED' },
+        { status: 'EXPIRED' },
+        { status: 'REMOVED' }
+      ]
     };
 
     if (options.country) {

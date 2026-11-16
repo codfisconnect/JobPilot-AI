@@ -20,7 +20,7 @@ export interface ApplyDialogProps {
   onNavigateToApplications?: (appId?: string) => void;
 }
 
-type DialogView = 'choose' | 'progress' | 'missing_info' | 'success' | 'failure';
+type DialogView = 'choose' | 'progress' | 'missing_info' | 'success' | 'redirected' | 'failure';
 
 interface ProgressStep {
   id: string;
@@ -135,6 +135,24 @@ export const ApplyDialog: React.FC<ApplyDialogProps> = ({
           confirmationNumber: attempt.submissionResult?.confirmationNumber
         });
       }
+    } else if (currentState === 'REDIRECTED_TO_EMPLOYER') {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      setSubmittedApp(attempt.submissionResult || attempt);
+      setView('redirected');
+      if (onSuccess) {
+        onSuccess({
+          id: attempt.attemptId || attempt.id,
+          role: jobTitle,
+          company: companyName,
+          status: 'READY_TO_APPLY',
+          appliedAt: new Date().toISOString(),
+          confirmationNumber: attempt.submissionResult?.confirmationNumber
+        });
+      }
+    } else if (currentState === 'JOB_CLOSED') {
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      setView('failure');
+      setErrorMessage('This position has been closed and is no longer accepting applications.');
     } else if (currentState === 'WAITING_FOR_CANDIDATE') {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       setMissingField(attempt.missingField);
@@ -443,6 +461,90 @@ export const ApplyDialog: React.FC<ApplyDialogProps> = ({
                 }}
               >
                 <span>View Application</span>
+                <ArrowRight size={16} />
+              </button>
+            </div>
+          </>
+        )}
+
+        {/* View: External Employer Redirect Tracking */}
+        {view === 'redirected' && (
+          <>
+            <div className="apply-dialog-body apply-success-view">
+              <div className="apply-success-icon-wrap" style={{ background: 'rgba(99, 102, 241, 0.1)', color: '#6366f1' }}>
+                <ExternalLink size={32} />
+              </div>
+              <h3 className="apply-success-title">Application Initiated & Tracked</h3>
+              <p className="apply-success-subtitle">
+                This employer requires completing your application directly on their career portal. PilotMama has tracked this in your pipeline.
+              </p>
+
+              <div className="apply-summary-card">
+                <div className="apply-summary-row">
+                  <span className="apply-summary-label">Role:</span>
+                  <span className="apply-summary-value">{jobTitle}</span>
+                </div>
+                <div className="apply-summary-row">
+                  <span className="apply-summary-label">Company:</span>
+                  <span className="apply-summary-value">{companyName}</span>
+                </div>
+                <div className="apply-summary-row">
+                  <span className="apply-summary-label">Selected Resume:</span>
+                  <span className="apply-summary-value">
+                    {resumeChoice === 'tailored' ? 'Tailored Resume' : 'Master Resume'}
+                  </span>
+                </div>
+                <div className="apply-summary-row">
+                  <span className="apply-summary-label">Status:</span>
+                  <span className="apply-summary-value" style={{ color: '#f59e0b', fontWeight: 600 }}>Ready To Apply / External</span>
+                </div>
+                {submittedApp?.employerUrl && (
+                  <div className="apply-summary-row">
+                    <span className="apply-summary-label">Target Portal:</span>
+                    <a
+                      href={submittedApp.employerUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{ color: '#6366f1', textDecoration: 'underline', fontSize: '0.85rem', wordBreak: 'break-all' }}
+                    >
+                      Visit Employer Application
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="apply-dialog-footer">
+              <button
+                type="button"
+                className="apply-btn-secondary"
+                onClick={onClose}
+              >
+                Close
+              </button>
+              {submittedApp?.employerUrl && (
+                <a
+                  href={submittedApp.employerUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="apply-btn-primary"
+                  style={{ textDecoration: 'none' }}
+                >
+                  <span>Complete on Employer Site</span>
+                  <ExternalLink size={14} />
+                </a>
+              )}
+              <button
+                type="button"
+                className="apply-btn-secondary"
+                onClick={() => {
+                  onClose();
+                  if (onNavigateToApplications) {
+                    onNavigateToApplications(submittedApp?.applicationId || attemptId || undefined);
+                  }
+                }}
+              >
+                <span>View Application Tracker</span>
                 <ArrowRight size={16} />
               </button>
             </div>

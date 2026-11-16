@@ -525,6 +525,121 @@
   align-items: center;
 }
 
+/* Wizard Navigation Bar */
+.wizard-nav-container {
+  display: flex;
+  overflow-x: auto;
+  gap: 6px;
+  padding: 8px 24px;
+  background: var(--bg-surface-soft);
+  border-bottom: 1px solid var(--border-primary);
+  scrollbar-width: thin;
+}
+
+.wizard-step-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s ease-in-out;
+}
+
+.wizard-step-btn:hover {
+  background: rgba(99, 102, 241, 0.05);
+  color: var(--text-primary);
+}
+
+.wizard-step-btn.active {
+  background: var(--bg-surface);
+  border-color: var(--color-primary);
+  color: var(--color-primary);
+  font-weight: 600;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.wizard-step-btn.verified .step-num {
+  background: #10b981;
+  color: white;
+}
+
+.step-num {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.7rem;
+  background: var(--border-primary);
+  color: var(--text-muted);
+}
+
+.wizard-step-btn.active .step-num {
+  background: var(--color-primary);
+  color: white;
+}
+
+.step-check {
+  color: #10b981;
+  font-size: 0.75rem;
+  font-weight: bold;
+}
+
+/* Final Review Summary */
+.final-review-summary-box {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: var(--bg-surface-soft);
+  padding: 16px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-primary);
+}
+
+.final-review-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.final-review-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.final-review-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+}
+
+.final-review-val {
+  font-size: 0.85rem;
+  color: var(--text-primary);
+}
+
+.final-review-warnings {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.25);
+}
+
+.final-review-notice {
+  padding-top: 8px;
+  border-top: 1px solid var(--border-primary);
+}
+
 @media (max-width: 580px) {
   .review-modal-card {
     max-height: 96vh;
