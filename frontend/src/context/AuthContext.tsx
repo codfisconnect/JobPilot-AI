@@ -22,7 +22,7 @@ interface AuthContextType {
     companySize?: string;
     [key: string]: any;
   }) => Promise<RegisterResponse>;
-  verifyOtp: (data: { email: string; code: string; purpose?: string; newPassword?: string }) => Promise<User>;
+  verifyOtp: (data: { email: string; code: string; purpose?: string; fullName?: string; newPassword?: string }) => Promise<User>;
   requestOtp: (data: { email: string; purpose?: string }) => Promise<OtpResponse>;
   resendOtp: (data: { email: string; purpose?: string }) => Promise<OtpResponse>;
   resetPassword: (data: { email: string; code: string; newPassword: string }) => Promise<{ message: string }>;
@@ -148,7 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, []);
 
-  const verifyOtp = useCallback(async (data: { email: string; code: string; purpose?: string; newPassword?: string }) => {
+  const verifyOtp = useCallback(async (data: { email: string; code: string; purpose?: string; fullName?: string; newPassword?: string }) => {
     try {
       setError(null);
       const res = await apiClient.verifyOtp(data);

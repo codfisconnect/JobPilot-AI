@@ -43,14 +43,17 @@ export class OtpService {
     const expiresAt = new Date(now.getTime() + this.EXPIRATION_MINUTES * 60 * 1000);
     const resendAfter = new Date(now.getTime() + this.RESEND_COOLDOWN_SECONDS * 1000);
 
-    // Save to memory cache for development/offline resilience
-    const memKey = `${normalizedEmail}:${purpose}`;
-    this.inMemoryOtps.set(memKey, {
-      hash: otpHash,
-      plain: plainCode,
-      expiresAt,
-      attempts: 0
-    });
+    // In development only, save to memory cache for offline resilience. In production, never retain plaintext OTP in memory.
+    const isProduction = env.NODE_ENV === 'production';
+    if (!isProduction) {
+      const memKey = `${normalizedEmail}:${purpose}`;
+      this.inMemoryOtps.set(memKey, {
+        hash: otpHash,
+        plain: plainCode,
+        expiresAt,
+        attempts: 0
+      });
+    }
 
     try {
       // Check resend cooldown on the most recent OTP for this email & purpose
@@ -89,36 +92,53 @@ export class OtpService {
           attempts: 0,
           maxAttempts: this.MAX_ATTEMPTS,
           verified: false,
-          metadata: { ...(metadata || {}), ...(env.NODE_ENV !== "production" ? { debugCode: plainCode } : {}) }
+          metadata: { ...(metadata || {}) }
         }
       });
     } catch (dbErr: any) {
       if (dbErr instanceof TooManyRequestsError) throw dbErr;
-      logger.info(`[OtpService] Stored fallback OTP in memory for <${normalizedEmail}> (Code: ${plainCode})`);
+      if (isProduction) {
+        logger.error(`[OtpService] Database error storing OTP hash for <${normalizedEmail}>: ${dbErr?.message}`);
+        throw new AppError("Database service is temporarily unavailable. Please try again shortly.", 503, 'DATABASE_UNAVAILABLE');
+      }
+      logger.info(`[OtpService] Stored fallback OTP in memory for <${normalizedEmail}>`);
     }
 
-    logger.info(`[OtpService] Verification OTP generated for <${normalizedEmail}> [Code: ${plainCode}] (Purpose: ${purpose})`);
+    // Never log plaintext OTP code in production
+    if (isProduction) {
+      logger.info(`[OtpService] Verification OTP generated and queued for <${normalizedEmail}> (Purpose: ${purpose})`);
+    } else {
+      logger.info(`[OtpService] Verification OTP generated for <${normalizedEmail}> [Code: ${plainCode}] (Purpose: ${purpose})`);
+    }
 
     // Dispatch corresponding email template if configured
     try {
+      let emailResult;
       if (purpose === 'SIGNUP') {
-        await EmailService.sendVerificationEmail(normalizedEmail, plainCode);
+        emailResult = await EmailService.sendVerificationEmail(normalizedEmail, plainCode);
       } else if (purpose === 'LOGIN') {
-        await EmailService.sendLoginOtpEmail(normalizedEmail, plainCode);
+        emailResult = await EmailService.sendLoginOtpEmail(normalizedEmail, plainCode);
       } else if (purpose === 'PASSWORD_RESET') {
-        await EmailService.sendPasswordResetEmail(normalizedEmail, plainCode);
+        emailResult = await EmailService.sendPasswordResetEmail(normalizedEmail, plainCode);
       } else {
-        await EmailService.sendVerificationEmail(normalizedEmail, plainCode);
+        emailResult = await EmailService.sendVerificationEmail(normalizedEmail, plainCode);
       }
-    } catch (sendErr) {
-      if (env.NODE_ENV === 'production' && process.env.SMTP_HOST) {
-        throw new AppError("We couldn't send the verification code. Please try again.", 500, 'EMAIL_SEND_FAILED');
+
+      if (isProduction && emailResult && !emailResult.success) {
+        logger.error(`[OtpService] Production email delivery failed for <${normalizedEmail}>: ${emailResult.error}`);
+        throw new AppError("We couldn't deliver the verification code to your email. Please try again or contact support.", 500, 'EMAIL_SEND_FAILED');
+      }
+    } catch (sendErr: any) {
+      if (sendErr instanceof AppError) throw sendErr;
+      if (isProduction) {
+        logger.error(`[OtpService] Failed to dispatch OTP email in production for <${normalizedEmail}>: ${sendErr?.message}`);
+        throw new AppError("We couldn't deliver the verification code to your email. Please try again.", 500, 'EMAIL_SEND_FAILED');
       }
       logger.info(`[OtpService] Note: SMTP not configured. Development OTP code for ${normalizedEmail} is: ${plainCode}`);
     }
 
     return {
-      message: `Verification code sent to your email. (Dev Code: ${plainCode})`,
+      message: 'Verification code sent to your email.',
       cooldownSeconds: this.RESEND_COOLDOWN_SECONDS
     };
   }
@@ -157,7 +177,7 @@ export class OtpService {
     }
 
     if (!record) {
-      if (memRecord && memRecord.expiresAt > new Date()) {
+      if (env.NODE_ENV !== 'production' && memRecord && memRecord.expiresAt > new Date()) {
         if (memRecord.hash === incomingHash || memRecord.plain === cleanCode) {
           this.inMemoryOtps.delete(memKey);
           return { verified: true };

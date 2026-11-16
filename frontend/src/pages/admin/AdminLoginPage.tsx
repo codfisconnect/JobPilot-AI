@@ -33,14 +33,21 @@ export const AdminLoginPage: React.FC<AdminLoginPageProps> = ({ onSuccess, onExi
 
     try {
       setIsSubmitting(true);
-      const userObj = await login({ email, password });
-      if (userObj.role !== 'ADMIN') {
+      const authRes = await login({ email, password });
+      const user = authRes?.user || authRes;
+
+      if (!user || user.role !== 'ADMIN') {
         setLocalError('Access denied: Account does not possess ADMIN privileges.');
         return;
       }
       onSuccess();
     } catch (err: any) {
-      setLocalError(err.message || 'Authentication failed. Please verify credentials.');
+      const msg = err.message || '';
+      if (err.status === 401 || msg.toLowerCase().includes('invalid email or password') || msg.toLowerCase().includes('unauthorized')) {
+        setLocalError('Invalid administrator email or password.');
+      } else {
+        setLocalError(msg || 'Authentication failed. Please verify credentials.');
+      }
     } finally {
       setIsSubmitting(false);
     }

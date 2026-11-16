@@ -58,5 +58,30 @@ if (!parsedEnv.success) {
   }
 }
 
+// In production, validate critical security prerequisites
+if (process.env.NODE_ENV === 'production' && parsedEnv.success) {
+  const prodEnv = parsedEnv.data;
+  const issues: string[] = [];
+
+  if (prodEnv.JWT_ACCESS_SECRET === 'pilotmama-super-secret-jwt-access-key-production-ready') {
+    issues.push('JWT_ACCESS_SECRET is set to an insecure default value. Provide a unique cryptographically secure secret.');
+  }
+  if (prodEnv.JWT_REFRESH_SECRET === 'pilotmama-super-secret-jwt-refresh-key-production-ready') {
+    issues.push('JWT_REFRESH_SECRET is set to an insecure default value. Provide a unique cryptographically secure secret.');
+  }
+  if (prodEnv.JWT_ACCESS_SECRET === prodEnv.JWT_REFRESH_SECRET) {
+    issues.push('JWT_ACCESS_SECRET and JWT_REFRESH_SECRET must be distinct secrets.');
+  }
+  if (prodEnv.DATABASE_URL.includes('localhost') || prodEnv.DATABASE_URL.includes('127.0.0.1')) {
+    issues.push('DATABASE_URL points to localhost in production. Configure a production PostgreSQL connection string.');
+  }
+
+  if (issues.length > 0) {
+    console.error('❌ FATAL: Production security configuration check failed:');
+    issues.forEach(issue => console.error(`  - ${issue}`));
+    process.exit(1);
+  }
+}
+
 export const env = parsedEnv.success ? parsedEnv.data : envSchema.parse({});
 export type EnvConfig = z.infer<typeof envSchema>;

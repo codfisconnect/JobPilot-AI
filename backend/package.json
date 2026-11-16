@@ -10,6 +10,8 @@
     "start": "node dist/server.js",
     "dev": "tsx watch src/server.ts",
     "seed": "tsx src/database/seed.ts",
+    "admin:provision": "tsx src/database/provisionAdminCli.ts",
+    "admin:reset-password": "tsx src/database/provisionAdminCli.ts --force-reset",
     "test": "tsx src/tests/runTests.ts && tsx --test src/tests/*.test.ts"
   },
   "dependencies": {

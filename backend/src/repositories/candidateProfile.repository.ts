@@ -61,8 +61,11 @@ export class CandidateProfileRepository {
   }
 
   public static async createProfileForUser(userId: string) {
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    const fullName = user?.email ? user.email.split('@')[0] : 'Candidate';
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      include: { candidateProfile: true }
+    });
+    const fullName = user?.candidateProfile?.fullName?.trim() || '';
     return prisma.candidateProfile.create({
       data: {
         userId,
