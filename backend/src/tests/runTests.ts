@@ -356,6 +356,117 @@ JNT University - Bachelor of Technology
   const { provisionAdministrator } = await import('../database/adminSeed.js');
   assert(typeof provisionAdministrator === 'function', 'provisionAdministrator is exported as a trusted server-side management utility');
 
+  // Test 29: Resume Parsing Service - Syed Salman Fixture Location, Project Grouping, Skill Extraction & Confidence
+  const { ResumeParsingService } = await import('../services/resumeParsing.service.js');
+  const salmanResumeFixture = `
+SYED SALMAN A
+Email: salman@example.com | Phone: +91 9876543210
+
+PROFESSIONAL SUMMARY
+Dynamic and results-driven QA Engineer and Software Specialist with over 6 years of experience in delivering high-quality web applications.
+
+PROFESSIONAL EXPERIENCE
+Senior Quality Assurance Engineer
+Codfis Technologies Private Limited
+Duration: 6 years
+Location: Chennai, India
+
+PROJECTS
+EasyJet Airlines Inc.
+Role: Senior QA Automation Engineer | Environment: Java, Selenium, Maven, Jenkins
+PROJECT DESCRIPTION
+Led end-to-end quality assurance and test automation for the enterprise flight booking and passenger check-in systems.
+RESPONSIBILITIES
+- Designed modular automated test suites reducing regression test cycles by 40%.
+- Integrated automated tests into CI/CD pipelines.
+
+Wakampa (Ecommerce)
+Role: QA Lead | Environment: Agile, Jira, Postman
+PROJECT DESCRIPTION
+Architected testing strategy for a multi-vendor ecommerce platform with high transaction volumes.
+RESPONSIBILITIES
+- Managed sprint defect triage and user story test coverage.
+- Conducted API contract testing.
+
+Project Three
+Role: Software Analyst | Environment: Maven, Git, Confluence
+PROJECT DESCRIPTION
+Developed comprehensive traceability matrices and analytics dashboards.
+
+EDUCATION
+Bachelor of Engineering in Computer Science
+Anna University - Chennai, India
+Year: 2018
+
+SKILLS
+Technical & Methodological:
+Git, Maven, Eclipse, Jira, Confluence, Agile Methodologies, Scrum, Kanban, BPMN, Power BI, Software Testing, Quality Engineering, Business Analysis, Root Cause Analysis.
+
+Chennai, India
+`;
+
+  const parsedSalman = await ResumeParsingService.parse(salmanResumeFixture);
+
+  // 1. Location
+  assert(
+    parsedSalman.personalInfo.location === 'Chennai, India',
+    `ResumeParsingService extracts candidate location from bottom/footer: found "${parsedSalman.personalInfo.location}"`
+  );
+
+  // 2. Projects (exactly 3, not fragmented into section headers)
+  assert(
+    parsedSalman.projects.length === 3,
+    `ResumeParsingService groups projects accurately without fragmentation: expected 3, found ${parsedSalman.projects.length}`
+  );
+  assert(
+    parsedSalman.projects[0].name.includes('EasyJet Airlines Inc.'),
+    `Project 1 name correctly extracted: "${parsedSalman.projects[0]?.name}"`
+  );
+  assert(
+    parsedSalman.projects[1].name.includes('Wakampa (Ecommerce)'),
+    `Project 2 name correctly extracted: "${parsedSalman.projects[1]?.name}"`
+  );
+  assert(
+    parsedSalman.projects[2].name.includes('Project Three'),
+    `Project 3 name correctly extracted: "${parsedSalman.projects[2]?.name}"`
+  );
+
+  // 3. Experience & Education
+  assert(
+    parsedSalman.experience.length === 1,
+    `ResumeParsingService extracts exactly 1 professional experience record: found ${parsedSalman.experience.length}`
+  );
+  assert(
+    parsedSalman.education.length === 1,
+    `ResumeParsingService extracts exactly 1 education record: found ${parsedSalman.education.length}`
+  );
+
+  // 4. Skills (14 unique competencies)
+  assert(
+    parsedSalman.skills.length === 14,
+    `ResumeParsingService extracts exactly 14 unique skills: found ${parsedSalman.skills.length}`
+  );
+
+  // 5. Confidence Score (genuine calculation, high quality resume fixture)
+  assert(
+    parsedSalman.parseConfidence >= 80 && parsedSalman.parseConfidence <= 100,
+    `ResumeParsingService computes genuine weighted confidence score: ${parsedSalman.parseConfidence}%`
+  );
+
+  // 6. Confidence Penalty test (missing location & phone & projects)
+  const partialResume = `
+Jane Doe
+jane@example.com
+Summary: Developer with 2 years of experience.
+Education: BS CS, State University
+Skills: Python, Django
+`;
+  const parsedPartial = await ResumeParsingService.parse(partialResume);
+  assert(
+    parsedPartial.parseConfidence < parsedSalman.parseConfidence,
+    `ResumeParsingService applies confidence penalties for missing fields: partial=${parsedPartial.parseConfidence}% vs complete=${parsedSalman.parseConfidence}%`
+  );
+
   console.log(`\nTest Results: ${passed}/${total} passed.`);
   if (passed === total) {
     console.log('ALL CRITICAL BACKEND, CODEWALLA INTEGRATION, AND REGRESSION TESTS PASSED SUCCESSFULLY!\n');

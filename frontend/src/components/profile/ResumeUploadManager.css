@@ -229,12 +229,12 @@
   color: var(--text-muted);
 }
 
-/* Extraction Metric Chips */
+/* Extraction Metric Cards / Chips */
 .review-metrics-summary {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 10px 24px;
+  gap: 10px;
+  padding: 12px 24px;
   background: var(--bg-surface-soft);
   border-bottom: 1px solid var(--border-primary);
   overflow-x: auto;
@@ -244,12 +244,39 @@
 .metric-chip {
   display: flex;
   align-items: center;
-  gap: 4px;
-  padding: 4px 10px;
+  gap: 6px;
+  padding: 6px 12px;
   border-radius: var(--radius-sm);
   background: var(--bg-surface);
   border: 1px solid var(--border-primary);
-  font-size: 0.78rem;
+  font-size: 0.82rem;
+  transition: all 0.15s ease-in-out;
+}
+
+.metric-chip.clickable {
+  cursor: pointer;
+  user-select: none;
+}
+
+.metric-chip.clickable:hover {
+  border-color: var(--color-primary);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.metric-confidence-high {
+  border-color: rgba(16, 185, 129, 0.4);
+  color: #10b981;
+}
+
+.metric-confidence-med {
+  border-color: rgba(245, 158, 11, 0.4);
+  color: #f59e0b;
+}
+
+.metric-confidence-low {
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
 }
 
 .metric-chip-label {
@@ -499,7 +526,27 @@
 }
 
 @media (max-width: 580px) {
+  .review-modal-card {
+    max-height: 96vh;
+    border-radius: var(--radius-md);
+  }
+  .review-modal-header {
+    padding: 12px 16px;
+  }
+  .review-metrics-summary {
+    padding: 8px 12px;
+    gap: 6px;
+  }
+  .metric-chip {
+    padding: 4px 8px;
+    font-size: 0.74rem;
+  }
+  .review-modal-body {
+    padding: 14px 16px;
+    gap: 16px;
+  }
   .review-modal-footer {
+    padding: 10px 16px;
     flex-direction: column;
     align-items: stretch;
   }
