@@ -19,6 +19,13 @@ export const ApplicationStatusBadge: React.FC<ApplicationStatusBadgeProps> = ({
         return { label: 'Saved', colorClass: 'badge-saved' };
       case 'READY_TO_APPLY':
         return { label: 'Ready to Apply', colorClass: 'badge-ready' };
+      case 'EXTERNAL_SITE_OPENED':
+        return { label: 'Application Started', colorClass: 'badge-ready' };
+      case 'CANDIDATE_RETURNED':
+        return { label: 'Returned from Employer Site', colorClass: 'badge-neutral' };
+      case 'APPLICATION_STATUS_UNKNOWN':
+        return { label: 'Confirmation Pending', colorClass: 'badge-neutral' };
+      case 'APPLIED_CONFIRMED':
       case 'APPLIED':
         return { label: 'Applied', colorClass: 'badge-applied' };
       case 'ASSESSMENT':

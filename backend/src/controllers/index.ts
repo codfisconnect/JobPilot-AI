@@ -754,7 +754,7 @@ export class ApplicationController {
    */
   public static async trackExternal(req: Request, res: Response) {
     try {
-      const { candidateId, jobId, action, notes, reminderDate, followCompany } = req.body;
+      const { candidateId, jobId, action, notes, reminderDate, followCompany, confirmedApplied, externalUrl, referenceNumber } = req.body;
       if (!candidateId || !jobId) {
         return res.status(400).json({ success: false, error: 'candidateId and jobId are required' });
       }
@@ -767,17 +767,20 @@ export class ApplicationController {
       const candidate = await CandidateRepository.getById(candidateId);
       const now = new Date().toISOString();
 
+      // Normalize action from parameters
+      const effectiveAction = action || (confirmedApplied === true ? 'CONFIRMED_APPLIED' : (confirmedApplied === false ? 'NOT_APPLIED' : 'CLICKED_LINK'));
+
       // If user selected "Follow this company", register follow intent
       if (followCompany && job.company) {
         const { FollowedCompanyRepository } = await import('../services/repositories.js');
         await FollowedCompanyRepository.follow(candidateId, job.company);
       }
 
-      // Check existing application record
+      // Check existing application record to prevent duplicate creations
       let app = (await ApplicationRepository.getAll(candidateId)).find(a => a.jobId === jobId);
 
-      if (action === 'CLICKED_LINK') {
-        // Link clicked -> DOES NOT mark as applied. Sets status to 'Ready to Apply'
+      if (effectiveAction === 'CLICKED_LINK' || effectiveAction === 'EXTERNAL_SITE_OPENED') {
+        // Link clicked / external site opened -> DOES NOT mark as applied. Sets status to 'Ready to Apply' / 'EXTERNAL_SITE_OPENED'
         if (!app) {
           app = {
             id: `app-ext-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
@@ -788,19 +791,19 @@ export class ApplicationController {
             location: job.location,
             applicationType: 'EXTERNAL',
             applicationMode: 'external',
-            applicationUrl: job.applicationUrl || job.sourceUrl,
+            applicationUrl: externalUrl || job.applicationUrl || job.sourceUrl,
             status: 'Ready to Apply' as any,
             matchScore: 80,
             candidateName: candidate?.name,
             candidateEmail: candidate?.email,
             candidatePhone: candidate?.phone,
             applicationDate: now.split('T')[0],
-            notes: notes || 'Redirected to external career page.',
+            notes: notes || 'External application started.',
             statusHistory: [
-              { status: 'Ready to Apply', changedAt: now, note: 'External career link opened in new tab' }
+              { status: 'Ready to Apply', changedAt: now, note: 'External career site opened' }
             ],
             timeline: [
-              { timestamp: now, stage: 'Redirected to Company Site', description: 'Application link opened on official company website.' }
+              { timestamp: now, stage: 'Application Started', description: 'Application initiated on official employer website.' }
             ],
             createdAt: now,
             updatedAt: now
@@ -810,20 +813,20 @@ export class ApplicationController {
         return res.json({ success: true, data: app, redirected: true });
       }
 
-      if (action === 'CONFIRMED_APPLIED') {
-        // Candidate returns and explicitly confirms they submitted on external site
+      if (effectiveAction === 'CONFIRMED_APPLIED' || effectiveAction === 'APPLIED_CONFIRMED') {
+        // Candidate returns and explicitly confirms submission
         const statusHistory = app?.statusHistory || [];
         statusHistory.push({
           status: 'Applied',
           changedAt: now,
-          note: notes || 'Candidate confirmed manual application submission on employer career website.'
+          note: notes || `Candidate confirmed manual application submission on employer site.${referenceNumber ? ` Ref: ${referenceNumber}` : ''}`
         });
 
         const timeline = app?.timeline || [];
         timeline.push({
           timestamp: now,
           stage: 'Applied on External Site',
-          description: 'Candidate confirmed application was completed.'
+          description: `Candidate confirmed application was completed.${referenceNumber ? ` (Ref: ${referenceNumber})` : ''}`
         });
 
         const updatedApp: ApplicationRecord = {
@@ -835,7 +838,7 @@ export class ApplicationController {
           location: job.location,
           applicationType: 'EXTERNAL',
           applicationMode: 'external',
-          applicationUrl: job.applicationUrl || job.sourceUrl,
+          applicationUrl: externalUrl || job.applicationUrl || job.sourceUrl,
           status: 'Applied' as any,
           matchScore: app?.matchScore || 80,
           candidateName: candidate?.name,
@@ -854,7 +857,43 @@ export class ApplicationController {
         return res.json({ success: true, data: saved, message: 'External application confirmed and logged in your tracker.' });
       }
 
-      if (action === 'REQUESTED_EMAIL') {
+      if (effectiveAction === 'NOT_APPLIED') {
+        // Candidate returns but did not complete submission
+        const statusHistory = app?.statusHistory || [];
+        statusHistory.push({
+          status: 'Ready to Apply',
+          changedAt: now,
+          note: notes || 'Candidate returned without submitting.'
+        });
+
+        const updatedApp: ApplicationRecord = {
+          id: app?.id || `app-ext-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+          candidateId,
+          jobId,
+          company: job.company,
+          role: job.role,
+          location: job.location,
+          applicationType: 'EXTERNAL',
+          applicationMode: 'external',
+          applicationUrl: externalUrl || job.applicationUrl || job.sourceUrl,
+          status: 'Ready to Apply' as any,
+          matchScore: app?.matchScore || 80,
+          candidateName: candidate?.name,
+          candidateEmail: candidate?.email,
+          candidatePhone: candidate?.phone,
+          applicationDate: now.split('T')[0],
+          notes: notes || 'Candidate saved opportunity without submitting.',
+          statusHistory,
+          timeline: app?.timeline || [],
+          createdAt: app?.createdAt || now,
+          updatedAt: now
+        };
+
+        const saved = await ApplicationRepository.save(updatedApp);
+        return res.json({ success: true, data: saved, message: 'Saved in tracker as not applied.' });
+      }
+
+      if (effectiveAction === 'REQUESTED_EMAIL') {
         // Candidate requested job details in email to apply later
         return res.json({
           success: true,

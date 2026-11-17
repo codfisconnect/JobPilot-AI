@@ -3,6 +3,7 @@ import { CanonicalJob } from '../types/job.types';
 import { apiClient } from '../api/client';
 import { JobCard } from '../components/jobs/JobCard';
 import { JobDetailModal } from '../components/jobs/JobDetailModal';
+import { ExternalApplyModal } from '../components/jobs/ExternalApplyModal';
 import { ApplicationModal } from '../components/applications/ApplicationModal';
 import { ErrorBoundary } from '../components/common/ErrorBoundary';
 import { Button } from '../components/common/Button';
@@ -253,6 +254,29 @@ export const JobsPage: React.FC<JobsPageProps> = ({
       setLoading(false);
     }
   }, [activeTab, searchChips, searchQuery, countryFilter, locationFilter, remoteFilter, employmentFilter, sourceFilter, companyFilter, postedDateFilter, sortFilter]);
+
+  // Check for returning candidate session context from external application
+  useEffect(() => {
+    try {
+      const stored = sessionStorage.getItem('pilotmama_external_apply_context');
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (parsed.jobId && parsed.action === 'EXTERNAL_SITE_OPENED') {
+          // Re-hydrate return modal prompt
+          apiClient.getCanonicalJobById(parsed.jobId)
+            .then(res => {
+              const fullJob = res.data || res;
+              if (fullJob) {
+                handleDirectApply(fullJob);
+              }
+            })
+            .catch(() => {});
+        }
+      }
+    } catch {
+      // Ignore sessionStorage parsing errors
+    }
+  }, []);
 
   // Initial and reactive fetch upon filter modifications or activeCandidate update
   useEffect(() => {
@@ -760,28 +784,20 @@ export const JobsPage: React.FC<JobsPageProps> = ({
         }}
       />
 
-      {/* Native In-Page Application Agent Modal protected by local ErrorBoundary */}
+      {/* External Application Modal (Same-tab embed / redirect with application tracker) */}
       {applyingJob && (
-        <ErrorBoundary
-          fallbackTitle="Application Agent could not start."
+        <ExternalApplyModal
+          isOpen={isApplyModalOpen}
           onClose={() => {
             setIsApplyModalOpen(false);
             setApplyingJob(null);
           }}
-        >
-          <ApplicationModal
-            isOpen={isApplyModalOpen}
-            onClose={() => {
-              setIsApplyModalOpen(false);
-              setApplyingJob(null);
-            }}
-            job={applyingJob}
-            candidate={activeCandidate}
-            onSuccess={(app) => {
-              showToast?.(`Application started: ${app.role} at ${app.company}`);
-            }}
-          />
-        </ErrorBoundary>
+          job={applyingJob}
+          onConfirmApplied={(app) => {
+            showToast?.(`Application tracked: ${applyingJob.role} at ${applyingJob.company}`);
+          }}
+          onTailorResume={onSelectJobForAnalysis}
+        />
       )}
 
       {/* Mobile Filter Drawer / Bottom Sheet */}
