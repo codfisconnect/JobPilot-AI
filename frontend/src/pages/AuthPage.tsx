@@ -321,17 +321,7 @@ export const AuthPage: React.FC<AuthPageProps> = ({
 
     try {
       setIsSubmitting(true);
-      const res = await login({ email: cleanEmail, password });
-
-      // If account email is unverified, backend challenges with OTP
-      if (res && res.requiresOtp) {
-        setOtpPurpose('SIGNUP');
-        setOtpCode('');
-        setCooldown(res.cooldownSeconds || 60);
-        setSuccessNotice('Your email is not yet verified. A 6-digit code has been sent to your inbox.');
-        setMode('otp_verification');
-        return;
-      }
+      await login({ email: cleanEmail, password });
 
       if (onSuccess) {
         onSuccess();

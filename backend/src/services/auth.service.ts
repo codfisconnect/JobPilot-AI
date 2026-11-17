@@ -259,15 +259,14 @@ export class AuthService {
   }
 
   /**
-   * Password login (with verified-email enforcement)
+   * Password login (direct authentication for matching email and password)
+   * Note: Allows direct login for both verified and unverified candidates.
+   * Email verification status is preserved as a separate property.
    */
   async login(data: {
     email: string;
     password: string;
-  }): Promise<
-    | AuthSessionResult
-    | { requiresOtp: true; email: string; message: string; cooldownSeconds: number }
-  > {
+  }): Promise<AuthSessionResult> {
     const normalizedEmail = AuthService.validateEmail(data.email);
     const user = await this.userRepo.findByEmail(normalizedEmail);
 
@@ -285,34 +284,8 @@ export class AuthService {
       throw new UnauthorizedError('Your account has been deactivated. Please contact support.');
     }
 
-    // SECURITY POLICY: If candidate email is not yet verified, require OTP verification before session issue
-    if (!user.emailVerified) {
-      let message = 'Your email address is not yet verified. A verification code has been dispatched to your inbox.';
-      let cooldownSeconds = 60;
-      try {
-        const sent = await OtpService.generateAndSendOtp(
-          normalizedEmail,
-          OtpPurpose.SIGNUP
-        );
-        message = sent.message;
-        cooldownSeconds = sent.cooldownSeconds;
-      } catch (otpErr: any) {
-        // If delivery failed, do not falsely claim code was dispatched
-        if (otpErr?.code === 'EMAIL_SEND_FAILED' || (otpErr instanceof AppError && otpErr.statusCode >= 500)) {
-          throw otpErr;
-        }
-        // If recent OTP was already dispatched (cooldown / rate limit), inform candidate cleanly
-        message = otpErr.message || 'Please check your email for your verification code.';
-      }
-
-      return {
-        requiresOtp: true,
-        email: normalizedEmail,
-        message,
-        cooldownSeconds
-      };
-    }
-
+    // Direct login: authenticate candidate immediately without OTP challenge.
+    // Email verification status is preserved separately on the user profile.
     return this.issueUserTokens(user);
   }
 
