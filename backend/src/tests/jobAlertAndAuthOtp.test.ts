@@ -398,7 +398,7 @@ describe('Job Alert Outbox, Email OTP & Social Auth Suite', () => {
       );
     });
 
-    it('should register a candidate as unverified and challenge login before OTP verification', async () => {
+    it('should register a candidate as unverified and allow direct password login without OTP challenge', async () => {
       const regEmail = `signup.unverified.${timestamp}@testpilotmama.com`;
       const regPass = 'ValidSecretPass123!';
 
@@ -412,19 +412,23 @@ describe('Job Alert Outbox, Email OTP & Social Auth Suite', () => {
       assert.strictEqual(regResult.email, regEmail);
       assert.strictEqual(regResult.requiresVerification, true);
 
-      // Attempt login with password before OTP verification -> Must challenge with requiresOtp
-      const loginChallenge = await authService.login({ email: regEmail, password: regPass });
-      assert.strictEqual((loginChallenge as any).requiresOtp, true);
-      assert.ok((loginChallenge as any).cooldownSeconds >= 0);
+      // Direct password login: correct password authenticates candidate immediately without OTP challenge
+      const directLogin = await authService.login({ email: regEmail, password: regPass }) as any;
+      assert.ok(directLogin.user, 'Session must return user object');
+      assert.strictEqual(directLogin.user.email, regEmail);
+      assert.strictEqual(directLogin.user.emailVerified, false, 'Email verification flag remains separate property');
+      assert.ok(directLogin.accessToken.length > 20, 'Direct login must issue access token');
+      assert.ok(directLogin.refreshToken.length > 20, 'Direct login must issue refresh token');
+      assert.strictEqual(directLogin.requiresOtp, undefined, 'Must not challenge password login with requiresOtp');
 
-      // Retrieve the generated OTP from mock sent emails
+      // Retrieve the registration verification OTP from mock sent emails
       const sent = EmailService.getSentEmails().find(e => e.to === regEmail && e.subject.includes('Verification Code'));
-      assert.ok(sent, 'Verification email should be dispatched');
+      assert.ok(sent, 'Verification email should be dispatched on registration');
       const otpMatch = (sent.text || '').match(/\b(\d{6})\b/) || sent.html.match(/>\s*(\d{6})\s*</);
       assert.ok(otpMatch, 'Verification code should be present in email HTML or text');
       const validCode = otpMatch[1];
 
-      // Wrong OTP fails
+      // Wrong OTP verification fails
       await assert.rejects(
         async () => {
           await authService.verifyRegistrationOtp({ email: regEmail, code: '000000' });
@@ -432,17 +436,18 @@ describe('Job Alert Outbox, Email OTP & Social Auth Suite', () => {
         /Incorrect code/
       );
 
-      // Correct OTP activates account and returns session
+      // Correct OTP activates/verifies account and returns session
       const verifyResult = await authService.verifyRegistrationOtp({ email: regEmail, code: validCode });
       assert.strictEqual(verifyResult.user.email, regEmail);
       assert.strictEqual(verifyResult.user.emailVerified, true);
       assert.ok(verifyResult.accessToken.length > 20);
       assert.ok(verifyResult.refreshToken.length > 20);
 
-      // Now regular login succeeds without requiresOtp challenge
-      const loginResult = await authService.login({ email: regEmail, password: regPass });
-      assert.strictEqual((loginResult as any).user.email, regEmail);
-      assert.ok((loginResult as any).accessToken.length > 20);
+      // Regular password login continues to succeed directly
+      const loginResult = await authService.login({ email: regEmail, password: regPass }) as any;
+      assert.strictEqual(loginResult.user.email, regEmail);
+      assert.strictEqual(loginResult.user.emailVerified, true);
+      assert.ok(loginResult.accessToken.length > 20);
     });
 
     it('should support passwordless Email OTP login', async () => {

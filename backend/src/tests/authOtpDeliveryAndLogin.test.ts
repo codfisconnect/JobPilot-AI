@@ -6,6 +6,7 @@ import { EmailService, InMemoryEmailProvider, UnconfiguredProductionEmailProvide
 import { IEmailProvider, EmailOptions, EmailSendResult } from '../services/email/emailProvider.interface.js';
 import { OtpPurpose, UserRole } from '@prisma/client';
 import { hashPassword } from '../utils/password.js';
+import { prisma } from '../database/prisma.js';
 
 // Custom mock provider to simulate email delivery failure in tests
 class MockFailingEmailProvider implements IEmailProvider {
@@ -54,8 +55,23 @@ describe('JobPilot AI - OTP Email Delivery and Password Login Scenarios', () => 
   let mockRepo: any;
   let auth: AuthService;
   const originalEnvNodeEnv = process.env.NODE_ENV;
+  const originalSendWithRetry = EmailService.sendWithRetry;
+  const originalEmailOtp = prisma.emailOtp;
 
   before(async () => {
+    // Stub prisma.emailOtp methods to isolate tests from local database connection timeouts
+    (prisma as any).emailOtp = {
+      findFirst: async () => null,
+      deleteMany: async () => ({ count: 0 }),
+      create: async ({ data }: any) => ({ id: 'mock_otp_id', ...data }),
+      update: async ({ data }: any) => ({ id: 'mock_otp_id', ...data }),
+      delete: async () => ({ id: 'mock_otp_id' })
+    };
+
+    // Override sendWithRetry in unit tests to eliminate exponential backoff sleep delays
+    EmailService.sendWithRetry = async function (options: EmailOptions, maxRetries = 0, initialBackoffMs = 0) {
+      return EmailService.getProvider().sendEmail(options);
+    };
     const passwordHash = await hashPassword(plainPassword);
 
     mockUsers = [
@@ -117,6 +133,8 @@ describe('JobPilot AI - OTP Email Delivery and Password Login Scenarios', () => 
 
   after(() => {
     process.env.NODE_ENV = originalEnvNodeEnv;
+    EmailService.sendWithRetry = originalSendWithRetry;
+    (prisma as any).emailOtp = originalEmailOtp;
     EmailService.setProvider(new InMemoryEmailProvider());
   });
 
