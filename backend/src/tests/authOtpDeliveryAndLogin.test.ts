@@ -162,7 +162,7 @@ describe('JobPilot AI - OTP Email Delivery and Password Login Scenarios', () => 
     assert.strictEqual(mockSuccess.sentMails.length, 0, 'No email should be dispatched on failed password');
   });
 
-  it('Scenario 3: Unverified account + correct password -> sends SIGNUP verification OTP with requiresOtp: true', async () => {
+  it('Scenario 3: Unverified account + correct password -> creates session directly without OTP challenge', async () => {
     const mockSuccess = new MockSuccessEmailProvider();
     EmailService.setProvider(mockSuccess);
 
@@ -171,15 +171,13 @@ describe('JobPilot AI - OTP Email Delivery and Password Login Scenarios', () => 
       password: plainPassword
     });
 
-    assert.strictEqual(result.requiresOtp, true, 'Must flag requiresOtp: true');
-    assert.strictEqual(result.email, unverifiedUserEmail);
-    assert.ok(result.cooldownSeconds > 0);
-    assert.ok(result.message.length > 0);
-
-    // Verify email was dispatched with SIGNUP verification purpose
-    assert.strictEqual(mockSuccess.sentMails.length, 1);
-    assert.strictEqual(mockSuccess.sentMails[0].to, unverifiedUserEmail);
-    assert.strictEqual(mockSuccess.sentMails[0].metadata?.type, 'SIGNUP_OTP');
+    assert.ok(result.user, 'Session must return user object');
+    assert.strictEqual(result.user.email, unverifiedUserEmail);
+    assert.strictEqual(result.user.emailVerified, false, 'Email verification flag remains false as separate property');
+    assert.ok(result.accessToken, 'Session must return access token');
+    assert.ok(result.refreshToken, 'Session must return refresh token');
+    assert.strictEqual(result.requiresOtp, undefined, 'Must not challenge with requiresOtp');
+    assert.strictEqual(mockSuccess.sentMails.length, 0, 'No email OTP should be sent for unverified password login');
   });
 
   it('Scenario 4: Unconfigured production email provider explicitly returns success: false', async () => {
@@ -213,22 +211,16 @@ describe('JobPilot AI - OTP Email Delivery and Password Login Scenarios', () => 
     );
   });
 
-  it('Scenario 6: When email delivery fails during unverified password login, error propagates instead of falsely claiming OTP sent', async () => {
+  it('Scenario 6: Password login never attempts to send email even if email provider is broken', async () => {
     EmailService.setProvider(new MockFailingEmailProvider());
 
-    await assert.rejects(
-      async () => {
-        await auth.login({
-          email: unverifiedUserEmail,
-          password: plainPassword
-        });
-      },
-      (err: any) => {
-        assert.strictEqual(err.code, 'EMAIL_SEND_FAILED');
-        assert.strictEqual(err.statusCode, 500);
-        return true;
-      }
-    );
+    const result: any = await auth.login({
+      email: unverifiedUserEmail,
+      password: plainPassword
+    });
+
+    assert.ok(result.user, 'Password login succeeds directly');
+    assert.strictEqual(result.user.email, unverifiedUserEmail);
   });
 
   it('Scenario 7: Passwordless login uses LOGIN OTP purpose while Signup uses SIGNUP purpose', async () => {

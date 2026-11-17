@@ -116,23 +116,11 @@ export class AuthController {
 
   /**
    * POST /api/v1/auth/login
-   * Password login (with unverified-email OTP challenge protection)
+   * Password login (direct session issue for matching email and password)
    */
   static async login(req: Request, res: Response, next: NextFunction): Promise<void> {
     try {
       const result = await authService.login(req.body);
-
-      if ('requiresOtp' in result) {
-        res.status(200).json({
-          success: true,
-          data: result,
-          meta: {
-            requestId: (req as any).id,
-            timestamp: new Date().toISOString()
-          }
-        });
-        return;
-      }
 
       const { user, accessToken, refreshToken } = result;
       res.cookie(REFRESH_COOKIE_NAME, refreshToken, COOKIE_OPTIONS);
