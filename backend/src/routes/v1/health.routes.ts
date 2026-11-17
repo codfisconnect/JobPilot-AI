@@ -22,7 +22,7 @@ healthRouter.get('/health', async (req, res) => {
       gitCommit: process.env.RENDER_GIT_COMMIT || process.env.COMMIT_REF || '8884327',
       email: {
         provider: EmailService.getProvider().name,
-        smtpConfigured: EmailService.getProvider().name !== 'IN_MEMORY_DEV_PROVIDER',
+        smtpConfigured: EmailService.getProvider().isConfigured(),
         smtpHostSet: Boolean(env.SMTP_HOST || process.env.SMTP_HOST),
         smtpUserSet: Boolean(env.SMTP_USER || process.env.SMTP_USER),
         smtpPassSet: Boolean(env.SMTP_PASS || process.env.SMTP_PASS),

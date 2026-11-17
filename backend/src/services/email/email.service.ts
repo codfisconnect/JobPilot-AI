@@ -40,6 +40,25 @@ export class InMemoryEmailProvider implements IEmailProvider {
   }
 }
 
+export class UnconfiguredProductionEmailProvider implements IEmailProvider {
+  public name = 'UNCONFIGURED_PRODUCTION_PROVIDER';
+
+  isConfigured(): boolean {
+    return false;
+  }
+
+  async sendEmail(options: EmailOptions): Promise<EmailSendResult> {
+    const errorMsg = 'Production transactional email service is not configured (SMTP / Brevo credentials missing).';
+    logger.error(`[EmailService] Cannot send email to <${options.to}>: ${errorMsg}`);
+    return {
+      success: false,
+      error: errorMsg,
+      provider: this.name,
+      timestamp: new Date().toISOString()
+    };
+  }
+}
+
 export class SmtpEmailProvider implements IEmailProvider {
   public name = 'SMTP_BREVO_PROVIDER';
   private transporter: Transporter | null = null;
@@ -183,6 +202,13 @@ export class EmailService {
         fromEmail: env.SMTP_FROM_EMAIL || process.env.SMTP_FROM_EMAIL || user,
         fromName: env.SMTP_FROM_NAME || process.env.SMTP_FROM_NAME || 'Pilot Mama'
       });
+    }
+
+    // Never use InMemoryEmailProvider in production
+    const isProduction = env.NODE_ENV === 'production' || process.env.NODE_ENV === 'production';
+    if (isProduction) {
+      logger.warn('[EmailService] Production mode detected but SMTP / Brevo credentials are not configured. Using UnconfiguredProductionEmailProvider.');
+      return new UnconfiguredProductionEmailProvider();
     }
 
     return new InMemoryEmailProvider();

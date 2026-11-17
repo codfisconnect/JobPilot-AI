@@ -297,7 +297,11 @@ export class AuthService {
         message = sent.message;
         cooldownSeconds = sent.cooldownSeconds;
       } catch (otpErr: any) {
-        // If recent OTP was already dispatched (e.g. at registration a moment ago), inform candidate cleanly
+        // If delivery failed, do not falsely claim code was dispatched
+        if (otpErr?.code === 'EMAIL_SEND_FAILED' || (otpErr instanceof AppError && otpErr.statusCode >= 500)) {
+          throw otpErr;
+        }
+        // If recent OTP was already dispatched (cooldown / rate limit), inform candidate cleanly
         message = otpErr.message || 'Please check your email for your verification code.';
       }
 
