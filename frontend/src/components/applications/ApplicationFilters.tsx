@@ -13,10 +13,11 @@ interface ApplicationFiltersProps {
 }
 
 const STATUS_OPTIONS: { label: string; value: string }[] = [
-  { label: 'All Statuses', value: 'ALL' },
-  { label: 'Saved', value: 'SAVED' },
-  { label: 'Ready to Apply', value: 'READY_TO_APPLY' },
+  { label: 'All Applications', value: 'ALL' },
+  { label: 'Application Started', value: 'READY_TO_APPLY' },
   { label: 'Applied', value: 'APPLIED' },
+  { label: 'Confirmation Pending', value: 'SAVED' },
+  { label: 'Saved / Not Applied', value: 'SAVED' },
   { label: 'Assessment', value: 'ASSESSMENT' },
   { label: 'HR Screen', value: 'HR_SCREEN' },
   { label: 'Technical', value: 'TECHNICAL' },

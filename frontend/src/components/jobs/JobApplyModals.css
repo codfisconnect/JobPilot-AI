@@ -432,3 +432,194 @@
   margin-top: 1.5rem;
 }
 
+/* Same-Tab Embed & Resume Selection Styles */
+.ext-resume-selection-section {
+  text-align: left;
+  margin-bottom: 1.5rem;
+}
+
+.ext-section-title {
+  display: block;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.75rem;
+}
+
+.ext-resume-options {
+  display: flex;
+  flex-direction: column;
+  gap: 0.625rem;
+  margin-bottom: 0.75rem;
+}
+
+.ext-resume-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--border-primary);
+  border-radius: var(--radius-md, 8px);
+  background: var(--bg-surface-active, rgba(255, 255, 255, 0.02));
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.ext-resume-card.active {
+  border-color: var(--accent-primary, #6366f1);
+  background: rgba(99, 102, 241, 0.08);
+}
+
+.ext-resume-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.ext-resume-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.ext-resume-desc {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.ext-tailor-link-btn {
+  background: transparent;
+  border: none;
+  color: var(--accent-primary, #6366f1);
+  font-size: 0.8125rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
+  cursor: pointer;
+  padding: 0.25rem 0;
+  text-decoration: underline;
+}
+
+/* Fullscreen/Large Iframe Embedding Mode */
+.ext-iframe-wrapper {
+  display: flex;
+  flex-direction: column;
+  height: 75vh;
+  min-height: 500px;
+}
+
+.ext-iframe-banner {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.625rem 1rem;
+  background: var(--bg-surface-active, #1e293b);
+  border-bottom: 1px solid var(--border-primary);
+  border-radius: var(--radius-md, 8px) var(--radius-md, 8px) 0 0;
+}
+
+.ext-iframe-banner-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ext-iframe-container {
+  position: relative;
+  flex: 1;
+  width: 100%;
+  background: #ffffff;
+}
+
+.ext-application-iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.ext-iframe-loader {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.85);
+  color: #ffffff;
+  gap: 1rem;
+  z-index: 5;
+}
+
+.ext-iframe-fallback-card {
+  padding: 2.5rem 1.5rem;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  max-width: 500px;
+  margin: auto;
+}
+
+.ext-iframe-fallback-card h4 {
+  font-size: 1.125rem;
+  font-weight: 700;
+  margin: 0;
+}
+
+.ext-iframe-fallback-card p {
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+/* 3-Column Confirmation Buttons */
+.ext-confirm-buttons-3col {
+  display: flex;
+  justify-content: center;
+  gap: 0.75rem;
+  margin-top: 1.5rem;
+  flex-wrap: wrap;
+}
+
+.ext-ref-field {
+  text-align: left;
+  margin: 1.25rem 0;
+}
+
+.ext-field-label {
+  display: block;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 0.375rem;
+}
+
+.ext-text-input {
+  width: 100%;
+  padding: 0.625rem 0.875rem;
+  border-radius: var(--radius-md, 8px);
+  border: 1px solid var(--border-primary);
+  background: var(--bg-surface, #0f172a);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+}
+
+.ext-field-hint {
+  display: block;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  margin-top: 0.25rem;
+}
+
+.ext-saved-ref-box {
+  background: var(--bg-surface-active, rgba(255, 255, 255, 0.04));
+  padding: 0.625rem 1rem;
+  border-radius: var(--radius-md, 8px);
+  display: inline-block;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+}
+

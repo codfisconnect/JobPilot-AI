@@ -85,11 +85,8 @@ export const NaukriJobDetail: React.FC<NaukriJobDetailProps> = ({ job, onClose, 
   }, [companyName]);
 
   const handleApplyClick = () => {
-    if (isExternal) {
-      setIsExternalModalOpen(true);
-    } else {
-      setIsInternalModalOpen(true);
-    }
+    // Phase 3 Master Requirement: Always route candidate applications to employer's external site modal
+    setIsExternalModalOpen(true);
   };
 
   const handleToggleSave = () => {
@@ -306,9 +303,9 @@ export const NaukriJobDetail: React.FC<NaukriJobDetailProps> = ({ job, onClose, 
             variant="primary"
             size="lg"
             onClick={handleApplyClick}
-            icon={isExternal ? <ExternalLink size={18} /> : <Send size={18} />}
+            icon={<ExternalLink size={18} />}
           >
-            {isExternal ? 'Apply on Company Website' : 'Apply Now'}
+            Apply on external site
           </Button>
 
           {onAnalyzeFit && (
@@ -700,9 +697,9 @@ export const NaukriJobDetail: React.FC<NaukriJobDetailProps> = ({ job, onClose, 
             <Button
               variant="primary"
               onClick={handleApplyClick}
-              icon={isExternal ? <ExternalLink size={16} /> : <Send size={16} />}
+              icon={<ExternalLink size={16} />}
             >
-              {isExternal ? 'Apply on Company Website' : 'Apply Now'}
+              Apply on external site
             </Button>
           </div>
         </div>
