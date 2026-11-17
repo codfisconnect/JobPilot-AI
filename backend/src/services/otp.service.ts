@@ -124,8 +124,8 @@ export class OtpService {
         emailResult = await EmailService.sendVerificationEmail(normalizedEmail, plainCode);
       }
 
-      if (isProduction && emailResult && !emailResult.success) {
-        logger.error(`[OtpService] Production email delivery failed for <${normalizedEmail}>: ${emailResult.error}`);
+      if (emailResult && !emailResult.success) {
+        logger.error(`[OtpService] Email delivery failed for <${normalizedEmail}> via provider ${emailResult.provider}: ${emailResult.error}`);
         throw new AppError("We couldn't deliver the verification code to your email. Please try again or contact support.", 500, 'EMAIL_SEND_FAILED');
       }
     } catch (sendErr: any) {
