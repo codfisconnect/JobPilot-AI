@@ -4,6 +4,7 @@ import { CompletenessEstimatorService } from '../completenessEstimator.service.j
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
 import { safeParseJson } from '../../utils/safeJson.js';
+import { DateExtractionService } from '../dateExtraction.service.js';
 import * as cheerio from 'cheerio';
 
 export class GreenhouseAdapter implements IJobSourceStrategy {
@@ -94,13 +95,23 @@ export class GreenhouseAdapter implements IJobSourceStrategy {
         expectedCount = rawJobs.length;
 
         for (const item of rawJobs) {
+          // Extract genuine publication or creation date without using updated_at
+          const dateResult = DateExtractionService.extractPublicationDate(item, undefined, 'ATS_API');
+
           allJobs.push({
             externalJobId: String(item.id || ''),
             title: item.title || 'Job Opening',
             location: item.location?.name || undefined,
             description: item.content || undefined,
             applicationUrl: item.absolute_url || undefined,
-            postedAt: item.updated_at || undefined,
+            postedAt: dateResult.sourcePublishedAt || undefined,
+            sourcePublishedAt: dateResult.sourcePublishedAt,
+            firstDiscoveredAt: dateResult.firstDiscoveredAt,
+            sourceDateField: dateResult.sourceDateField,
+            sourceDatePrecision: dateResult.sourceDatePrecision,
+            sourceTimezone: dateResult.sourceTimezone,
+            dateSourceType: dateResult.dateSourceType,
+            rawPostingDate: dateResult.rawPostingDate,
             rawPayload: item
           });
         }

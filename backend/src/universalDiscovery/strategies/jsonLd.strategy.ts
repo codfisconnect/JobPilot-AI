@@ -4,6 +4,7 @@ import { CompletenessEstimatorService } from '../completenessEstimator.service.j
 import { FieldMapperService } from '../../services/fieldMapper.service.js';
 import { DiscoveredJobRaw } from '../types.js';
 import { JobSourceDiscoveryService } from '../../services/jobSourceDiscovery.service.js';
+import { DateExtractionService } from '../dateExtraction.service.js';
 
 export class JsonLdStrategy implements IJobSourceStrategy {
   public readonly name = 'JSON_LD_STRATEGY';
@@ -52,13 +53,22 @@ export class JsonLdStrategy implements IJobSourceStrategy {
         ? raw.jobLocation
         : raw.jobLocation?.address?.addressLocality || raw.jobLocation?.address?.addressRegion || undefined;
       
+      const dateResult = DateExtractionService.extractPublicationDate(raw, 'datePosted', 'STRUCTURED_DATA');
+
       jobs.push({
         externalJobId: raw.identifier?.value || raw.identifier || undefined,
         title: raw.title || 'Job Opening',
         location: loc,
         description: raw.description || raw.title,
         applicationUrl: raw.url || raw.directApplyUrl || undefined,
-        postedAt: raw.datePosted ? new Date(raw.datePosted) : undefined,
+        postedAt: dateResult.sourcePublishedAt || undefined,
+        sourcePublishedAt: dateResult.sourcePublishedAt,
+        firstDiscoveredAt: dateResult.firstDiscoveredAt,
+        sourceDateField: dateResult.sourceDateField,
+        sourceDatePrecision: dateResult.sourceDatePrecision,
+        sourceTimezone: dateResult.sourceTimezone,
+        dateSourceType: dateResult.dateSourceType,
+        rawPostingDate: dateResult.rawPostingDate,
         rawPayload: raw
       });
     }

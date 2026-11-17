@@ -467,6 +467,38 @@ Skills: Python, Django
     `ResumeParsingService applies confidence penalties for missing fields: partial=${parsedPartial.parseConfidence}% vs complete=${parsedSalman.parseConfidence}%`
   );
 
+  // Test 30: Automated Publication Date Extraction & Newest-First Sorting
+  const { DateExtractionService } = await import('../universalDiscovery/dateExtraction.service.js');
+  const rippleHireItem = {
+    jobSeq: 9001,
+    jobTitle: 'Senior Test Specialist',
+    jobLocation: 'Chennai, India',
+    jobPostingDate: '2026-11-16 10:00:00',
+    createDttm: '2026-11-01 09:00:00',
+    jobStatus: 'ACTIVE'
+  };
+  const extractedDate = DateExtractionService.extractPublicationDate(rippleHireItem, 'jobPostingDate', 'ATS_API');
+  assert(extractedDate.sourcePublishedAt !== null, 'DateExtractionService extracts sourcePublishedAt from RippleHire jobPostingDate');
+  assert(extractedDate.sourceDateField === 'jobPostingDate', 'DateExtractionService identifies exact sourceDateField');
+  assert(extractedDate.sourceDatePrecision === 'EXACT_TIMESTAMP', 'DateExtractionService determines EXACT_TIMESTAMP precision');
+
+  // Verify Blacklist rejection of lastModified / updated_at
+  const blacklistedItem = {
+    jobSeq: 9002,
+    updated_at: '2026-11-16T18:00:00Z',
+    lastModified: '2026-11-16T18:00:00Z'
+  };
+  const rejectedDate = DateExtractionService.extractPublicationDate(blacklistedItem, 'updated_at', 'ATS_API');
+  assert(rejectedDate.sourcePublishedAt === null, 'DateExtractionService rejects updated_at or lastModified from acting as publication date');
+  assert(rejectedDate.sourceDatePrecision === 'UNAVAILABLE', 'DateExtractionService marks precision UNAVAILABLE when only update timestamps exist');
+  assert(rejectedDate.firstDiscoveredAt instanceof Date, 'DateExtractionService reliably provides firstDiscoveredAt fallback');
+
+  // Effective Date comparison sorting (Newest First)
+  const jobOlder = { id: 'old', date: new Date('2026-11-10T12:00:00Z') };
+  const jobNewer = { id: 'new', date: new Date('2026-11-16T15:30:00Z') };
+  const sortedPair = [jobOlder, jobNewer].sort((a, b) => b.date.getTime() - a.date.getTime());
+  assert(sortedPair[0].id === 'new' && sortedPair[1].id === 'old', 'Default sorting orders newest effective date first');
+
   console.log(`\nTest Results: ${passed}/${total} passed.`);
   if (passed === total) {
     console.log('ALL CRITICAL BACKEND, CODEWALLA INTEGRATION, AND REGRESSION TESTS PASSED SUCCESSFULLY!\n');

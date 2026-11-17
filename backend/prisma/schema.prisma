@@ -544,10 +544,19 @@ model Job {
 
   education String?
 
-  postedAt      DateTime? @map("posted_at")
-  firstSeenAt   DateTime  @default(now()) @map("first_seen_at")
-  lastSeenAt    DateTime  @default(now()) @map("last_seen_at")
-  lastCheckedAt DateTime  @default(now()) @map("last_checked_at")
+  sourcePublishedAt      DateTime? @map("source_published_at")
+  firstDiscoveredAt      DateTime  @default(now()) @map("first_discovered_at")
+  sourceDateField        String?   @map("source_date_field")
+  sourceDatePrecision    String?   @map("source_date_precision") // EXACT_TIMESTAMP, DATE_ONLY, CREATION_FALLBACK, UNAVAILABLE
+  sourceTimezone         String?   @map("source_timezone")
+  dateSourceType         String?   @map("date_source_type")      // ATS_API, STRUCTURED_DATA, HTML_PAGE, EXCEL_IMPORT, BACKFILLED_DISCOVERY
+  rawPostingDate         String?   @map("raw_posting_date")
+
+  // Backward-compatible alias for existing queries and relations
+  postedAt               DateTime? @map("posted_at")
+  firstSeenAt            DateTime  @default(now()) @map("first_seen_at")
+  lastSeenAt             DateTime  @default(now()) @map("last_seen_at")
+  lastCheckedAt          DateTime  @default(now()) @map("last_checked_at")
 
   contentHash String @unique @map("content_hash")
 
@@ -577,6 +586,8 @@ model Job {
   @@index([employmentType])
   @@index([status])
   @@index([postedAt])
+  @@index([sourcePublishedAt])
+  @@index([firstDiscoveredAt])
   @@index([sourceType])
   @@index([sourceType, externalJobId])
   @@map("jobs")

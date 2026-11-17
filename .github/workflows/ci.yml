@@ -29,10 +29,10 @@ jobs:
     steps:
       - uses: actions/checkout@v3
 
-      - name: Use Node.js 20.x
+      - name: Use Node.js 24.x
         uses: actions/setup-node@v3
         with:
-          node-version: 20.x
+          node-version: 24.x
 
       - name: Install Root & Backend Dependencies
         run: |
@@ -46,6 +46,7 @@ jobs:
           npx prisma generate
         env:
           DATABASE_URL: postgresql://postgres:password@localhost:5432/pilot_mama_test?schema=public
+          DIRECT_URL: postgresql://postgres:password@localhost:5432/pilot_mama_test?schema=public
 
       - name: Apply Migrations
         run: |
@@ -53,6 +54,7 @@ jobs:
           npx prisma migrate deploy
         env:
           DATABASE_URL: postgresql://postgres:password@localhost:5432/pilot_mama_test?schema=public
+          DIRECT_URL: postgresql://postgres:password@localhost:5432/pilot_mama_test?schema=public
 
       - name: Run Backend Tests
         run: |
@@ -60,12 +62,16 @@ jobs:
           npm test
         env:
           DATABASE_URL: postgresql://postgres:password@localhost:5432/pilot_mama_test?schema=public
+          DIRECT_URL: postgresql://postgres:password@localhost:5432/pilot_mama_test?schema=public
           NODE_ENV: test
 
       - name: Build Backend
         run: |
           cd backend
           npm run build
+        env:
+          DATABASE_URL: postgresql://postgres:password@localhost:5432/pilot_mama_test?schema=public
+          DIRECT_URL: postgresql://postgres:password@localhost:5432/pilot_mama_test?schema=public
 
   frontend-build:
     name: Frontend Build & Typecheck

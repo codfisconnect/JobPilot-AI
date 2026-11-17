@@ -23,6 +23,13 @@ export interface DiscoveredJobRaw {
   applicationUrl?: string;
   url?: string;
   postedAt?: string | Date;
+  sourcePublishedAt?: Date | null;
+  firstDiscoveredAt?: Date;
+  sourceDateField?: string | null;
+  sourceDatePrecision?: 'EXACT_TIMESTAMP' | 'DATE_ONLY' | 'CREATION_FALLBACK' | 'UNAVAILABLE';
+  sourceTimezone?: string | null;
+  dateSourceType?: 'ATS_API' | 'STRUCTURED_DATA' | 'HTML_PAGE' | 'EXCEL_IMPORT' | 'BACKFILLED_DISCOVERY';
+  rawPostingDate?: string | null;
   deadline?: string | Date;
   rawPayload?: any;
 }

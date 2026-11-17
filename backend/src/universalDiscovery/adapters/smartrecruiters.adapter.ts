@@ -4,6 +4,7 @@ import { CompletenessEstimatorService } from '../completenessEstimator.service.j
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
 import { safeParseJson } from '../../utils/safeJson.js';
+import { DateExtractionService } from '../dateExtraction.service.js';
 
 export class SmartRecruitersAdapter implements IJobSourceStrategy {
   public readonly name = 'SMARTRECRUITERS_ADAPTER';
@@ -48,6 +49,8 @@ export class SmartRecruitersAdapter implements IJobSourceStrategy {
 
         for (const item of rawJobs) {
           const loc = item.location ? `${item.location.city || ''}, ${item.location.country || ''}`.trim().replace(/^,\s*|,\s*$/g, '') : undefined;
+          const dateResult = DateExtractionService.extractPublicationDate(item, 'releasedDate', 'ATS_API');
+
           allJobs.push({
             externalJobId: String(item.id || ''),
             title: item.name || 'Job Opening',
@@ -56,7 +59,14 @@ export class SmartRecruitersAdapter implements IJobSourceStrategy {
             employmentType: item.typeOfEmployment?.label || 'FULL_TIME',
             description: item.jobAd?.sections?.jobDescription?.text || undefined,
             applicationUrl: `https://jobs.smartrecruiters.com/${companyIdentifier}/${item.id}`,
-            postedAt: item.releasedDate ? new Date(item.releasedDate) : undefined,
+            postedAt: dateResult.sourcePublishedAt || undefined,
+            sourcePublishedAt: dateResult.sourcePublishedAt,
+            firstDiscoveredAt: dateResult.firstDiscoveredAt,
+            sourceDateField: dateResult.sourceDateField,
+            sourceDatePrecision: dateResult.sourceDatePrecision,
+            sourceTimezone: dateResult.sourceTimezone,
+            dateSourceType: dateResult.dateSourceType,
+            rawPostingDate: dateResult.rawPostingDate,
             rawPayload: item
           });
         }
