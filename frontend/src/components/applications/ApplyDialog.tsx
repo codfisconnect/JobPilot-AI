@@ -112,7 +112,18 @@ export const ApplyDialog: React.FC<ApplyDialogProps> = ({
       }
     } catch (err: any) {
       setView('failure');
-      setErrorMessage(err?.message || 'Application orchestrator error occurred.');
+      const msg = err?.message || '';
+      if (
+        msg.includes('no longer accepting applications') ||
+        msg.includes('closed this opportunity') ||
+        msg.includes('closed') ||
+        err?.code === 'JOB_CLOSED' ||
+        err?.error?.code === 'JOB_CLOSED'
+      ) {
+        setErrorMessage('This job is no longer accepting applications. The employer has closed this opportunity.');
+      } else {
+        setErrorMessage(err?.message || 'Application orchestrator error occurred.');
+      }
     }
   };
 
@@ -152,7 +163,7 @@ export const ApplyDialog: React.FC<ApplyDialogProps> = ({
     } else if (currentState === 'JOB_CLOSED') {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       setView('failure');
-      setErrorMessage('This position has been closed and is no longer accepting applications.');
+      setErrorMessage('This job is no longer accepting applications. The employer has closed this opportunity.');
     } else if (currentState === 'WAITING_FOR_CANDIDATE') {
       if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       setMissingField(attempt.missingField);
@@ -558,12 +569,16 @@ export const ApplyDialog: React.FC<ApplyDialogProps> = ({
               <div className={`apply-failure-icon-wrap ${orchestratorState?.status === 'BLOCKED_BY_CAPTCHA' ? 'blocked' : ''}`}>
                 <AlertCircle size={30} />
               </div>
-              <h4 className="apply-failure-title">Application could not be completed</h4>
+              <h4 className="apply-failure-title">
+                {errorMessage?.includes('closed this opportunity') || errorMessage?.includes('no longer accepting applications')
+                  ? 'Position Closed'
+                  : 'Application could not be completed'}
+              </h4>
               <div className="apply-failure-reason">
                 {errorMessage || 'Employer site unavailable or rejected automated submission.'}
               </div>
 
-              {(job.applicationUrl || job.sourceUrl) && (
+              {!errorMessage?.includes('closed this opportunity') && !errorMessage?.includes('no longer accepting applications') && (job.applicationUrl || job.sourceUrl) && (
                 <p style={{ fontSize: '0.8rem', color: '#64748b', marginTop: 4 }}>
                   You can still complete this application directly on the employer site.
                 </p>
@@ -578,7 +593,7 @@ export const ApplyDialog: React.FC<ApplyDialogProps> = ({
               >
                 Close
               </button>
-              {(job.applicationUrl || job.sourceUrl) && (
+              {!errorMessage?.includes('closed this opportunity') && !errorMessage?.includes('no longer accepting applications') && (job.applicationUrl || job.sourceUrl) && (
                 <a
                   href={job.applicationUrl || job.sourceUrl}
                   target="_blank"

@@ -125,12 +125,29 @@ export async function runAvailabilityAndApplicationTrackingTests() {
   const htmlResult = JobAvailabilityService.detectAvailability({ status: 'ACTIVE' }, undefined, pageHtml);
   testAssert(htmlResult.status === 'CLOSED', 'Detects CLOSED job from employer closure notice text in page HTML');
 
+  // RippleHire specific expired job message detection
+  const rippleHireExpiredHtml = '<div><h3>Bahwan CyberTek</h3><p>This job opportunity is no longer available.</p></div>';
+  const rhResult = JobAvailabilityService.detectAvailability({ status: 'ACTIVE' }, undefined, rippleHireExpiredHtml);
+  testAssert(rhResult.status === 'CLOSED', 'Detects CLOSED job from RippleHire exact "This job opportunity is no longer available" message');
+
+  // Workday & standard ATS expired job message detection
+  const workdayClosedHtml = '<div><p>This position is no longer available.</p></div>';
+  const wdResult = JobAvailabilityService.detectAvailability({ status: 'ACTIVE' }, undefined, workdayClosedHtml);
+  testAssert(wdResult.status === 'CLOSED', 'Detects CLOSED job from Workday "This position is no longer available"');
+
   const activeJob = {
     status: 'ACTIVE',
     validThrough: new Date(Date.now() + 86400000 * 30).toISOString()
   };
   const activeResult = JobAvailabilityService.detectAvailability(activeJob);
   testAssert(activeResult.status === 'OPEN', 'Detects OPEN job when active and no closing signals exist');
+
+  // Inconclusive detection without false positives
+  const unknownJob = {
+    status: 'PENDING_REVIEW'
+  };
+  const unknownResult = JobAvailabilityService.detectAvailability(unknownJob);
+  testAssert(unknownResult.status === 'UNKNOWN', 'Returns UNKNOWN for inconclusive job states without closing');
 
   // 6. Application Provider Resolution
   const targetUrl = 'https://careers.externalportal.com/apply/12345';

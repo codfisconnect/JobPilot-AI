@@ -247,6 +247,8 @@ export const JobsPage: React.FC<JobsPageProps> = ({
       console.error('Failed to load opportunities:', err);
       const norm = normalizeApiError(err, 'Unable to fetch job opportunities');
       setError(norm.message);
+      // Synchronize totalCount with cached items in state to prevent contradictory "Showing X of 0" display
+      setTotalCount(prev => (prev > 0 ? prev : jobs.length));
     } finally {
       setLoading(false);
     }
@@ -577,7 +579,12 @@ export const JobsPage: React.FC<JobsPageProps> = ({
       {/* Results Header */}
       <div className="jobs-results-meta">
         <span className="results-count-text">
-          Showing <strong>{jobs.length}</strong> of <strong>{totalCount}</strong> opportunities
+          Showing <strong>{jobs.length}</strong> of <strong>{Math.max(jobs.length, totalCount)}</strong> opportunities
+          {error && jobs.length > 0 && (
+            <span className="cached-results-badge" style={{ marginLeft: 8, fontSize: '0.75rem', color: '#f59e0b', fontWeight: 500 }}>
+              (Cached results)
+            </span>
+          )}
         </span>
         {activeFilterCount > 0 && (
           <span className="active-filter-indicator">

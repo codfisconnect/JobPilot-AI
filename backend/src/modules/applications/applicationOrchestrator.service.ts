@@ -60,10 +60,13 @@ export class ApplicationOrchestratorService {
       throw new NotFoundError(`Job not found with ID '${dto.jobId}'`);
     }
 
-    // Check Job Availability: Block application if job is confirmed closed
-    const availability = JobAvailabilityService.detectAvailability(job);
+    // Check Job Availability: Live verify availability and block application if job is confirmed closed
+    const availability = await JobAvailabilityService.verifyJobAvailability(job.id, true);
     if (availability.status === 'CLOSED') {
-      throw new BadRequestError(`This job posting is closed and no longer accepting applications (${availability.evidence}).`);
+      throw new BadRequestError('This job is no longer accepting applications. The employer has closed this opportunity.', {
+        reason: availability.evidence,
+        availabilityStatus: 'CLOSED'
+      });
     }
 
     // 3. Idempotency & Duplicate Application Check

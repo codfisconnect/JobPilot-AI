@@ -85,10 +85,13 @@ export class ApplicationService {
       throw new NotFoundError(`Job not found with ID '${dto.jobId}'`);
     }
 
-    // Availability Check: Block application if job is closed
-    const availability = JobAvailabilityService.detectAvailability(job);
+    // Availability Check: Live verify availability and block application if job is closed
+    const availability = await JobAvailabilityService.verifyJobAvailability(job.id, true);
     if (availability.status === 'CLOSED') {
-      throw new BadRequestError(`This job posting is closed and no longer accepting applications (${availability.evidence}).`);
+      throw new BadRequestError('This job is no longer accepting applications. The employer has closed this opportunity.', {
+        reason: availability.evidence,
+        availabilityStatus: 'CLOSED'
+      });
     }
 
     // 2. Duplicate Protection: Candidate cannot have multiple applications for same job
