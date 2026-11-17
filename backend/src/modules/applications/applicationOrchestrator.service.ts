@@ -14,6 +14,7 @@ import { ApplicationExecutionContext } from './providers/applicationProvider.int
 import { SubmissionVerificationService } from './submissionVerification.service.js';
 import { ApplicationRepository } from '../../services/repositories.js';
 import { ApplicationRecord } from '../../types/index.js';
+import { JobAvailabilityService } from '../../services/jobAvailability.service.js';
 
 export class ApplicationOrchestratorService {
   // Active attempts memory store (indexed by attemptId)
@@ -57,6 +58,15 @@ export class ApplicationOrchestratorService {
 
     if (!job) {
       throw new NotFoundError(`Job not found with ID '${dto.jobId}'`);
+    }
+
+    // Check Job Availability: Live verify availability and block application if job is confirmed closed
+    const availability = await JobAvailabilityService.verifyJobAvailability(job.id, true);
+    if (availability.status === 'CLOSED') {
+      throw new BadRequestError('This job is no longer accepting applications. The employer has closed this opportunity.', {
+        reason: availability.evidence,
+        availabilityStatus: 'CLOSED'
+      });
     }
 
     // 3. Idempotency & Duplicate Application Check
@@ -175,6 +185,65 @@ export class ApplicationOrchestratorService {
         job.applicationUrl || job.sourceUrl || '',
         job
       );
+
+      // If provider is explicitly unsupported, transition gracefully to REDIRECTED_TO_EMPLOYER
+      if (provider.providerName === 'UNSUPPORTED') {
+        attempt.state = 'REDIRECTED_TO_EMPLOYER';
+        attempt.statusUpdates.push({
+          id: '4',
+          step: 'EXTERNAL_REDIRECT',
+          label: 'Application initiated — Redirected to employer portal',
+          status: 'completed',
+          timestamp: now()
+        });
+
+        // Persist application with status READY_TO_APPLY and candidate-selected resume metadata
+        let validResumeVersionId: string | null = null;
+        if (selectedResume?.id) {
+          const rvExists = await prisma.resumeVersion.findUnique({
+            where: { id: selectedResume.id },
+            select: { id: true }
+          });
+          if (rvExists) {
+            validResumeVersionId = rvExists.id;
+          }
+        }
+
+        const appRecord = await prisma.application.upsert({
+          where: {
+            candidateProfileId_jobId: {
+              candidateProfileId: profile.id,
+              jobId: job.id
+            }
+          },
+          create: {
+            candidateProfileId: profile.id,
+            jobId: job.id,
+            status: ApplicationStatus.READY_TO_APPLY,
+            resumeVersionId: validResumeVersionId,
+            appliedAt: new Date(),
+            externalUrl: resolvedTargetUrl || job.applicationUrl || job.sourceUrl
+          },
+          update: {
+            status: ApplicationStatus.READY_TO_APPLY,
+            resumeVersionId: validResumeVersionId,
+            externalUrl: resolvedTargetUrl || job.applicationUrl || job.sourceUrl
+          }
+        });
+
+        attempt.submissionResult = {
+          confirmationNumber: `EXT-${appRecord.id.substring(0, 8).toUpperCase()}`,
+          submittedAt: now(),
+          employerUrl: resolvedTargetUrl || job.applicationUrl || job.sourceUrl,
+          provider: 'EXTERNAL_REDIRECT',
+          role: job.title,
+          company: job.company?.name || 'Employer',
+          resumeUsed: attempt.selectedResumeTitle || 'Master Resume',
+          applicationId: appRecord.id
+        };
+        attempt.updatedAt = now();
+        return attempt;
+      }
 
       const context: ApplicationExecutionContext = {
         attempt,

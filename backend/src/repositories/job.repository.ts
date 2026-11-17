@@ -101,34 +101,50 @@ export class JobRepositoryV1 {
     }
 
     if (existing) {
-      // Update freshness timestamps and sync mutable fields
+      // Update freshness timestamps and sync mutable fields without overwriting verified publication dates or firstDiscoveredAt
+      const updateData: any = {
+        lastSeenAt: new Date(),
+        lastCheckedAt: new Date(),
+        status: JobStatus.ACTIVE,
+        applicationUrl: data.applicationUrl || existing.applicationUrl,
+        sourceUrl: data.sourceUrl || existing.sourceUrl,
+        title: data.title,
+        description: data.description,
+        location: data.location || existing.location,
+        country: data.country || existing.country,
+        city: data.city || existing.city,
+        stateProvince: data.stateProvince || existing.stateProvince,
+        remoteType: data.remoteType,
+        employmentType: data.employmentType,
+        salaryMin: data.salaryMin !== undefined ? data.salaryMin : existing.salaryMin,
+        salaryMax: data.salaryMax !== undefined ? data.salaryMax : existing.salaryMax,
+        salaryCurrency: data.salaryCurrency || existing.salaryCurrency,
+        experienceMin: data.experienceMin !== undefined ? data.experienceMin : existing.experienceMin,
+        experienceMax: data.experienceMax !== undefined ? data.experienceMax : existing.experienceMax
+      };
+
+      // Only update sourcePublishedAt if existing had no date and new verified date is found
+      if ((existing as any).sourcePublishedAt === null && data.sourcePublishedAt) {
+        updateData.sourcePublishedAt = data.sourcePublishedAt;
+        updateData.postedAt = data.sourcePublishedAt;
+        updateData.sourceDateField = data.sourceDateField;
+        updateData.sourceDatePrecision = data.sourceDatePrecision;
+        updateData.sourceTimezone = data.sourceTimezone;
+        updateData.dateSourceType = data.dateSourceType;
+        updateData.rawPostingDate = data.rawPostingDate;
+      }
+
       const updated = await prisma.job.update({
         where: { id: existing.id },
-        data: {
-          lastSeenAt: new Date(),
-          lastCheckedAt: new Date(),
-          status: JobStatus.ACTIVE,
-          applicationUrl: data.applicationUrl || existing.applicationUrl,
-          sourceUrl: data.sourceUrl || existing.sourceUrl,
-          title: data.title,
-          description: data.description,
-          location: data.location || existing.location,
-          country: data.country || existing.country,
-          city: data.city || existing.city,
-          stateProvince: data.stateProvince || existing.stateProvince,
-          remoteType: data.remoteType,
-          employmentType: data.employmentType,
-          salaryMin: data.salaryMin !== undefined ? data.salaryMin : existing.salaryMin,
-          salaryMax: data.salaryMax !== undefined ? data.salaryMax : existing.salaryMax,
-          salaryCurrency: data.salaryCurrency || existing.salaryCurrency,
-          experienceMin: data.experienceMin !== undefined ? data.experienceMin : existing.experienceMin,
-          experienceMax: data.experienceMax !== undefined ? data.experienceMax : existing.experienceMax
-        }
+        data: updateData
       });
       return { job: updated, isNew: false };
     }
 
-    // Create new Job
+    // Create new Job: DO NOT fabricate postedAt or substitute new Date()!
+    const effectivePublishedAt = data.sourcePublishedAt || (data.postedAt ? new Date(data.postedAt) : null);
+    const effectiveDiscoveredAt = data.firstDiscoveredAt || new Date();
+
     const created = await prisma.job.create({
       data: {
         companyId,
@@ -154,9 +170,16 @@ export class JobRepositoryV1 {
         experienceMin: data.experienceMin,
         experienceMax: data.experienceMax,
         education: data.education,
-        postedAt: data.postedAt || new Date(),
-        firstSeenAt: new Date(),
-        lastSeenAt: new Date(),
+        postedAt: effectivePublishedAt,
+        sourcePublishedAt: effectivePublishedAt,
+        firstDiscoveredAt: effectiveDiscoveredAt,
+        sourceDateField: data.sourceDateField || null,
+        sourceDatePrecision: data.sourceDatePrecision || (effectivePublishedAt ? 'EXACT_TIMESTAMP' : 'UNAVAILABLE'),
+        sourceTimezone: data.sourceTimezone || null,
+        dateSourceType: data.dateSourceType || 'ATS_API',
+        rawPostingDate: data.rawPostingDate || null,
+        firstSeenAt: effectiveDiscoveredAt,
+        lastSeenAt: effectiveDiscoveredAt,
         lastCheckedAt: new Date(),
         contentHash: data.contentHash,
         status: JobStatus.ACTIVE
@@ -373,7 +396,12 @@ export class JobRepositoryV1 {
     const skip = (page - 1) * pageSize;
 
     const where: Prisma.JobWhereInput = {
-      status: params.status || JobStatus.ACTIVE
+      status: params.status || JobStatus.ACTIVE,
+      NOT: [
+        { status: JobStatus.CLOSED },
+        { status: JobStatus.EXPIRED },
+        { status: JobStatus.REMOVED }
+      ]
     };
 
     const andConditions: Prisma.JobWhereInput[] = [];
@@ -508,30 +536,44 @@ export class JobRepositoryV1 {
       };
     }
 
-    // Determine sorting
+    // Determine sorting: Default is Authoritative Newest-First
+    // Order by sourcePublishedAt / postedAt (newest first, with jobs having verified publication timestamps first),
+    // falling back to firstDiscoveredAt, then createdAt and id for deterministic tie-breaking.
     let orderBy: Prisma.JobOrderByWithRelationInput[] = [
-      { postedAt: 'desc' },
-      { createdAt: 'desc' }
+      { sourcePublishedAt: { sort: 'desc', nulls: 'last' } },
+      { firstDiscoveredAt: 'desc' },
+      { postedAt: { sort: 'desc', nulls: 'last' } },
+      { createdAt: 'desc' },
+      { id: 'desc' }
     ];
     if (params.sortBy === 'oldest') {
       orderBy = [
-        { postedAt: 'asc' },
-        { createdAt: 'asc' }
+        { sourcePublishedAt: { sort: 'asc', nulls: 'last' } },
+        { firstDiscoveredAt: 'asc' },
+        { postedAt: { sort: 'asc', nulls: 'last' } },
+        { createdAt: 'asc' },
+        { id: 'asc' }
       ];
     } else if (params.sortBy === 'salary') {
       orderBy = [
-        { salaryMax: 'desc' },
-        { createdAt: 'desc' }
+        { salaryMax: { sort: 'desc', nulls: 'last' } },
+        { sourcePublishedAt: { sort: 'desc', nulls: 'last' } },
+        { firstDiscoveredAt: 'desc' },
+        { id: 'desc' }
       ];
     } else if (params.sortBy === 'company') {
       orderBy = [
         { company: { name: 'asc' } },
-        { createdAt: 'desc' }
+        { sourcePublishedAt: { sort: 'desc', nulls: 'last' } },
+        { firstDiscoveredAt: 'desc' },
+        { id: 'desc' }
       ];
     } else if (params.sortBy === 'location') {
       orderBy = [
-        { location: 'asc' },
-        { createdAt: 'desc' }
+        { location: { sort: 'asc', nulls: 'last' } },
+        { sourcePublishedAt: { sort: 'desc', nulls: 'last' } },
+        { firstDiscoveredAt: 'desc' },
+        { id: 'desc' }
       ];
     }
 

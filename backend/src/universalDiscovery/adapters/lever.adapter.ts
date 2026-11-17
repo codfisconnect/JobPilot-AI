@@ -4,6 +4,7 @@ import { CompletenessEstimatorService } from '../completenessEstimator.service.j
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
 import { safeParseJson } from '../../utils/safeJson.js';
+import { DateExtractionService } from '../dateExtraction.service.js';
 
 export class LeverAdapter implements IJobSourceStrategy {
   public readonly name = 'LEVER_ADAPTER';
@@ -47,6 +48,8 @@ export class LeverAdapter implements IJobSourceStrategy {
         if (Array.isArray(rawJobs)) {
           expectedCount = rawJobs.length;
           for (const item of rawJobs) {
+            const dateResult = DateExtractionService.extractPublicationDate(item, 'createdAt', 'ATS_API');
+
             allJobs.push({
               externalJobId: String(item.id || ''),
               title: item.text || item.title || 'Job Opening',
@@ -55,7 +58,14 @@ export class LeverAdapter implements IJobSourceStrategy {
               employmentType: item.categories?.commitment || 'FULL_TIME',
               description: item.descriptionPlain || item.description || undefined,
               applicationUrl: item.applyUrl || item.hostedUrl || undefined,
-              postedAt: item.createdAt ? new Date(item.createdAt) : undefined,
+              postedAt: dateResult.sourcePublishedAt || undefined,
+              sourcePublishedAt: dateResult.sourcePublishedAt,
+              firstDiscoveredAt: dateResult.firstDiscoveredAt,
+              sourceDateField: dateResult.sourceDateField,
+              sourceDatePrecision: dateResult.sourceDatePrecision,
+              sourceTimezone: dateResult.sourceTimezone,
+              dateSourceType: dateResult.dateSourceType,
+              rawPostingDate: dateResult.rawPostingDate,
               rawPayload: item
             });
           }

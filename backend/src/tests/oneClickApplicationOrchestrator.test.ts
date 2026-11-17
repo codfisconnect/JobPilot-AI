@@ -1,4 +1,4 @@
-import { test, describe, before, after } from 'node:test';
+import { test, describe, before, after, beforeEach, afterEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { prisma } from '../database/prisma.js';
 import { ApplicationOrchestratorService } from '../modules/applications/applicationOrchestrator.service.js';
@@ -6,6 +6,7 @@ import { ApplicationProviderRegistry } from '../modules/applications/providers/a
 import { resolveApplicationTarget } from '../utils/targetUrlResolver.js';
 import { ProductionMatchingService } from '../services/matching.service.js';
 import { JobRecommendationService } from '../services/jobRecommendation.service.js';
+import { JobAvailabilityService, JobAvailabilityResult } from '../services/jobAvailability.service.js';
 
 describe('One-Click Application Orchestrator Deterministic Test Suite', () => {
   const ts = Date.now();
@@ -16,6 +17,19 @@ describe('One-Click Application Orchestrator Deterministic Test Suite', () => {
   let workdayJob: any;
   let standardJob: any;
   let resumeVersionA: any;
+  let originalVerifyJobAvailability: typeof JobAvailabilityService.verifyJobAvailability;
+
+  beforeEach(() => {
+    // Preserve original method before each test
+    originalVerifyJobAvailability = JobAvailabilityService.verifyJobAvailability;
+  });
+
+  afterEach(() => {
+    // Restore original method after each test to prevent test leakage
+    if (originalVerifyJobAvailability) {
+      JobAvailabilityService.verifyJobAvailability = originalVerifyJobAvailability;
+    }
+  });
 
   before(async () => {
     // 1. Create Test Company
@@ -196,6 +210,16 @@ describe('One-Click Application Orchestrator Deterministic Test Suite', () => {
 
   // TEST 4: Apply starts orchestrator, canonical job fetched, default resume is Master Resume
   test('4. Apply starts orchestrator using Master Resume by default without requiring wizard', async () => {
+    // Deterministic Mock: Ensure standardJob returns OPEN availability
+    JobAvailabilityService.verifyJobAvailability = async (jobId: string, _checkLive = false): Promise<JobAvailabilityResult> => {
+      return {
+        status: 'OPEN',
+        confidence: 95,
+        evidence: 'Deterministic test verification: job is OPEN and active',
+        checkedAt: new Date().toISOString()
+      };
+    };
+
     const attempt = await ApplicationOrchestratorService.startAttempt(
       candidateUserA.id,
       {
@@ -215,6 +239,16 @@ describe('One-Click Application Orchestrator Deterministic Test Suite', () => {
 
   // TEST 5: Orchestrator is retry-safe (idempotency prevents duplicate application)
   test('5. Retrying application does not duplicate application record', async () => {
+    // Deterministic Mock: Return OPEN so duplicate-application protection is tested without closed-job blocking
+    JobAvailabilityService.verifyJobAvailability = async (jobId: string, _checkLive = false): Promise<JobAvailabilityResult> => {
+      return {
+        status: 'OPEN',
+        confidence: 95,
+        evidence: 'Deterministic test verification: job is OPEN and active',
+        checkedAt: new Date().toISOString()
+      };
+    };
+
     // Attempting to start again for the same job and candidate
     await assert.rejects(
       async () => {
@@ -235,6 +269,16 @@ describe('One-Click Application Orchestrator Deterministic Test Suite', () => {
 
   // TEST 6: Candidate can select Tailored Resume optionally without forcing tailoring
   test('6. Candidate can select Tailored Resume optionally', async () => {
+    // Deterministic Mock: Return OPEN for ripplehireJob
+    JobAvailabilityService.verifyJobAvailability = async (jobId: string, _checkLive = false): Promise<JobAvailabilityResult> => {
+      return {
+        status: 'OPEN',
+        confidence: 95,
+        evidence: 'Deterministic test verification: job is OPEN and active',
+        checkedAt: new Date().toISOString()
+      };
+    };
+
     const attempt = await ApplicationOrchestratorService.startAttempt(
       candidateUserA.id,
       {
@@ -251,6 +295,15 @@ describe('One-Click Application Orchestrator Deterministic Test Suite', () => {
 
   // TEST 7: Mandatory missing information triggers WAITING_FOR_CANDIDATE without asking for known fields
   test('7. Missing mandatory field triggers WAITING_FOR_CANDIDATE for that specific field only', async () => {
+    // Deterministic Mock: Return OPEN for workdayJob
+    JobAvailabilityService.verifyJobAvailability = async (jobId: string, _checkLive = false): Promise<JobAvailabilityResult> => {
+      return {
+        status: 'OPEN',
+        confidence: 95,
+        evidence: 'Deterministic test verification: job is OPEN and active',
+        checkedAt: new Date().toISOString()
+      };
+    };
     // Create Candidate C with missing phone number
     const candC = await prisma.user.create({
       data: {
@@ -346,5 +399,79 @@ describe('One-Click Application Orchestrator Deterministic Test Suite', () => {
       candidateUserA.id
     );
     assert.ok(recs);
+  });
+
+  // TEST 11: CLOSED jobs are strictly blocked before application creation
+  test('11. CLOSED jobs are blocked before application creation with exact error message', async () => {
+    JobAvailabilityService.verifyJobAvailability = async (jobId: string, _checkLive = false): Promise<JobAvailabilityResult> => {
+      return {
+        status: 'CLOSED',
+        confidence: 95,
+        evidence: 'Employer requisition has closed on external portal',
+        checkedAt: new Date().toISOString()
+      };
+    };
+
+    await assert.rejects(
+      async () => {
+        await ApplicationOrchestratorService.startAttempt(
+          candidateUserB.id,
+          {
+            jobId: standardJob.id,
+            resumeChoice: 'master'
+          }
+        );
+      },
+      (err: any) => {
+        assert.ok(
+          err.message.includes('This job is no longer accepting applications. The employer has closed this opportunity.'),
+          `Expected exact closed job message, got: ${err.message}`
+        );
+        return true;
+      }
+    );
+  });
+
+  // TEST 12: Inconclusive UNKNOWN availability does NOT block application creation
+  test('12. Inconclusive UNKNOWN availability does not incorrectly block application creation', async () => {
+    JobAvailabilityService.verifyJobAvailability = async (jobId: string, _checkLive = false): Promise<JobAvailabilityResult> => {
+      return {
+        status: 'UNKNOWN',
+        confidence: 40,
+        evidence: 'Network timeout during live check; inconclusive status',
+        checkedAt: new Date().toISOString()
+      };
+    };
+
+    // Create a resume for candidateUserB so they can submit standardJob
+    const resB = await prisma.resume.create({
+      data: {
+        candidateProfileId: candidateUserB.candidateProfile.id,
+        title: 'Master Resume B',
+        isMaster: true,
+        originalFileName: 'resumeB.pdf',
+        mimeType: 'application/pdf',
+        fileSize: 1024,
+        storageProvider: 'LOCAL_DISK',
+        storageKey: `test_b_${ts}`,
+        status: 'PARSED',
+        rawText: 'Bob Smith. Frontend Engineer.'
+      }
+    });
+
+    const attempt = await ApplicationOrchestratorService.startAttempt(
+      candidateUserB.id,
+      {
+        jobId: standardJob.id,
+        resumeChoice: 'master'
+      }
+    );
+
+    assert.ok(attempt.attemptId, 'Attempt must proceed when status is UNKNOWN');
+    assert.equal(attempt.state, 'SUBMITTED', 'Proceeds normally through orchestration pipeline');
+
+    // Cleanup
+    await prisma.application.deleteMany({ where: { candidateProfileId: candidateUserB.candidateProfile.id } });
+    await prisma.resume.deleteMany({ where: { id: resB.id } });
   });
 });

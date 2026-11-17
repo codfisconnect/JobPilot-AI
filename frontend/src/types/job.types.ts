@@ -37,6 +37,13 @@ export interface CanonicalJob {
   experienceMax?: number | null;
   education?: string;
   postedAt?: string;
+  sourcePublishedAt?: string | null;
+  firstDiscoveredAt?: string;
+  sourceDateField?: string | null;
+  sourceDatePrecision?: 'EXACT_TIMESTAMP' | 'DATE_ONLY' | 'CREATION_FALLBACK' | 'UNAVAILABLE';
+  sourceTimezone?: string | null;
+  dateSourceType?: 'ATS_API' | 'STRUCTURED_DATA' | 'HTML_PAGE' | 'EXCEL_IMPORT' | 'BACKFILLED_DISCOVERY';
+  rawPostingDate?: string | null;
   firstSeenAt: string;
   lastSeenAt: string;
   status: 'ACTIVE' | 'EXPIRED' | 'CLOSED' | 'REMOVED';

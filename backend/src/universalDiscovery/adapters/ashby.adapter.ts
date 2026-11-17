@@ -4,6 +4,7 @@ import { CompletenessEstimatorService } from '../completenessEstimator.service.j
 import { DiscoveredJobRaw } from '../types.js';
 import { logger } from '../../utils/logger.js';
 import { safeParseJson } from '../../utils/safeJson.js';
+import { DateExtractionService } from '../dateExtraction.service.js';
 
 export class AshbyAdapter implements IJobSourceStrategy {
   public readonly name = 'ASHBY_ADAPTER';
@@ -48,6 +49,8 @@ export class AshbyAdapter implements IJobSourceStrategy {
         expectedCount = rawJobs.length;
 
         for (const item of rawJobs) {
+          const dateResult = DateExtractionService.extractPublicationDate(item, 'publishedAt', 'ATS_API');
+
           allJobs.push({
             externalJobId: String(item.id || ''),
             title: item.title || 'Job Opening',
@@ -56,7 +59,14 @@ export class AshbyAdapter implements IJobSourceStrategy {
             employmentType: item.employmentType || 'FULL_TIME',
             description: item.descriptionPlain || item.descriptionHtml || undefined,
             applicationUrl: item.jobUrl || item.applicationUrl || undefined,
-            postedAt: item.publishedAt ? new Date(item.publishedAt) : undefined,
+            postedAt: dateResult.sourcePublishedAt || undefined,
+            sourcePublishedAt: dateResult.sourcePublishedAt,
+            firstDiscoveredAt: dateResult.firstDiscoveredAt,
+            sourceDateField: dateResult.sourceDateField,
+            sourceDatePrecision: dateResult.sourceDatePrecision,
+            sourceTimezone: dateResult.sourceTimezone,
+            dateSourceType: dateResult.dateSourceType,
+            rawPostingDate: dateResult.rawPostingDate,
             rawPayload: item
           });
         }

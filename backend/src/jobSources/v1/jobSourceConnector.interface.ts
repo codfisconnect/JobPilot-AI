@@ -21,6 +21,13 @@ export interface IConnectorJobRaw {
   experienceMax?: number;
   education?: string;
   postedAt?: Date | string;
+  sourcePublishedAt?: Date | null;
+  firstDiscoveredAt?: Date;
+  sourceDateField?: string | null;
+  sourceDatePrecision?: 'EXACT_TIMESTAMP' | 'DATE_ONLY' | 'CREATION_FALLBACK' | 'UNAVAILABLE';
+  sourceTimezone?: string | null;
+  dateSourceType?: 'ATS_API' | 'STRUCTURED_DATA' | 'HTML_PAGE' | 'EXCEL_IMPORT' | 'BACKFILLED_DISCOVERY';
+  rawPostingDate?: string | null;
   descriptionHtml?: string;
   descriptionText: string;
   responsibilities?: string[];

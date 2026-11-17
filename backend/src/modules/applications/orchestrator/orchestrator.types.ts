@@ -9,6 +9,8 @@ export type OrchestratorState =
   | 'READY_TO_SUBMIT'
   | 'SUBMITTING'
   | 'SUBMITTED'
+  | 'REDIRECTED_TO_EMPLOYER'
+  | 'JOB_CLOSED'
   | 'WAITING_FOR_CANDIDATE'
   | 'BLOCKED_BY_CAPTCHA'
   | 'BLOCKED_BY_AUTH'
