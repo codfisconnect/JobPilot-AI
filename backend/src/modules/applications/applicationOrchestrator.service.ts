@@ -183,8 +183,8 @@ export class ApplicationOrchestratorService {
         job
       );
 
-      // If provider is unsupported or external redirect is required, transition gracefully to REDIRECTED_TO_EMPLOYER
-      if (provider.providerName === 'UNSUPPORTED' || !job.applicationUrl?.includes('/jobs/')) {
+      // If provider is explicitly unsupported, transition gracefully to REDIRECTED_TO_EMPLOYER
+      if (provider.providerName === 'UNSUPPORTED') {
         attempt.state = 'REDIRECTED_TO_EMPLOYER';
         attempt.statusUpdates.push({
           id: '4',
